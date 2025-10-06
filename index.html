@@ -69,7 +69,7 @@
             <div id="loginContent">
                 <h2 class="text-2xl font-bold mb-4 text-white">Streamr Explorer</h2>
                 <p class="mb-6 text-gray-400">Connect your wallet for full functionality, or continue as a guest to explore.</p>
-                <button id="connectWalletBtn" class="w-full bg-[#333333] hover:bg-[#444444] text-white font-bold py-3 px-4 rounded-lg transition-colors mb-4 flex items-center justify-center gap-2">
+                <button id="connectWalletBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors mb-4 flex items-center justify-center gap-2">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>
                     Connect Wallet
                 </button>
@@ -81,8 +81,8 @@
                 <div class="flex justify-center items-center mb-4">
                     <div class="loader rounded-full border-4 border-t-4 border-[#555555] border-t-transparent h-8 w-8"></div>
                 </div>
-                <p class="text-lg text-white">Connecting...</p>
-                <p class="text-sm text-gray-400 mt-2">Please follow the instructions in your wallet.</p>
+                <p id="loading-main-text" class="text-lg text-white">Connecting...</p>
+                <p id="loading-sub-text" class="text-sm text-gray-400 mt-2">Please follow the instructions in your wallet.</p>
             </div>
         </div>
     </div>
@@ -248,7 +248,7 @@
         </div>
     </div>
 
-    <div id="custom-tooltip" class="hidden absolute z-30 px-3 py-2 text-sm font-medium text-white bg-black rounded-lg shadow-sm border border-[#333333]">
+    <div id="custom-tooltip" class="hidden absolute z-30 px-3 py-2 text-sm font-medium text-white bg-black rounded-lg shadow-sm border border-[#333333] max-w-xs break-words">
         <!-- Tooltip content will be injected here -->
     </div>
 
@@ -302,6 +302,13 @@
                 "name": "balanceInData", // Returns a delegator's stake value in DATA tokens
                 "outputs": [ { "internalType": "uint256", "name": "amountDataWei", "type": "uint256" } ],
                 "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [ { "internalType": "uint256", "name": "maxIterations", "type": "uint256" } ],
+                "name": "payOutQueue",
+                "outputs": [],
+                "stateMutability": "nonpayable",
                 "type": "function"
             },
             // New functions for stake management
@@ -398,6 +405,7 @@
 
         // Global State
         let currentOperatorId = null;
+        let currentOperatorData = null; // Store full operator data for dynamic UI updates
         let currentDelegations = [];
         let totalDelegatorCount = 0;
         let dataPriceUSD = null;
@@ -412,6 +420,8 @@
         // --- Management State ---
         let activeSponsorshipMenu = null;
         let currentSponsorshipContext = { id: null, currentStakeWei: '0' };
+        let isDelegatorViewActive = true;
+
 
         // --- Streamr State ---
         let streamrClient = null;
@@ -489,11 +499,21 @@
             }
         }
 
-        function setLoginModalState(state) {
+        function setLoginModalState(state, mode = 'wallet') {
+            const loadingMainText = document.getElementById('loading-main-text');
+            const loadingSubText = document.getElementById('loading-sub-text');
+
             if (state === 'loading') {
                 loginContent.classList.add('hidden');
                 loadingContent.classList.remove('hidden');
-            } else {
+                if (mode === 'guest') {
+                    loadingMainText.textContent = 'Loading...';
+                    loadingSubText.textContent = 'Fetching operator data, please wait.';
+                } else { // 'wallet'
+                    loadingMainText.textContent = 'Connecting...';
+                    loadingSubText.textContent = 'Please follow the instructions in your wallet.';
+                }
+            } else { // 'buttons' state
                 loginContent.classList.remove('hidden');
                 loadingContent.classList.add('hidden');
             }
@@ -523,7 +543,6 @@
         }
 
         async function initializeApp() {
-            showLoader(true);
             await cleanupClient();
             try {
                 // 1. Initialize Streamr Client (always as guest/anonymous)
@@ -544,8 +563,6 @@
                 console.error("Initialization failed:", error);
                 showCustomAlert('Initialization Error', `Failed to initialize the application: ${error.message}`);
                 setLoginModalState('buttons');
-            } finally {
-                showLoader(false);
             }
         }
         
@@ -596,6 +613,7 @@
         }
 
         async function connectAsGuest() {
+            setLoginModalState('loading', 'guest');
             myRealAddress = '';
             walletInfoEl.classList.add('hidden');
             sessionStorage.removeItem('authMethod');
@@ -877,6 +895,37 @@
             txModalConfirm.addEventListener('click', confirmHandler);
         }
 
+        async function handleProcessQueue() {
+            if (!myRealAddress) {
+                showCustomAlert('Action Required', 'Please connect your wallet to process the queue.');
+                return;
+            }
+
+            transactionModal.classList.remove('hidden');
+            txModalTitle.textContent = 'Process Undelegation Queue';
+            setTxModalState('loading', { text: "Preparing transaction...", subtext: "This will pay out queued undelegations with the operator's available DATA." });
+
+            try {
+                const provider = new ethers.providers.Web3Provider(window.ethereum);
+                const signer = provider.getSigner();
+                const operatorContract = new ethers.Contract(currentOperatorId, OPERATOR_CONTRACT_ABI, signer);
+
+                // Call payOutQueue with 0, which means process as many as possible until funds run out or queue is empty.
+                const tx = await operatorContract.payOutQueue(0);
+
+                setTxModalState('loading', { text: 'Processing Transaction...', subtext: 'Waiting for the transaction to be confirmed on the blockchain.' });
+
+                const receipt = await tx.wait();
+                setTxModalState('success', { txHash: receipt.transactionHash });
+                fetchAndRenderOperatorDetails(currentOperatorId); // Refresh details view
+
+            } catch (e) {
+                console.error("Queue processing failed:", e);
+                const message = getFriendlyErrorMessage(e);
+                setTxModalState('error', { message });
+            }
+        }
+
         function setStakeModalState(state, options = {}) {
             // Hide all dynamic sections first
             stakeModalInputSection.classList.add('hidden');
@@ -1031,6 +1080,44 @@
             }
         }
 
+        async function handleCollectAllEarnings() {
+            if (!myRealAddress) {
+                showCustomAlert('Action Required', 'Please connect your wallet to collect earnings.');
+                return;
+            }
+            if (!currentOperatorData || !currentOperatorData.stakes || currentOperatorData.stakes.length === 0) {
+                showCustomAlert('No Sponsorships', 'There are no sponsorships to collect earnings from.');
+                return;
+            }
+
+            // Use main transaction modal for this action
+            transactionModal.classList.remove('hidden');
+            txModalTitle.textContent = 'Collect All Earnings';
+            setTxModalState('loading', { text: "Preparing transaction...", subtext: "This will collect earnings from all sponsorships." });
+
+            try {
+                const provider = new ethers.providers.Web3Provider(window.ethereum);
+                const signer = provider.getSigner();
+                const operatorContract = new ethers.Contract(currentOperatorId, OPERATOR_CONTRACT_ABI, signer);
+
+                // Create an array of all sponsorship addresses
+                const allSponsorshipIds = currentOperatorData.stakes.map(stake => stake.sponsorship.id);
+                
+                const tx = await operatorContract.withdrawEarningsFromSponsorships(allSponsorshipIds);
+                
+                setTxModalState('loading', { text: 'Processing Transaction...', subtext: 'Waiting for the transaction to be confirmed on the blockchain.' });
+                
+                const receipt = await tx.wait();
+                setTxModalState('success', { txHash: receipt.transactionHash });
+                fetchAndRenderOperatorDetails(currentOperatorId); // Refresh details view
+
+            } catch (e) {
+                console.error("Collect all earnings failed:", e);
+                const message = getFriendlyErrorMessage(e);
+                setTxModalState('error', { message });
+            }
+        }
+
         async function fetchMyStake(operatorId) {
              if (!myRealAddress) return; 
 
@@ -1108,6 +1195,15 @@
             const url = `https://polygonscan.com/${type}/${address}`;
             return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="text-gray-300 hover:text-white transition-colors" title="${address}">${abbreviated}</a>`;
         };
+
+        function escapeHtml(unsafe) {
+            return unsafe
+                 .replace(/&/g, "&amp;")
+                 .replace(/</g, "&lt;")
+                 .replace(/>/g, "&gt;")
+                 .replace(/"/g, "&quot;")
+                 .replace(/'/g, "&#039;");
+        }
 
 
         const showLoader = (show) => {
@@ -1286,16 +1382,20 @@
         };
 
         /**
-         * Parses the operator name from the metadata JSON string.
+         * Parses the operator metadata from the metadata JSON string.
          */
-        const getOperatorName = (metadataJsonString) => {
-             try {
+        function parseOperatorMetadata(metadataJsonString) {
+            try {
                 if (metadataJsonString) {
                     const metadata = JSON.parse(metadataJsonString);
-                    return metadata.name || null;
+                    return {
+                        name: metadata.name || null,
+                        description: metadata.description || null,
+                        imageUrl: metadata.imageIpfsCid ? `https://ipfs.io/ipfs/${metadata.imageIpfsCid}` : null
+                    };
                 }
             } catch(e) { /* ignore parse error */ }
-            return null;
+            return { name: null, description: null, imageUrl: null };
         }
 
 
@@ -1320,7 +1420,7 @@
                 }
                 const balanceWei = BigInt(data.result);
                 const balanceMatic = Number(balanceWei) / 1e18;
-                return balanceMatic.toFixed(4); // Format to 4 decimal places
+                return balanceMatic.toFixed(2); // Format to 2 decimal places
             } catch (error) {
                 console.error(`Failed to get MATIC balance for ${address}:`, error);
                 return 'Error';
@@ -1412,7 +1512,7 @@
                     
                     // Client-side filtering logic
                     operators = data.operators.filter(op => {
-                        const name = getOperatorName(op.metadataJsonString);
+                        const { name } = parseOperatorMetadata(op.metadataJsonString);
                         if (!name) return false;
                         return name.toLowerCase().includes(lowerCaseFilter);
                     });
@@ -1533,12 +1633,23 @@
                                remainingWei
                                spotAPY
                                isRunning
+                               stream {
+                                   id
+                               }
                            }
                         }
                         delegations(where: {isSelfDelegation: false}, first: 10, orderBy: _valueDataWei, orderDirection: desc) {
                           id
                           _valueDataWei
                           delegator { id }
+                        }
+                        queueEntries(orderBy: date, orderDirection: asc) {
+                          id
+                          amount
+                          delegator {
+                            id
+                          }
+                          date
                         }
                       }
                       selfDelegation: delegations(where: {operator: "${currentOperatorId}", isSelfDelegation: true}, first: 1) {
@@ -1613,18 +1724,8 @@
         }
 
         function createOperatorCardHtml(op) {
-             let operatorName = getOperatorName(op.metadataJsonString);
-             let imageUrl = null;
+             const { name: operatorName, description: operatorDescription, imageUrl } = parseOperatorMetadata(op.metadataJsonString);
              const placeholderUrl = 'https://placehold.co/64x64/1E1E1E/a3a3a3?text=OP';
-             try {
-                 if (op.metadataJsonString) {
-                     const metadata = JSON.parse(op.metadataJsonString);
-                     // operatorName is already set above
-                     if (metadata.imageIpfsCid) {
-                         imageUrl = `https://ipfs.io/ipfs/${metadata.imageIpfsCid}`;
-                     }
-                 }
-             } catch(e) { /* ignore parse error */ }
              
              const weightedApy = calculateWeightedApy(op.stakes);
              const totalStakedData = convertWeiToData(op.valueWithoutEarnings); 
@@ -1634,7 +1735,8 @@
                  <img src="${imageUrl || placeholderUrl}" 
                       onerror="this.src='${placeholderUrl}'; this.onerror=null;"
                       alt="Operator Avatar" 
-                      class="w-16 h-16 rounded-full border-2 border-[#333333] object-cover mb-4">
+                      class="w-16 h-16 rounded-full border-2 border-[#333333] object-cover mb-4"
+                      ${operatorDescription ? `data-tooltip-content="${escapeHtml(operatorDescription)}"` : ''}>
                  <div class="w-full">
                      <h3 class="font-bold text-lg text-white truncate" title="${operatorName || op.id}">${operatorName || op.id}</h3>
                      ${operatorName ? `<div class="font-mono text-xs text-gray-500 truncate mt-1">${createAddressLink(op.id)}</div>` : ''}
@@ -1676,11 +1778,8 @@
         function updateDelegatorsSection() {
             const listEl = document.getElementById('delegators-list');
             const footerEl = document.getElementById('delegators-footer');
-            const headerEl = document.getElementById('delegators-header');
-
-            if (!listEl || !footerEl || !headerEl) return;
-
-            headerEl.textContent = `Delegators (${totalDelegatorCount > 0 ? totalDelegatorCount - 1 : 0})`;
+            
+            if (!listEl || !footerEl ) return;
 
             listEl.innerHTML = currentDelegations.map(delegation => {
                 const delegatedData = convertWeiToData(delegation._valueDataWei);
@@ -1702,6 +1801,7 @@
 
         function renderOperatorDetails(data) {
             const op = data.operator;
+            currentOperatorData = op; // Store for dynamic UI updates
             const slashes = data.slashingEvents;
             const selfDelegation = data.selfDelegation && data.selfDelegation.length > 0 ? data.selfDelegation[0] : null;
 
@@ -1714,34 +1814,25 @@
             currentDelegations = op.delegations;
             totalDelegatorCount = op.delegatorCount;
 
-            let operatorName = '';
-            let imageUrl = null;
+            const { name: operatorName, description: operatorDescription, imageUrl } = parseOperatorMetadata(op.metadataJsonString);
             let redundancyFactor = '1 (Default)';
             const placeholderUrl = 'https://placehold.co/80x80/1E1E1E/a3a3a3?text=OP';
 
             try {
                 // Get Redundancy Factor from last Heartbeat or metadata
-                if (op.metadataJsonString) {
-                    const meta = JSON.parse(op.metadataJsonString);
-                    if (meta && meta.redundancyFactor !== undefined) {
-                        redundancyFactor = meta.redundancyFactor;
-                    }
-                }
                 if (op.latestHeartbeatMetadata) {
                     const meta = JSON.parse(op.latestHeartbeatMetadata);
                     if (meta && meta.redundancyFactor !== undefined) {
                         redundancyFactor = meta.redundancyFactor;
                     }
-                }
-                // Get Operator Name and Image from metadataJsonString
-                if (op.metadataJsonString) {
+                } else if (op.metadataJsonString) {
+                    // Fallback to main metadata if heartbeat is not available
                     const meta = JSON.parse(op.metadataJsonString);
-                    operatorName = meta.name || '';
-                    if (meta.imageIpfsCid) {
-                        imageUrl = `https://ipfs.io/ipfs/${meta.imageIpfsCid}`;
+                    if (meta && meta.redundancyFactor !== undefined) {
+                        redundancyFactor = meta.redundancyFactor;
                     }
                 }
-            } catch (e) { console.error("Could not parse metadata", e); }
+            } catch (e) { console.error("Could not parse redundancy factor from metadata", e); }
 
 
             // Calculate the Operator's own share of profits from their self-delegation
@@ -1750,6 +1841,8 @@
                 // _valueDataWei is the actual staked value for this specific delegation (self-delegation).
                 operatorsOwnStakeWei = BigInt(selfDelegation._valueDataWei);
             }
+            const selfDelegationData = convertWeiToData(operatorsOwnStakeWei.toString());
+            const selfDelegationTooltip = `${formatBigNumber(selfDelegationData)} DATA`;
 
             let operatorsShareOfEarningsWei = 0n;
             // The total stake value used to calculate profit distribution, excluding earnings.
@@ -1792,33 +1885,37 @@
                 if (!sp) return ''; // Skip if sponsorship data is missing
                 const stakedData = convertWeiToData(stake.amountWei);
                 const balanceData = convertWeiToData(sp.remainingWei);
+                const sponsorshipUrl = `https://streamr.network/hub/network/sponsorships/${sp.id}`;
+                // Use streamId if available, otherwise fallback to the sponsorship address
+                const sponsorshipDisplayText = sp.stream && sp.stream.id ? sp.stream.id : sp.id;
+
                 return `
-                <li class="py-3 border-b border-[#333333] relative">
-                    <div class="flex justify-between items-start">
-                        <div class="font-mono text-xs text-gray-300 truncate pr-8">${createAddressLink(sp.id)}</div>
-                        <div class="absolute top-2 right-0">
-                             <button class="text-gray-400 hover:text-white p-1" onclick="toggleSponsorshipMenu(event, '${sp.id}')">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" /></svg>
-                            </button>
-                            <div id="sponsorship-menu-${sp.id}" class="hidden absolute right-0 mt-2 w-48 bg-[#2C2C2C] border border-[#333333] rounded-md shadow-lg z-10">
-                                <a href="#" onclick="event.preventDefault(); handleEditStake('${sp.id}', '${stake.amountWei}')" class="block px-4 py-2 text-sm text-gray-200 hover:bg-[#444444]">Edit Stake</a>
-                                <a href="#" onclick="event.preventDefault(); handleCollectEarnings('${sp.id}')" class="block px-4 py-2 text-sm text-gray-200 hover:bg-[#444444]">Collect Earnings</a>
-                            </div>
+                <li class="flex justify-between items-center py-3 border-b border-[#333333]">
+                    <div class="flex-1 min-w-0">
+                        <a href="${sponsorshipUrl}" target="_blank" rel="noopener noreferrer" class="font-mono text-xs text-gray-300 hover:text-white transition-colors truncate block" title="${sponsorshipDisplayText}">${sponsorshipDisplayText}</a>
+                        <div class="text-xs grid grid-cols-2 gap-x-4 mt-1">
+                           <div>
+                                <span class="text-gray-400">Staked: 
+                                    <strong class="text-white" data-tooltip-value="${stakedData}">${formatBigNumber(stakedData)} DATA</strong>
+                                </span>
+                           </div>
+                           <div>
+                               <span class="text-gray-400">Remaining Funds: 
+                                    <strong class="text-white" data-tooltip-value="${balanceData}">${formatBigNumber(balanceData)} DATA</strong>
+                               </span>
+                           </div>
+                           <span class="text-gray-400">APY: <strong class="text-green-400">${Math.round(Number(sp.spotAPY) * 100)}%</strong></span>
+                           <span class="${sp.isRunning ? 'text-green-400' : 'text-red-400'} font-semibold">${sp.isRunning ? 'Running' : 'Not Running'}</span>
                         </div>
                     </div>
-                    <div class="text-xs grid grid-cols-2 gap-x-4 mt-1">
-                       <div>
-                            <span class="text-gray-400">Staked: 
-                                <strong class="text-white" data-tooltip-value="${stakedData}">${formatBigNumber(stakedData)} DATA</strong>
-                            </span>
-                       </div>
-                       <div>
-                           <span class="text-gray-400">Remaining Funds: 
-                                <strong class="text-white" data-tooltip-value="${balanceData}">${formatBigNumber(balanceData)} DATA</strong>
-                           </span>
-                       </div>
-                       <span class="text-gray-400">APY: <strong class="text-green-400">${Math.round(Number(sp.spotAPY) * 100)}%</strong></span>
-                       <span class="${sp.isRunning ? 'text-green-400' : 'text-red-400'} font-semibold">${sp.isRunning ? 'Running' : 'Not Running'}</span>
+                    <div class="relative flex-shrink-0 ml-4">
+                         <button class="text-gray-400 hover:text-white p-1" onclick="toggleSponsorshipMenu(event, '${sp.id}')">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" /></svg>
+                        </button>
+                        <div id="sponsorship-menu-${sp.id}" class="hidden absolute right-0 mt-2 w-48 bg-[#2C2C2C] border border-[#333333] rounded-md shadow-lg z-10">
+                            <a href="#" onclick="event.preventDefault(); handleEditStake('${sp.id}', '${stake.amountWei}')" class="block px-4 py-2 text-sm text-gray-200 hover:bg-[#444444]">Edit Stake</a>
+                            <a href="#" onclick="event.preventDefault(); handleCollectEarnings('${sp.id}')" class="block px-4 py-2 text-sm text-gray-200 hover:bg-[#444444]">Collect Earnings</a>
+                        </div>
                     </div>
                 </li>
             `}).join('') : '<li class="text-gray-500 text-sm">Not participating in any sponsorships.</li>';
@@ -1841,7 +1938,7 @@
                 <li class="flex justify-between items-center py-2 border-b border-[#333333]">
                     <div class="font-mono text-xs text-gray-300 truncate">${createAddressLink(agent)}</div>
                      <div class="flex items-center gap-2">
-                        <span id="agent-balance-${agent}" class="font-mono text-xs text-gray-300 text-right" title="MATIC Balance">...</span>
+                        <span id="agent-balance-${agent}" class="font-mono text-xs text-gray-300 text-right" title="POL Balance">...</span>
                         ${isOwner ? `
                         <div class="flex items-center" title="Owner">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
@@ -1856,10 +1953,24 @@
             const nodesHtml = op.nodes && op.nodes.length > 0 ? op.nodes.map(nodeId => `
                 <li class="flex justify-between items-center py-2 border-b border-[#333333]">
                     <div class="font-mono text-xs text-gray-300 truncate">${createAddressLink(nodeId, 'address')}</div>
-                     <span id="node-balance-${nodeId}" class="font-mono text-xs text-gray-300 text-right" title="MATIC Balance">...</span>
+                     <span id="node-balance-${nodeId}" class="font-mono text-xs text-gray-300 text-right" title="POL Balance">...</span>
                 </li>
             `).join('') : '<li class="text-gray-500 text-sm">No nodes running.</li>';
             
+            const queueHtml = op.queueEntries && op.queueEntries.length > 0 ? op.queueEntries.map(entry => {
+                const amountData = convertWeiToData(entry.amount);
+                return `
+                 <li class="py-2 border-b border-[#333333]">
+                    <div class="flex justify-between items-center">
+                        <div class="font-mono text-xs text-gray-300 truncate">${createAddressLink(entry.delegator.id)}</div>
+                        <p class="font-mono text-xs text-orange-400 font-semibold" data-tooltip-value="${amountData}">${formatBigNumber(amountData)} DATA</p>
+                    </div>
+                    <div class="text-xs mt-1 text-gray-400">
+                       <p>Queued: ${new Date(entry.date * 1000).toLocaleString()}</p>
+                    </div>
+                </li>
+            `}).join('') : '<li class="text-gray-500 text-sm">The undelegation queue is empty.</li>';
+
             // Total stake without earnings
             const stakeData = convertWeiToData(op.valueWithoutEarnings); 
             const totalEarningsData = convertWeiToData(op.cumulativeEarningsWei);
@@ -1873,7 +1984,8 @@
                         <img src="${imageUrl || placeholderUrl}" 
                              onerror="this.src='${placeholderUrl}'; this.onerror=null;"
                              alt="Operator Avatar" 
-                             class="w-20 h-20 rounded-full border-2 border-[#333333] flex-shrink-0 object-cover">
+                             class="w-20 h-20 rounded-full border-2 border-[#333333] flex-shrink-0 object-cover"
+                              ${operatorDescription ? `data-tooltip-content="${escapeHtml(operatorDescription)}"` : ''}>
                         <div class="flex-1 min-w-0">
                             <div class="flex items-start md:items-center justify-between flex-col md:flex-row gap-4">
                                 <div class="min-w-0">
@@ -1881,52 +1993,61 @@
                                     ${operatorName ? `<div class="font-mono text-sm text-gray-400 mt-1 break-words">${createAddressLink(op.id)}</div>` : ''}
                                 </div>
                                 
-                                <!-- APY Highlight: Now text-4xl -->
                                 <div class="flex-shrink-0 text-right">
                                     <p class="text-sm text-gray-400 font-semibold mb-1">APY</p>
                                     <p class="text-4xl font-extrabold text-green-400 whitespace-nowrap mb-4">${Math.round(apy * 100)}%</p>
                                 </div>
-                                <!-- End APY Highlight -->
-
                             </div>
                         </div>
                     </div>
 
+                    <!-- Minimal Stats -->
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-6 mt-6">
                         <div>
                             <p class="text-sm text-gray-400">Stake (DATA)</p>
                             <p class="text-2xl font-semibold text-white" data-tooltip-value="${stakeData}">${formatBigNumber(stakeData)}</p>
                         </div>
                         <div>
-                            <p class="text-sm text-gray-400">Deployed Stake (DATA)</p>
-                            <p class="text-2xl font-semibold text-white" data-tooltip-value="${deployedStakeData}">${formatBigNumber(deployedStakeData)}</p>
-                        </div>
-                         <div>
-                            <p class="text-sm text-gray-400">% Owner's Stake</p>
-                            <p class="text-2xl font-semibold text-white">${Math.round(ownersStakePercent)}%</p>
+                            <p class="text-sm text-gray-400">Total Earnings (DATA)</p>
+                            <p class="text-2xl font-semibold text-white" data-tooltip-value="${totalEarningsData}">${formatBigNumber(totalEarningsData)}</p>
                         </div>
                         <div>
                             <p class="text-sm text-gray-400">% Owner's Cut</p>
                             <p class="text-2xl font-semibold text-white">${ownersCutPercent}%</p>
                         </div>
                         <div>
-                            <p class="text-sm text-gray-400">Total Earnings (DATA)</p>
-                            <p class="text-2xl font-semibold text-white" data-tooltip-value="${totalEarningsData}">${formatBigNumber(totalEarningsData)}</p>
-                        </div>
-                        <div>
-                            <p class="text-sm text-gray-400">Owner's Earnings from Cut (DATA)</p>
-                            <p class="text-2xl font-semibold text-white" data-tooltip-value="${ownerCutData}">${formatBigNumber(ownerCutData)}</p>
-                        </div>
-                        <!-- Total Staking Earnings taking up 1 column in this layout -->
-                        <div>
-                            <p class="text-sm text-gray-400">Total Distributed Earnings (DATA)</p>
-                            <p class="text-2xl font-semibold text-white" data-tooltip-value="${totalDistributedData}">${formatBigNumber(totalDistributedData)}</p>
-                        </div>
-                        <!-- Active Nodes -->
-                        <div>
                             <p class="text-sm text-gray-400">Nodes</p>
                             <p id="active-nodes-stats-value" class="text-2xl font-semibold text-white">0</p>
                         </div>
+                    </div>
+                    
+                    <!-- Collapsible Section -->
+                    <div id="extended-stats" class="hidden mt-6">
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+                            <div>
+                                <p class="text-sm text-gray-400">Total Distributed Earnings (DATA)</p>
+                                <p class="text-2xl font-semibold text-white" data-tooltip-value="${totalDistributedData}">${formatBigNumber(totalDistributedData)}</p>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-400">Owner's Earnings from Cut (DATA)</p>
+                                <p class="text-2xl font-semibold text-white" data-tooltip-value="${ownerCutData}">${formatBigNumber(ownerCutData)}</p>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-400">Deployed Stake (DATA)</p>
+                                <p class="text-2xl font-semibold text-white" data-tooltip-value="${deployedStakeData}">${formatBigNumber(deployedStakeData)}</p>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-400">% Owner's Stake</p>
+                                <p class="text-2xl font-semibold text-white" data-tooltip-content="${selfDelegationTooltip}">${Math.round(ownersStakePercent)}%</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Toggle Button -->
+                    <div class="mt-4 text-center">
+                        <button id="toggle-stats-btn" onclick="toggleStatsPanel()" class="text-gray-400 hover:text-white transition">
+                            <svg id="stats-arrow" class="w-6 h-6 mx-auto transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                        </button>
                     </div>
                 </div>
                 
@@ -1938,8 +2059,8 @@
                              <p class="text-3xl font-semibold text-white" id="my-stake-value">Loading...</p>
                          </div>
                          <div class="flex gap-4">
-                             <button id="delegate-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed">Delegate</button>
-                             <button id="undelegate-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded-lg transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed">Undelegate</button>
+                             <button id="delegate-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed">Delegate</button>
+                             <button id="undelegate-btn" class="bg-sky-600 hover:bg-sky-700 text-white font-bold py-2 px-6 rounded-lg transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed">Undelegate</button>
                          </div>
                      </div>
                 </div>
@@ -1947,12 +2068,30 @@
                 <!-- Lists Block -->
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
                     <div class="detail-section p-6">
-                        <h3 id="delegators-header" class="text-xl font-semibold text-white mb-4">Delegators</h3>
-                        <ul id="delegators-list" class="max-h-96 overflow-y-auto pr-2"></ul>
-                        <div id="delegators-footer" class="mt-4"></div>
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 id="delegator-queue-title" class="text-xl font-semibold text-white">Delegators (${op.delegatorCount > 0 ? op.delegatorCount - 1 : 0})</h3>
+                            <button onclick="toggleDelegatorQueueView()" title="Switch View" class="text-gray-400 hover:text-white p-1">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                                </svg>
+                            </button>
+                        </div>
+                        
+                        <div id="delegators-content">
+                            <ul id="delegators-list" class="max-h-96 overflow-y-auto pr-2"></ul>
+                            <div id="delegators-footer" class="mt-4"></div>
+                        </div>
+
+                        <div id="queue-content" class="hidden">
+                            ${op.queueEntries && op.queueEntries.length > 0 ? `<button onclick="handleProcessQueue()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg text-sm mb-4">Process Queue</button>` : ''}
+                            <ul class="max-h-96 overflow-y-auto pr-2">${queueHtml}</ul>
+                        </div>
                     </div>
                     <div class="detail-section p-6">
-                        <h3 class="text-xl font-semibold text-white mb-4">Sponsorships (${op.stakes ? op.stakes.length : 0})</h3>
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-xl font-semibold text-white">Sponsorships (${op.stakes ? op.stakes.length : 0})</h3>
+                            ${op.stakes && op.stakes.length > 0 ? `<button onclick="handleCollectAllEarnings()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-1 px-3 rounded-lg text-xs">Collect All</button>` : ''}
+                        </div>
                         <ul class="max-h-96 overflow-y-auto pr-2">${sponsorshipsHtml}</ul>
                     </div>
                      <div class="detail-section p-6">
@@ -2027,7 +2166,7 @@
 
             uniqueAddresses.forEach(async (address) => {
                 const balance = await getMaticBalance(address);
-                const formattedBalance = `${balance} MATIC`;
+                const formattedBalance = `${balance} POL`;
 
                 const agentElements = document.querySelectorAll(`#agent-balance-${address}`);
                 agentElements.forEach(el => el.textContent = formattedBalance);
@@ -2063,6 +2202,35 @@
             activeSponsorshipMenu = menu.classList.contains('hidden') ? null : menu;
         }
 
+        function toggleStatsPanel() {
+            const extendedStats = document.getElementById('extended-stats');
+            const arrow = document.getElementById('stats-arrow');
+            extendedStats.classList.toggle('hidden');
+            arrow.classList.toggle('rotate-180');
+        }
+
+        function toggleDelegatorQueueView() {
+            isDelegatorViewActive = !isDelegatorViewActive;
+
+            const delegatorsContent = document.getElementById('delegators-content');
+            const queueContent = document.getElementById('queue-content');
+            const title = document.getElementById('delegator-queue-title');
+            const op = currentOperatorData;
+
+            if (!op) return;
+
+            if (isDelegatorViewActive) {
+                delegatorsContent.classList.remove('hidden');
+                queueContent.classList.add('hidden');
+                title.textContent = `Delegators (${op.delegatorCount > 0 ? op.delegatorCount - 1 : 0})`;
+            } else {
+                delegatorsContent.classList.add('hidden');
+                queueContent.classList.remove('hidden');
+                title.textContent = `Undelegation Queue (${op.queueEntries ? op.queueEntries.length : 0})`;
+            }
+        }
+
+
         // --- Event Listeners ---
         backToListBtn.addEventListener('click', showListView);
         connectWalletBtn.addEventListener('click', connectWithWallet);
@@ -2076,11 +2244,23 @@
 
         const mainContainer = document.getElementById('main-container');
         mainContainer.addEventListener('mouseover', (e) => {
-            const target = e.target.closest('[data-tooltip-value]');
-            if (target && dataPriceUSD) {
+            const target = e.target.closest('[data-tooltip-value], [data-tooltip-content]');
+            if (!target) return;
+
+            let tooltipContent = '';
+            
+            // Prioritize direct content if available
+            if (target.dataset.tooltipContent) {
+                tooltipContent = target.dataset.tooltipContent;
+            } 
+            // Fallback to USD value calculation
+            else if (target.dataset.tooltipValue && dataPriceUSD) {
                 const dataValue = target.dataset.tooltipValue;
-                const usdValue = formatUsdForTooltip(dataValue);
-                customTooltip.innerHTML = usdValue;
+                tooltipContent = formatUsdForTooltip(dataValue);
+            }
+
+            if (tooltipContent) {
+                customTooltip.innerHTML = tooltipContent;
                 customTooltip.classList.remove('hidden');
             }
         });
@@ -2093,7 +2273,7 @@
         });
 
         mainContainer.addEventListener('mouseout', (e) => {
-            const target = e.target.closest('[data-tooltip-value]');
+            const target = e.target.closest('[data-tooltip-value], [data-tooltip-content]');
             if (target) {
                 customTooltip.classList.add('hidden');
             }
