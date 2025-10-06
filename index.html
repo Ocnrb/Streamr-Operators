@@ -68,21 +68,21 @@
         <div class="bg-[#1E1E1E] rounded-lg p-8 max-w-sm w-full text-gray-300 text-center shadow-2xl border border-[#333333]">
             <div id="loginContent">
                 <h2 class="text-2xl font-bold mb-4 text-white">Streamr Explorer</h2>
-                <p class="mb-6 text-gray-400">Conecte a sua carteira para futuras funcionalidades ou continue como convidado para explorar.</p>
+                <p class="mb-6 text-gray-400">Connect your wallet for full functionality, or continue as a guest to explore.</p>
                 <button id="connectWalletBtn" class="w-full bg-[#333333] hover:bg-[#444444] text-white font-bold py-3 px-4 rounded-lg transition-colors mb-4 flex items-center justify-center gap-2">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>
-                    Conectar Carteira
+                    Connect Wallet
                 </button>
                 <button id="guestBtn" class="w-full bg-[#444444] hover:bg-[#555555] text-white font-bold py-3 px-4 rounded-lg transition-colors">
-                    Continuar como Convidado
+                    Continue as Guest
                 </button>
             </div>
             <div id="loadingContent" class="hidden">
                 <div class="flex justify-center items-center mb-4">
                     <div class="loader rounded-full border-4 border-t-4 border-[#555555] border-t-transparent h-8 w-8"></div>
                 </div>
-                <p class="text-lg text-white">A conectar...</p>
-                <p class="text-sm text-gray-400 mt-2">Por favor, siga as instruções na sua carteira.</p>
+                <p class="text-lg text-white">Connecting...</p>
+                <p class="text-sm text-gray-400 mt-2">Please follow the instructions in your wallet.</p>
             </div>
         </div>
     </div>
@@ -90,7 +90,7 @@
     <!-- Custom Alert Modal (for Ethers errors) -->
     <div id="customAlertModal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50 hidden">
         <div class="bg-[#1E1E1E] rounded-lg p-8 max-w-md w-full text-gray-300 border border-[#333333]">
-            <h2 id="customAlertTitle" class="text-2xl font-bold mb-4 text-white">Alerta</h2>
+            <h2 id="customAlertTitle" class="text-2xl font-bold mb-4 text-white">Alert</h2>
             <p id="customAlertMessage" class="mb-6"></p>
             <button id="closeAlertBtn" class="mt-6 w-full bg-[#333333] hover:bg-[#444444] text-white font-bold py-2 px-4 rounded-lg transition-colors">
                 OK
@@ -101,11 +101,11 @@
     <!-- Transaction Modal -->
     <div id="transactionModal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50 hidden">
         <div class="bg-[#1E1E1E] rounded-lg p-8 max-w-md w-full text-gray-300 border border-[#333333] shadow-2xl">
-            <h2 id="tx-modal-title" class="text-2xl font-bold mb-4 text-white">Delegar ao Operador</h2>
+            <h2 id="tx-modal-title" class="text-2xl font-bold mb-4 text-white">Delegate to Operator</h2>
             
             <!-- Input Section -->
             <div id="tx-modal-input-section">
-                <p id="tx-modal-description" class="mb-4 text-gray-400">Introduza a quantidade de DATA a delegar.</p>
+                <p id="tx-modal-description" class="mb-4 text-gray-400">Enter the amount of DATA to delegate.</p>
                 <input 
                     type="number" 
                     id="tx-modal-amount" 
@@ -113,27 +113,75 @@
                     class="w-full p-3 bg-[#121212] border border-[#333333] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#555555] transition-colors"
                 >
                 <div class="flex justify-between mt-2 text-sm">
-                     <span id="tx-modal-balance-label" class="text-gray-400">O seu Saldo:</span>
-                     <span id="tx-modal-balance-value" class="text-gray-300">A carregar...</span>
+                     <span id="tx-modal-balance-label" class="text-gray-400">Your Balance:</span>
+                     <span id="tx-modal-balance-value" class="text-gray-300">Loading...</span>
+                </div>
+                <div class="flex justify-between mt-1 text-sm text-gray-500">
+                     <span>Minimum to delegate:</span>
+                     <span id="tx-modal-minimum-value">Loading...</span>
                 </div>
                 <div class="mt-6 flex gap-4">
-                    <button id="tx-modal-cancel" class="w-full bg-[#444444] hover:bg-[#555555] text-white font-bold py-3 px-4 rounded-lg transition-colors">Cancelar</button>
-                    <button id="tx-modal-confirm" class="w-full bg-[#333333] hover:bg-[#444444] text-white font-bold py-3 px-4 rounded-lg transition-colors">Confirmar</button>
+                    <button id="tx-modal-cancel" class="w-full bg-[#444444] hover:bg-[#555555] text-white font-bold py-3 px-4 rounded-lg transition-colors">Cancel</button>
+                    <button id="tx-modal-confirm" class="w-full bg-[#333333] hover:bg-[#444444] text-white font-bold py-3 px-4 rounded-lg transition-colors">Confirm</button>
                 </div>
             </div>
 
             <!-- Status Section -->
             <div id="tx-modal-status-section" class="hidden text-center">
-                <div class="flex justify-center items-center mb-4">
+                <div id="tx-modal-loader" class="flex justify-center items-center mb-4">
                     <div class="loader rounded-full border-4 border-t-4 border-[#555555] border-t-transparent h-8 w-8"></div>
                 </div>
-                <p id="tx-modal-status-text" class="text-lg text-white">A aguardar confirmação...</p>
-                <p id="tx-modal-status-subtext" class="text-sm text-gray-400 mt-2">Por favor, confirme a transação na sua carteira.</p>
+                <p id="tx-modal-status-text" class="text-lg text-white">Awaiting confirmation...</p>
+                <p id="tx-modal-status-subtext" class="text-sm text-gray-400 mt-2">Please confirm the transaction in your wallet.</p>
                  <div id="tx-modal-receipt" class="hidden mt-4 text-left">
-                    <p class="text-green-400 font-bold">Transação bem-sucedida!</p>
-                    <a id="tx-modal-receipt-link" href="#" target="_blank" rel="noopener noreferrer" class="text-gray-300 hover:text-white text-sm break-all">Ver no Polygonscan</a>
+                    <p class="text-green-400 font-bold">Transaction Successful!</p>
+                    <a id="tx-modal-receipt-link" href="#" target="_blank" rel="noopener noreferrer" class="text-gray-300 hover:text-white text-sm break-all">View on Polygonscan</a>
                 </div>
-                <button id="tx-modal-close" class="mt-6 w-full bg-[#333333] hover:bg-[#444444] text-white font-bold py-2 px-4 rounded-lg transition-colors hidden">Fechar</button>
+                <button id="tx-modal-close" class="mt-6 w-full bg-[#333333] hover:bg-[#444444] text-white font-bold py-2 px-4 rounded-lg transition-colors hidden">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stake Management Modal -->
+    <div id="stakeModal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-[#1E1E1E] rounded-lg p-8 max-w-md w-full text-gray-300 border border-[#333333] shadow-2xl">
+            <h2 id="stake-modal-title" class="text-2xl font-bold mb-4 text-white">Manage Stake</h2>
+            
+            <!-- Input Section -->
+            <div id="stake-modal-input-section">
+                <p id="stake-modal-description" class="mb-4 text-gray-400">Enter the new total stake amount for this sponsorship.</p>
+                <input 
+                    type="number" 
+                    id="stake-modal-amount" 
+                    placeholder="0.0" 
+                    class="w-full p-3 bg-[#121212] border border-[#333333] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#555555] transition-colors"
+                >
+                <div class="flex justify-between mt-2 text-sm">
+                     <span class="text-gray-400">Your Current Stake:</span>
+                     <span id="stake-modal-current-stake" class="text-gray-300">Loading...</span>
+                </div>
+                <div class="flex justify-between mt-1 text-sm">
+                     <span class="text-gray-400">Operator's Free Funds:</span>
+                     <span id="stake-modal-free-funds" class="text-gray-300">Loading...</span>
+                </div>
+                <div class="mt-6 flex gap-4">
+                    <button id="stake-modal-cancel" class="w-full bg-[#444444] hover:bg-[#555555] text-white font-bold py-3 px-4 rounded-lg transition-colors">Cancel</button>
+                    <button id="stake-modal-confirm" class="w-full bg-[#333333] hover:bg-[#444444] text-white font-bold py-3 px-4 rounded-lg transition-colors">Confirm</button>
+                </div>
+            </div>
+
+            <!-- Status Section (re-using transaction modal's logic) -->
+            <div id="stake-modal-status-section" class="hidden text-center">
+                 <div id="stake-modal-loader" class="flex justify-center items-center mb-4">
+                    <div class="loader rounded-full border-4 border-t-4 border-[#555555] border-t-transparent h-8 w-8"></div>
+                </div>
+                <p id="stake-modal-status-text" class="text-lg text-white">Awaiting confirmation...</p>
+                <p id="stake-modal-status-subtext" class="text-sm text-gray-400 mt-2">Please confirm the transaction in your wallet.</p>
+                 <div id="stake-modal-receipt" class="hidden mt-4 text-left">
+                    <p class="text-green-400 font-bold">Transaction Successful!</p>
+                    <a id="stake-modal-receipt-link" href="#" target="_blank" rel="noopener noreferrer" class="text-gray-300 hover:text-white text-sm break-all">View on Polygonscan</a>
+                </div>
+                <button id="stake-modal-close" class="mt-6 w-full bg-[#333333] hover:bg-[#444444] text-white font-bold py-2 px-4 rounded-lg transition-colors hidden">Close</button>
             </div>
         </div>
     </div>
@@ -146,11 +194,11 @@
     
     <div class="absolute top-4 right-4 z-20 flex items-center gap-4">
         <div id="wallet-info" class="bg-[#1E1E1E] border border-[#333333] text-white p-3 rounded-lg shadow-lg text-sm hidden items-center gap-2">
-            <!-- As informações da carteira serão injetadas aqui -->
+            <!-- Wallet info will be injected here -->
         </div>
         <div id="data-price-box" class="bg-[#1E1E1E] border border-[#333333] text-white p-3 rounded-lg shadow-lg text-sm flex items-center gap-2">
-            <span>Preço DATA:</span>
-            <span id="data-price-value" class="font-bold text-green-400">A carregar...</span>
+            <span>DATA Price:</span>
+            <span id="data-price-value" class="font-bold text-green-400">Loading...</span>
         </div>
     </div>
 
@@ -158,7 +206,7 @@
     <div id="main-container" class="container mx-auto p-4 md:p-8 hidden">
         <header class="text-center mb-10">
             <h1 class="text-3xl md:text-5xl font-bold text-white mb-2">Streamr Operator Explorer</h1>
-            <p class="text-md text-gray-400">Navegue e inspecione os operadores na rede Streamr.</p>
+            <p class="text-md text-gray-400">Browse and inspect operators on the Streamr network.</p>
         </header>
 
         <!-- Operator List View -->
@@ -168,7 +216,7 @@
                 <input 
                     type="text" 
                     id="search-input" 
-                    placeholder="Pesquisar" 
+                    placeholder="Search" 
                     class="w-full p-4 pl-12 bg-[#1E1E1E] border border-[#333333] rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-[#555555] transition-colors"
                     oninput="handleSearchChange(this.value)"
                 >
@@ -178,12 +226,12 @@
             </div>
             
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6" id="operators-grid">
-                <!-- Os cartões dos operadores serão inseridos aqui -->
+                <!-- Operator cards will be inserted here -->
             </div>
-            <!-- Botão "Carregar Mais" para a lista de operadores -->
+            <!-- Load More button for the operator list -->
             <div class="mt-8 text-center" id="load-more-container">
                  <button id="load-more-operators-btn" class="bg-[#2C2C2C] hover:bg-[#3A3A3A] text-white font-bold py-3 px-8 rounded-xl transition-colors hidden" onclick="loadMoreOperators(this)">
-                    Carregar Mais Operadores
+                    Load More Operators
                 </button>
             </div>
         </main>
@@ -192,16 +240,16 @@
         <div id="operator-detail-view" class="space-y-8">
             <button id="back-to-list-btn" class="bg-[#333333] hover:bg-[#444444] text-white font-bold py-2 px-4 rounded-lg transition-colors flex items-center">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>
-                Voltar à Lista
+                Back to List
             </button>
             <div id="detail-content">
-                <!-- O conteúdo detalhado será inserido aqui -->
+                <!-- Detailed content will be inserted here -->
             </div>
         </div>
     </div>
 
     <div id="custom-tooltip" class="hidden absolute z-30 px-3 py-2 text-sm font-medium text-white bg-black rounded-lg shadow-sm border border-[#333333]">
-        <!-- O conteúdo da dica de ferramenta será injetado aqui -->
+        <!-- Tooltip content will be injected here -->
     </div>
 
     <!-- Streamr SDK -->
@@ -209,8 +257,9 @@
 
 
     <script>
-        // --- Constantes de Contrato Inteligente e Rede ---
+        // --- Smart Contract & Network Constants ---
         const DATA_TOKEN_ADDRESS_POLYGON = '0x3a9A81d576d83FF21f26f325066054540720fC34';
+        const STREAMR_CONFIG_ADDRESS = '0x344587b3d00394821557352354331D7048754d24';
         const DATA_TOKEN_ABI = [
              {
                 "inputs": [
@@ -233,7 +282,7 @@
             }
         ];
         const OPERATOR_CONTRACT_ABI = [
-            // ABI mínimo para anular delegação e verificar stake
+            // Minimal ABI for undelegating and checking stake
             {
                 "inputs": [ { "internalType": "uint256", "name": "operatorTokenAmount", "type": "uint256" } ],
                 "name": "undelegate",
@@ -243,21 +292,45 @@
             },
             {
                 "inputs": [ { "internalType": "address", "name": "account", "type": "address" } ],
-                "name": "balanceOf", // Retorna a quantidade de Operator Tokens (ações) que um delegador tem
+                "name": "balanceOf", // Returns the amount of Operator Tokens (shares) a delegator has
                 "outputs": [ { "internalType": "uint256", "name": "", "type": "uint256" } ],
                 "stateMutability": "view",
                 "type": "function"
             },
             {
-                "inputs": [ { "internalType": "address", "name": "delegatorAddress", "type": "address" } ],
-                "name": "getDelegatorStake", // Retorna a quantidade de tokens DATA que um delegador apostou
-                "outputs": [ { "internalType": "uint256", "name": "", "type": "uint256" } ],
+                "inputs": [ { "internalType": "address", "name": "delegator", "type": "address" } ],
+                "name": "balanceInData", // Returns a delegator's stake value in DATA tokens
+                "outputs": [ { "internalType": "uint256", "name": "amountDataWei", "type": "uint256" } ],
                 "stateMutability": "view",
+                "type": "function"
+            },
+            // New functions for stake management
+            {
+                "inputs": [ { "internalType": "address", "name": "sponsorship", "type": "address" }, { "internalType": "uint256", "name": "amountWei", "type": "uint256" } ],
+                "name": "stake",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "inputs": [ { "internalType": "address", "name": "sponsorship", "type": "address" }, { "internalType": "uint256", "name": "targetStakeWei", "type": "uint256" } ],
+                "name": "reduceStakeTo",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "inputs": [ { "internalType": "address[]", "name": "sponsorshipAddresses", "type": "address[]" } ],
+                "name": "withdrawEarningsFromSponsorships",
+                "outputs": [ { "internalType": "uint256", "name": "", "type": "uint256" } ],
+                "stateMutability": "nonpayable",
                 "type": "function"
             }
         ];
+        const STREAMR_CONFIG_ABI = [{ "inputs": [], "name": "minimumDelegationWei", "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }], "stateMutability": "view", "type": "function" }];
 
-        // --- Constantes de API e SDK ---
+
+        // --- API & SDK Constants ---
         const API_KEY = 'bb77dd994c8e90edcbd73661a326f068';
         const SUBGRAPH_ID = 'EGWFdhhiWypDuz22Uy7b3F69E9MEkyfU9iAQMttkH5Rj';
         const API_URL = `https://gateway-arbitrum.network.thegraph.com/api/${API_KEY}/subgraphs/id/${SUBGRAPH_ID}`;
@@ -274,7 +347,7 @@
         const customTooltip = document.getElementById('custom-tooltip');
         const loadMoreOperatorsBtn = document.getElementById('load-more-operators-btn'); 
         
-        // --- Elementos da Janela Modal de Login ---
+        // --- Login Modal Elements ---
         const loginModal = document.getElementById('loginModal');
         const connectWalletBtn = document.getElementById('connectWalletBtn');
         const guestBtn = document.getElementById('guestBtn');
@@ -286,24 +359,44 @@
         const closeAlertBtn = document.getElementById('closeAlertBtn');
         const walletInfoEl = document.getElementById('wallet-info');
 
-        // --- Elementos da Janela Modal de Transação ---
+        // --- Transaction Modal Elements ---
         const transactionModal = document.getElementById('transactionModal');
         const txModalTitle = document.getElementById('tx-modal-title');
         const txModalDescription = document.getElementById('tx-modal-description');
         const txModalAmount = document.getElementById('tx-modal-amount');
         const txModalBalanceLabel = document.getElementById('tx-modal-balance-label');
         const txModalBalanceValue = document.getElementById('tx-modal-balance-value');
+        const txModalMinimumValue = document.getElementById('tx-modal-minimum-value');
         const txModalCancel = document.getElementById('tx-modal-cancel');
-        let txModalConfirm = document.getElementById('tx-modal-confirm'); // Usar let para poder ser substituído
+        let txModalConfirm = document.getElementById('tx-modal-confirm'); // Use let to allow replacement
         const txModalInputSection = document.getElementById('tx-modal-input-section');
         const txModalStatusSection = document.getElementById('tx-modal-status-section');
+        const txModalLoader = document.getElementById('tx-modal-loader');
         const txModalStatusText = document.getElementById('tx-modal-status-text');
         const txModalStatusSubtext = document.getElementById('tx-modal-status-subtext');
         const txModalReceipt = document.getElementById('tx-modal-receipt');
         const txModalReceiptLink = document.getElementById('tx-modal-receipt-link');
         const txModalClose = document.getElementById('tx-modal-close');
 
-        // Estado global
+        // --- Stake Modal Elements ---
+        const stakeModal = document.getElementById('stakeModal');
+        const stakeModalTitle = document.getElementById('stake-modal-title');
+        const stakeModalDescription = document.getElementById('stake-modal-description');
+        const stakeModalAmount = document.getElementById('stake-modal-amount');
+        const stakeModalCurrentStake = document.getElementById('stake-modal-current-stake');
+        const stakeModalFreeFunds = document.getElementById('stake-modal-free-funds');
+        const stakeModalCancel = document.getElementById('stake-modal-cancel');
+        let stakeModalConfirm = document.getElementById('stake-modal-confirm');
+        const stakeModalInputSection = document.getElementById('stake-modal-input-section');
+        const stakeModalStatusSection = document.getElementById('stake-modal-status-section');
+        const stakeModalLoader = document.getElementById('stake-modal-loader');
+        const stakeModalStatusText = document.getElementById('stake-modal-status-text');
+        const stakeModalStatusSubtext = document.getElementById('stake-modal-status-subtext');
+        const stakeModalReceipt = document.getElementById('stake-modal-receipt');
+        const stakeModalReceiptLink = document.getElementById('stake-modal-receipt-link');
+        const stakeModalClose = document.getElementById('stake-modal-close');
+
+        // Global State
         let currentOperatorId = null;
         let currentDelegations = [];
         let totalDelegatorCount = 0;
@@ -316,7 +409,11 @@
         let searchTimeout = null; 
         const POLYGON_RPC_URL = 'https://polygon-rpc.com';
 
-        // --- Estado do Streamr ---
+        // --- Management State ---
+        let activeSponsorshipMenu = null;
+        let currentSponsorshipContext = { id: null, currentStakeWei: '0' };
+
+        // --- Streamr State ---
         let streamrClient = null;
         let coordinationSubscription = null;
         let priceSubscription = null; 
@@ -326,7 +423,7 @@
         let unreachableNodes = new Set();
         const MAX_STREAM_MESSAGES = 20;
 
-        // --- Funções Utilitárias ---
+        // --- Utility Functions ---
         function showCustomAlert(title, message) {
             customAlertTitle.textContent = title;
             customAlertMessage.textContent = message;
@@ -336,23 +433,23 @@
         async function checkAndSwitchNetwork() {
             try {
                 if (!window.ethereum) {
-                    showCustomAlert('Carteira não detetada', 'Por favor, instale uma carteira como a MetaMask.');
+                    showCustomAlert('Wallet not detected', 'Please install a wallet like MetaMask.');
                     return false;
                 }
                 const provider = new ethers.providers.Web3Provider(window.ethereum);
                 const network = await provider.getNetwork();
-                if (network.chainId !== 137) { // 137 é o chainId da Polygon Mainnet
-                    showCustomAlert('Rede Incorreta', 'Por favor, mude a sua carteira para a rede Polygon Mainnet para usar esta funcionalidade.');
+                if (network.chainId !== 137) { // 137 is the chainId for Polygon Mainnet
+                    showCustomAlert('Incorrect Network', 'Please switch your wallet to the Polygon Mainnet to use this feature.');
                     try {
                         await window.ethereum.request({
                             method: 'wallet_switchEthereumChain',
-                            params: [{ chainId: '0x89' }], // 0x89 é o hexadecimal para 137
+                            params: [{ chainId: '0x89' }], // 0x89 is hex for 137
                         });
-                        // Recarregar a página para garantir que tudo é reinicializado com a nova rede
+                        // Reload page to ensure everything is re-initialized with the new network
                         window.location.reload();
                         return true;
                     } catch (switchError) {
-                        // Este código de erro indica que a cadeia não foi adicionada à MetaMask.
+                        // This error code indicates that the chain has not been added to MetaMask.
                         if (switchError.code === 4902) {
                             try {
                                 await window.ethereum.request({
@@ -371,23 +468,23 @@
                                         },
                                     ],
                                 });
-                                // Recarregar após adicionar
+                                // Reload after adding
                                 window.location.reload();
                                 return true;
                             } catch (addError) {
-                                console.error("Falha ao adicionar a rede Polygon", addError);
-                                showCustomAlert('Erro', 'Falha ao adicionar a rede Polygon à sua carteira.');
+                                console.error("Failed to add Polygon network", addError);
+                                showCustomAlert('Error', 'Failed to add the Polygon network to your wallet.');
                             }
                         } else {
-                             showCustomAlert('Erro', 'Falha ao mudar de rede. Por favor, faça-o manualmente na sua carteira.');
+                             showCustomAlert('Error', 'Failed to switch network. Please do it manually in your wallet.');
                         }
-                        console.error("Falha ao mudar de rede", switchError);
+                        console.error("Failed to switch network", switchError);
                         return false;
                     }
                 }
-                return true; // Já está na rede correta
+                return true; // Already on the correct network
             } catch (e) {
-                console.error("Não foi possível verificar a rede:", e);
+                console.error("Could not check network:", e);
                 return false;
             }
         }
@@ -402,25 +499,25 @@
             }
         }
         
-        // --- Lógica do Streamr e de Inicialização ---
+        // --- Streamr & Initialization Logic ---
         async function cleanupClient() {
             if (coordinationSubscription) {
                 try {
                     await coordinationSubscription.unsubscribe();
-                } catch (e) { /* ignorar */ }
+                } catch (e) { /* ignore */ }
                 coordinationSubscription = null;
-                isCoordinationStreamConnected = false; // Redefinir estado
+                isCoordinationStreamConnected = false; // Reset state
             }
             if (priceSubscription) {
                  try {
                     await priceSubscription.unsubscribe();
-                } catch (e) { /* ignorar */ }
+                } catch (e) { /* ignore */ }
                 priceSubscription = null;
             }
             if (streamrClient) {
                 try {
                     await streamrClient.destroy();
-                } catch (e) { /* ignorar */ }
+                } catch (e) { /* ignore */ }
                 streamrClient = null;
             }
         }
@@ -429,23 +526,23 @@
             showLoader(true);
             await cleanupClient();
             try {
-                // 1. Inicializar o Cliente Streamr (sempre como convidado/anónimo)
+                // 1. Initialize Streamr Client (always as guest/anonymous)
                 streamrClient = new StreamrClient();
-                console.log(`Cliente Streamr inicializado.`);
+                console.log(`Streamr client initialized.`);
 
-                // 2. Configurar o Stream de Preços do DATA
+                // 2. Set up DATA Price Stream
                 await setupDataPriceStream();
 
-                // 3. Carregar a Lista de Operadores
+                // 3. Load Operator List
                 await fetchAndRenderOperatorsList();
 
-                // 4. Esconder Login/Carregamento, Mostrar UI Principal
+                // 4. Hide Login/Loading, Show Main UI
                 loginModal.classList.add('hidden');
                 document.getElementById('main-container').classList.remove('hidden');
 
             } catch (error) {
-                console.error("A inicialização falhou:", error);
-                showCustomAlert('Erro de Inicialização', `Falha ao inicializar a aplicação: ${error.message}`);
+                console.error("Initialization failed:", error);
+                showCustomAlert('Initialization Error', `Failed to initialize the application: ${error.message}`);
                 setLoginModalState('buttons');
             } finally {
                 showLoader(false);
@@ -455,7 +552,7 @@
         async function connectWithWallet() {
             const injectedProvider = window.ethereum || window.top?.ethereum;
             if (!injectedProvider) {
-                showCustomAlert("MetaMask Não Encontrado", "Por favor, instale a extensão MetaMask e atualize a página.");
+                showCustomAlert("MetaMask Not Found", "Please install the MetaMask extension and refresh the page.");
                 return;
             }
 
@@ -473,7 +570,7 @@
                     return; 
                 }
 
-                // Atualizar a UI de informações da carteira
+                // Update wallet info UI
                 walletInfoEl.innerHTML = `
                     <svg class="w-5 h-5 text-green-400" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
                     <span>${myRealAddress.substring(0, 6)}...${myRealAddress.substring(myRealAddress.length - 4)}</span>
@@ -486,14 +583,14 @@
                 sessionStorage.setItem('authMethod', 'metamask');
 
             } catch (err) {
-                console.error("Erro detalhado durante a conexão da carteira:", err);
+                console.error("Detailed error during wallet connection:", err);
                 myRealAddress = '';
                 walletInfoEl.classList.add('hidden');
-                let errorMessage = "O pedido de conexão da carteira foi rejeitado ou falhou.";
+                let errorMessage = "Wallet connection request was rejected or failed.";
                 if (err.code === 4001 || (err.info && err.info.error && err.info.error.code === 4001) ) {
-                    errorMessage = "O pedido de assinatura foi rejeitado na sua carteira.";
+                    errorMessage = "The signature request was rejected in your wallet.";
                 }
-                showCustomAlert('Falha na Conexão da Carteira', errorMessage);
+                showCustomAlert('Wallet Connection Failed', errorMessage);
                 setLoginModalState('buttons');
             }
         }
@@ -505,61 +602,65 @@
             await initializeApp();
         }
 
-        // --- Lógica de Preço do Streamr ---
+        // --- Streamr Price Logic ---
         async function setupDataPriceStream() {
-             dataPriceValueEl.textContent = 'A subscrever...';
+             dataPriceValueEl.textContent = 'Subscribing...';
              
              try {
-                // Anular a subscrição de qualquer stream de preços anterior
+                // Unsubscribe from any previous price stream
                 if (priceSubscription) {
                     await priceSubscription.unsubscribe();
                 }
 
                 priceSubscription = await streamrClient.subscribe(DATA_PRICE_STREAM_ID, (message) => {
-                    // Extrair o valor 'bestBid' da mensagem do stream da Binance.
+                    // Extract 'bestBid' from Binance stream message.
                     if (message && message.bestBid !== undefined) {
                         dataPriceUSD = parseFloat(message.bestBid);
                         dataPriceValueEl.textContent = `$${dataPriceUSD.toFixed(4)}`;
                     }
                 });
 
-                console.log(`Subscrito no stream de preços do DATA: ${DATA_PRICE_STREAM_ID}`);
+                console.log(`Subscribed to DATA price stream: ${DATA_PRICE_STREAM_ID}`);
 
              } catch (error) {
-                 console.error("Erro ao configurar o stream de preços do DATA:", error);
-                 dataPriceValueEl.textContent = 'Erro no Stream';
+                 console.error("Error setting up DATA price stream:", error);
+                 dataPriceValueEl.textContent = 'Stream Error';
              }
         }
 
-        // --- Funções de Interação com Contratos Inteligentes ---
+        // --- Smart Contract Interaction Functions ---
 
         function setTxModalState(state, options = {}) {
-            // Esconder todas as secções dinâmicas primeiro
+            // Hide all dynamic sections first
             txModalInputSection.classList.add('hidden');
             txModalStatusSection.classList.add('hidden');
             txModalReceipt.classList.add('hidden');
             txModalClose.classList.add('hidden');
+            txModalLoader.classList.remove('hidden'); // Show loader by default in status states
 
             if (state === 'input') {
                 txModalInputSection.classList.remove('hidden');
-                txModalStatusText.textContent = ''; // Limpar texto de estado
-                txModalAmount.value = ''; // Limpar input
+                txModalStatusText.textContent = ''; // Clear status text
+                txModalAmount.value = ''; // Clear input
             } else if (state === 'loading') {
                 txModalStatusSection.classList.remove('hidden');
-                txModalStatusText.textContent = options.text || 'A aguardar confirmação...';
-                txModalStatusSubtext.textContent = options.subtext || 'Por favor, confirme a transação na sua carteira.';
+                txModalStatusText.textContent = options.text || 'Awaiting confirmation...';
+                txModalStatusSubtext.textContent = options.subtext || 'Please confirm the transaction in your wallet.';
             } else if (state === 'success') {
                 txModalStatusSection.classList.remove('hidden');
                 txModalReceipt.classList.remove('hidden');
                 txModalClose.classList.remove('hidden');
-                txModalStatusText.textContent = 'Transação Bem-sucedida!';
+                txModalLoader.classList.add('hidden');
+                txModalStatusText.textContent = 'Transaction Successful!';
                 txModalStatusSubtext.textContent = '';
                 txModalReceiptLink.href = `https://polygonscan.com/tx/${options.txHash}`;
             } else if (state === 'error') {
                 txModalStatusSection.classList.remove('hidden');
                 txModalClose.classList.remove('hidden');
-                txModalStatusText.textContent = 'Transação Falhou';
-                txModalStatusSubtext.textContent = options.message || 'Algo correu mal.';
+                txModalLoader.classList.add('hidden');
+                txModalStatusText.textContent = 'Transaction Failed';
+                txModalStatusText.classList.add('text-red-400');
+                txModalStatusSubtext.textContent = options.message || 'Something went wrong.';
             }
         }
 
@@ -568,14 +669,22 @@
                 transactionModal.classList.add('hidden');
                 return;
             }
+            
+            // Reset and configure modal for the specific action
+            txModalStatusText.classList.remove('text-red-400'); // Clear error state
+            txModalTitle.textContent = mode === 'delegate' ? 'Delegate to Operator' : 'Undelegate from Operator';
+            txModalDescription.textContent = mode === 'delegate' ? 'Enter the amount of DATA to delegate.' : 'Enter the amount of Operator Tokens to undelegate.';
+            txModalBalanceLabel.textContent = 'Your Balance:';
+            txModalBalanceValue.textContent = 'Loading...';
 
-            // Redefinir e configurar a janela modal para a ação específica
-            txModalTitle.textContent = mode === 'delegate' ? 'Delegar ao Operador' : 'Anular Delegação do Operador';
-            txModalDescription.textContent = mode === 'delegate' ? 'Introduza a quantidade de DATA a delegar.' : 'Introduza a quantidade de Tokens de Operador a anular a delegação.';
-            txModalBalanceLabel.textContent = 'O seu Saldo:';
-            txModalBalanceValue.textContent = 'A carregar...';
+            const minimumDelegationContainer = txModalMinimumValue.parentElement;
+            if (mode === 'delegate') {
+                minimumDelegationContainer.classList.remove('hidden');
+            } else {
+                minimumDelegationContainer.classList.add('hidden');
+            }
 
-            setTxModalState('input'); // Definir estado inicial
+            setTxModalState('input'); // Set initial state
             transactionModal.classList.remove('hidden');
 
             try {
@@ -585,21 +694,59 @@
                     const tokenAddress = ethers.utils.getAddress(DATA_TOKEN_ADDRESS_POLYGON);
                     const dataTokenContract = new ethers.Contract(tokenAddress, DATA_TOKEN_ABI, provider);
                     balanceWei = await dataTokenContract.balanceOf(myRealAddress);
-                } else { // modo 'undelegate'
+                } else { // 'undelegate' mode
                     const operatorContract = new ethers.Contract(currentOperatorId, OPERATOR_CONTRACT_ABI, provider);
                     balanceWei = await operatorContract.balanceOf(myRealAddress);
                 }
                 const balanceFormatted = ethers.utils.formatEther(balanceWei);
-                const tokenSymbol = mode === 'delegate' ? 'DATA' : 'Tokens de Operador';
+                const tokenSymbol = mode === 'delegate' ? 'DATA' : 'Operator Tokens';
                 txModalBalanceValue.textContent = `${formatBigNumber(parseFloat(balanceFormatted).toFixed(4))} ${tokenSymbol}`;
 
+                if (mode === 'delegate') {
+                    try {
+                        const configContract = new ethers.Contract(STREAMR_CONFIG_ADDRESS, STREAMR_CONFIG_ABI, provider);
+                        const minWei = await configContract.minimumDelegationWei();
+                        const minFormatted = ethers.utils.formatEther(minWei);
+                        // Exchange rate is not exactly 1:1 but close enough for a UI hint.
+                        txModalMinimumValue.textContent = `${parseFloat(minFormatted).toFixed(0)} DATA (approx.)`;
+                    } catch (e) {
+                        console.error("Failed to get minimum delegation", e);
+                        txModalMinimumValue.textContent = 'N/A';
+                    }
+                }
+
             } catch (e) {
-                console.error(`Falha ao obter saldo para ${mode}:`, e);
-                txModalBalanceValue.textContent = 'Erro';
+                console.error(`Failed to get balance for ${mode}:`, e);
+                txModalBalanceValue.textContent = 'Error';
                 txModalBalanceValue.classList.add('text-red-400');
             }
         }
         
+        function getFriendlyErrorMessage(error) {
+            if (error.code === 4001) {
+                return 'Transaction rejected in your wallet.';
+            }
+            if (error.reason) {
+                if (error.reason.toLowerCase().includes('slash')) {
+                    return 'Operation failed. The operator may have been slashed.';
+                }
+                if (error.reason.toLowerCase().includes('minimum')) {
+                    return 'Operation failed. The amount may be less than the required minimum.';
+                }
+                 if (error.reason.toLowerCase().includes('capacity')) {
+                    return 'Operation failed. The operator may be at full capacity.';
+                }
+                return `Transaction failed: ${error.reason}`;
+            }
+            if (error.data && error.data.message) {
+                return `Transaction failed: ${error.data.message}`;
+            }
+             if (error.message) {
+                return error.message;
+            }
+            return 'An unknown error occurred.';
+        }
+
         async function handleDelegate() {
             if (!myRealAddress || !currentOperatorId) return;
 
@@ -616,11 +763,11 @@
             const confirmHandler = async () => {
                 let amount = txModalAmount.value.replace(',', '.');
                 if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
-                    showCustomAlert('Quantidade Inválida', 'Por favor, introduza uma quantidade válida superior a zero.');
+                    showCustomAlert('Invalid Amount', 'Please enter a valid amount greater than zero.');
                     return;
                 }
 
-                setTxModalState('loading', { text: "A verificar saldo...", subtext: "Aguarde, por favor." });
+                setTxModalState('loading', { text: "Checking balance...", subtext: "Please wait." });
                 
                 try {
                     const provider = new ethers.providers.Web3Provider(window.ethereum);
@@ -634,13 +781,13 @@
                     try {
                         amountWei = ethers.utils.parseEther(amount);
                     } catch (e) {
-                        showCustomAlert('Quantidade Inválida', 'Por favor, introduza um número válido.');
+                        showCustomAlert('Invalid Amount', 'Please enter a valid number.');
                         setTxModalState('input');
                         return;
                     }
 
                     if (amountWei.gt(userBalanceWei)) {
-                        showCustomAlert('Saldo Insuficiente', 'Não tem DATA suficiente para delegar essa quantidade.');
+                        showCustomAlert('Insufficient Balance', 'You do not have enough DATA to delegate that amount.');
                         setTxModalState('input');
                         return;
                     }
@@ -649,7 +796,7 @@
                     
                     const tx = await dataTokenContract.transferAndCall(currentOperatorId, amountWei, '0x');
                     
-                    setTxModalState('loading', { text: 'A processar Transação...', subtext: 'A aguardar que a transação seja confirmada na blockchain.' });
+                    setTxModalState('loading', { text: 'Processing Transaction...', subtext: 'Waiting for the transaction to be confirmed on the blockchain.' });
 
                     const receipt = await tx.wait();
                     setTxModalState('success', { txHash: receipt.transactionHash });
@@ -657,8 +804,8 @@
                     fetchMyStake(currentOperatorId);
 
                 } catch(e) {
-                    console.error("A delegação falhou:", e);
-                    const message = e.code === 4001 ? 'Transação rejeitada na carteira.' : (e.reason || e.message);
+                    console.error("Delegation failed:", e);
+                    const message = getFriendlyErrorMessage(e);
                     setTxModalState('error', { message });
                 }
             };
@@ -682,11 +829,11 @@
             const confirmHandler = async () => {
                 const amount = txModalAmount.value.replace(',', '.');
                 if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
-                    showCustomAlert('Quantidade Inválida', 'Por favor, introduza uma quantidade válida superior a zero.');
+                    showCustomAlert('Invalid Amount', 'Please enter a valid amount greater than zero.');
                     return;
                 }
 
-                setTxModalState('loading', { text: "A verificar saldo...", subtext: "Aguarde, por favor." });
+                setTxModalState('loading', { text: "Checking balance...", subtext: "Please wait." });
                 
                 try {
                     const provider = new ethers.providers.Web3Provider(window.ethereum);
@@ -699,13 +846,13 @@
                     try {
                         amountWei = ethers.utils.parseEther(amount);
                     } catch (e) {
-                        showCustomAlert('Quantidade Inválida', 'Por favor, introduza um número válido.');
+                        showCustomAlert('Invalid Amount', 'Please enter a valid number.');
                         setTxModalState('input');
                         return;
                     }
 
                     if (amountWei.gt(userBalanceWei)) {
-                        showCustomAlert('Saldo Insuficiente', 'Não tem Tokens de Operador suficientes para anular a delegação dessa quantidade.');
+                        showCustomAlert('Insufficient Balance', 'You do not have enough Operator Tokens to undelegate that amount.');
                         setTxModalState('input');
                         return;
                     }
@@ -713,7 +860,7 @@
                     setTxModalState('loading');
                     const tx = await operatorContract.undelegate(amountWei);
 
-                    setTxModalState('loading', { text: 'A processar Transação...', subtext: 'A aguardar que a transação seja confirmada na blockchain.' });
+                    setTxModalState('loading', { text: 'Processing Transaction...', subtext: 'Waiting for the transaction to be confirmed on the blockchain.' });
 
                     const receipt = await tx.wait();
                     setTxModalState('success', { txHash: receipt.transactionHash });
@@ -721,13 +868,167 @@
                     fetchMyStake(currentOperatorId);
 
                 } catch (e) {
-                    console.error("A anulação da delegação falhou:", e);
-                    const message = e.code === 4001 ? 'Transação rejeitada na carteira.' : (e.reason || e.message);
+                    console.error("Undelegation failed:", e);
+                    const message = getFriendlyErrorMessage(e);
                     setTxModalState('error', { message });
                 }
             };
             
             txModalConfirm.addEventListener('click', confirmHandler);
+        }
+
+        function setStakeModalState(state, options = {}) {
+            // Hide all dynamic sections first
+            stakeModalInputSection.classList.add('hidden');
+            stakeModalStatusSection.classList.add('hidden');
+            stakeModalReceipt.classList.add('hidden');
+            stakeModalClose.classList.add('hidden');
+            stakeModalLoader.classList.remove('hidden');
+
+            if (state === 'input') {
+                stakeModalInputSection.classList.remove('hidden');
+                stakeModalStatusText.textContent = '';
+                stakeModalAmount.value = '';
+                stakeModalStatusText.classList.remove('text-red-400');
+            } else if (state === 'loading') {
+                stakeModalStatusSection.classList.remove('hidden');
+                stakeModalStatusText.textContent = options.text || 'Awaiting confirmation...';
+                stakeModalStatusSubtext.textContent = options.subtext || 'Please confirm the transaction in your wallet.';
+            } else if (state === 'success') {
+                stakeModalStatusSection.classList.remove('hidden');
+                stakeModalReceipt.classList.remove('hidden');
+                stakeModalClose.classList.remove('hidden');
+                stakeModalLoader.classList.add('hidden');
+                stakeModalStatusText.textContent = 'Transaction Successful!';
+                stakeModalStatusSubtext.textContent = '';
+                stakeModalReceiptLink.href = `https://polygonscan.com/tx/${options.txHash}`;
+            } else if (state === 'error') {
+                stakeModalStatusSection.classList.remove('hidden');
+                stakeModalClose.classList.remove('hidden');
+                stakeModalLoader.classList.add('hidden');
+                stakeModalStatusText.textContent = 'Transaction Failed';
+                stakeModalStatusText.classList.add('text-red-400');
+                stakeModalStatusSubtext.textContent = options.message || 'Something went wrong.';
+            }
+        }
+
+        async function handleEditStake(sponsorshipId, currentStakeWei) {
+             if (!myRealAddress) {
+                showCustomAlert('Action Required', 'Please connect your wallet to manage stake.');
+                return;
+            }
+            currentSponsorshipContext = { id: sponsorshipId, currentStakeWei: currentStakeWei };
+
+            setStakeModalState('input');
+            stakeModal.classList.remove('hidden');
+
+            const currentStakeData = convertWeiToData(currentStakeWei);
+            stakeModalCurrentStake.textContent = `${formatBigNumber(currentStakeData)} DATA`;
+            stakeModalAmount.value = parseFloat(currentStakeData);
+
+            // Fetch free funds
+            stakeModalFreeFunds.textContent = 'Loading...';
+            try {
+                const provider = new ethers.providers.Web3Provider(window.ethereum);
+                const tokenContract = new ethers.Contract(DATA_TOKEN_ADDRESS_POLYGON, DATA_TOKEN_ABI, provider);
+                const freeFundsWei = await tokenContract.balanceOf(currentOperatorId);
+                stakeModalFreeFunds.textContent = `${formatBigNumber(convertWeiToData(freeFundsWei))} DATA`;
+            } catch (e) {
+                console.error("Failed to get free funds:", e);
+                stakeModalFreeFunds.textContent = 'Error';
+            }
+            
+            // Re-attach event listener to a new button clone
+            const oldConfirmBtn = stakeModalConfirm;
+            const newConfirmBtn = oldConfirmBtn.cloneNode(true);
+            oldConfirmBtn.parentNode.replaceChild(newConfirmBtn, oldConfirmBtn);
+            stakeModalConfirm = newConfirmBtn;
+
+            stakeModalConfirm.addEventListener('click', confirmStakeEdit);
+        }
+
+        async function confirmStakeEdit() {
+            const targetAmount = stakeModalAmount.value.replace(',', '.');
+            if (!targetAmount || isNaN(targetAmount) || parseFloat(targetAmount) < 0) {
+                showCustomAlert('Invalid Amount', 'Please enter a valid number.');
+                return;
+            }
+
+            setStakeModalState('loading', { text: "Preparing transaction...", subtext: "Please wait." });
+
+            try {
+                const provider = new ethers.providers.Web3Provider(window.ethereum);
+                const signer = provider.getSigner();
+                const operatorContract = new ethers.Contract(currentOperatorId, OPERATOR_CONTRACT_ABI, signer);
+
+                const targetAmountWei = ethers.utils.parseEther(targetAmount);
+                const currentAmountWei = ethers.BigNumber.from(currentSponsorshipContext.currentStakeWei);
+
+                let tx;
+
+                if (targetAmountWei.gt(currentAmountWei)) {
+                    // Increasing stake
+                    const differenceWei = targetAmountWei.sub(currentAmountWei);
+                    const tokenContract = new ethers.Contract(DATA_TOKEN_ADDRESS_POLYGON, DATA_TOKEN_ABI, provider);
+                    const freeFundsWei = await tokenContract.balanceOf(currentOperatorId);
+
+                    if (differenceWei.gt(freeFundsWei)) {
+                        showCustomAlert('Insufficient Funds', 'The operator does not have enough free funds to increase the stake by this amount.');
+                        setStakeModalState('input');
+                        return;
+                    }
+                    tx = await operatorContract.stake(currentSponsorshipContext.id, differenceWei);
+                } else if (targetAmountWei.lt(currentAmountWei)) {
+                    // Decreasing stake
+                    tx = await operatorContract.reduceStakeTo(currentSponsorshipContext.id, targetAmountWei);
+                } else {
+                    // No change
+                    stakeModal.classList.add('hidden');
+                    return;
+                }
+
+                setStakeModalState('loading');
+                const receipt = await tx.wait();
+                setStakeModalState('success', { txHash: receipt.transactionHash });
+                fetchAndRenderOperatorDetails(currentOperatorId); // Refresh details view
+
+            } catch(e) {
+                console.error("Stake edit failed:", e);
+                const message = getFriendlyErrorMessage(e);
+                setStakeModalState('error', { message });
+            }
+        }
+
+        async function handleCollectEarnings(sponsorshipId) {
+            if (!myRealAddress) {
+                showCustomAlert('Action Required', 'Please connect your wallet to collect earnings.');
+                return;
+            }
+            
+            // Use main transaction modal for this simple action
+            transactionModal.classList.remove('hidden');
+            txModalTitle.textContent = 'Collect Earnings';
+            setTxModalState('loading', { text: "Preparing transaction...", subtext: "Please wait." });
+
+            try {
+                const provider = new ethers.providers.Web3Provider(window.ethereum);
+                const signer = provider.getSigner();
+                const operatorContract = new ethers.Contract(currentOperatorId, OPERATOR_CONTRACT_ABI, signer);
+                
+                // Contract expects an array of sponsorship addresses
+                const tx = await operatorContract.withdrawEarningsFromSponsorships([sponsorshipId]);
+                
+                setTxModalState('loading', { text: 'Processing Transaction...', subtext: 'Waiting for the transaction to be confirmed on the blockchain.' });
+                
+                const receipt = await tx.wait();
+                setTxModalState('success', { txHash: receipt.transactionHash });
+                fetchAndRenderOperatorDetails(currentOperatorId); // Refresh details view
+
+            } catch (e) {
+                console.error("Earnings collection failed:", e);
+                const message = getFriendlyErrorMessage(e);
+                setTxModalState('error', { message });
+            }
         }
 
         async function fetchMyStake(operatorId) {
@@ -741,7 +1042,7 @@
              
              const isCorrectNetwork = await checkAndSwitchNetwork();
              if (!isCorrectNetwork) {
-                 myStakeValueEl.textContent = 'Rede Incorreta';
+                 myStakeValueEl.textContent = 'Incorrect Network';
                  myStakeValueEl.classList.add('text-red-400');
                  return;
              }
@@ -749,7 +1050,7 @@
              try {
                 const provider = new ethers.providers.Web3Provider(window.ethereum);
                 const operatorContract = new ethers.Contract(operatorId, OPERATOR_CONTRACT_ABI, provider);
-                const myStakeWei = await operatorContract.getDelegatorStake(myRealAddress);
+                const myStakeWei = await operatorContract.balanceInData(myRealAddress);
                 const myStakeData = convertWeiToData(myStakeWei.toString());
                 
                 myStakeValueEl.textContent = `${formatBigNumber(myStakeData)} DATA`;
@@ -757,14 +1058,16 @@
 
 
              } catch(e) {
-                console.error("Falha ao obter o stake do utilizador (assumindo 0):", e);
+                // This error can happen if the user has never delegated to this operator.
+                // The contract might revert instead of returning 0. We handle this by assuming 0 stake.
+                console.error("Failed to get user's stake (assuming 0):", e);
                 myStakeValueEl.textContent = '0.00 DATA';
                 myStakeValueEl.classList.remove('text-red-400');
              }
         }
 
 
-        // --- Funções de Formatação e Conversão ---
+        // --- Formatting & Conversion Functions ---
         const formatBigNumber = (numStr) => {
             if (!numStr) return '0';
             const parts = numStr.toString().split('.');
@@ -785,17 +1088,17 @@
                 const decimals = (remainder * BigInt(100)) / dataDenominator;
                 return `${dataValue.toString()}.${decimals.toString().padStart(2, '0')}`;
             } catch (e) {
-                console.error("Não foi possível converter wei para DATA:", weiStr, e);
+                console.error("Could not convert wei to DATA:", weiStr, e);
                 return 'N/A';
             }
         };
         
         const formatUsdForTooltip = (dataAmountStr) => {
-            if (dataPriceUSD === null || !dataAmountStr) return 'Não disponível';
-            // Remover espaços do número formatado antes de o analisar
+            if (dataPriceUSD === null || !dataAmountStr) return 'Not available';
+            // Remove spaces from the formatted number before parsing
             const numericDataAmount = parseFloat(dataAmountStr.replace(/ /g, '').replace(',', '.'));
             const usdValue = numericDataAmount * dataPriceUSD;
-            // Arredondar o valor em USD e formatá-lo
+            // Round the USD value and format it
             return `~$${formatBigNumber(Math.round(usdValue))}`;
         };
         
@@ -811,17 +1114,17 @@
             loaderOverlay.style.display = show ? 'flex' : 'none';
         };
 
-        // --- Lógica do Streamr (Stream de Coordenação) ---
+        // --- Streamr (Coordination Stream) Logic ---
         
         async function unsubscribeFromCoordinationStream() {
             if (coordinationSubscription) {
                 try {
                     await coordinationSubscription.unsubscribe();
-                } catch (e) { /* ignorar */ }
+                } catch (e) { /* ignore */ }
                 coordinationSubscription = null;
-                isCoordinationStreamConnected = false; // Redefinir estado
-                activeNodes.clear(); // Limpar o conjunto de nós
-                unreachableNodes.clear(); // Limpar o conjunto de nós inalcançáveis
+                isCoordinationStreamConnected = false; // Reset state
+                activeNodes.clear(); // Clear the node set
+                unreachableNodes.clear(); // Clear the unreachable node set
             }
         }
 
@@ -832,18 +1135,18 @@
             const indicatorEl = document.getElementById('stream-status-indicator');
             const messagesContainerEl = document.getElementById('stream-messages-container');
             const nodesCountEl = document.getElementById('active-nodes-count-value');
-            const nodesStatsCountEl = document.getElementById('active-nodes-stats-value'); // Novo elemento
+            const nodesStatsCountEl = document.getElementById('active-nodes-stats-value'); // New element
             const unreachableNodesCountEl = document.getElementById('unreachable-nodes-count-value');
             const unreachableNodesContainer = document.getElementById('unreachable-nodes-container');
             
             if (!indicatorEl || !messagesContainerEl || !nodesCountEl || !unreachableNodesCountEl || !unreachableNodesContainer || !nodesStatsCountEl) return;
 
-            // Limpar mensagens anteriores e redefinir contagem de nós na UI
-            messagesContainerEl.innerHTML = '<div class="text-gray-500 text-sm text-center py-4">As mensagens em direto aparecerão aqui.</div>';
+            // Clear previous messages and reset node count on UI
+            messagesContainerEl.innerHTML = '<div class="text-gray-500 text-sm text-center py-4">Live messages will appear here.</div>';
             nodesCountEl.textContent = '0';
-            nodesStatsCountEl.textContent = '0'; // Redefinir elemento de estatísticas
+            nodesStatsCountEl.textContent = '0'; // Reset stats element
             unreachableNodesCountEl.textContent = '0';
-            unreachableNodesContainer.classList.add('hidden'); // Esconder por defeito
+            unreachableNodesContainer.classList.add('hidden'); // Hide by default
             
             if (!streamrClient) {
                  indicatorEl.className = 'w-3 h-3 rounded-full bg-red-500';
@@ -851,32 +1154,32 @@
             }
 
             indicatorEl.className = 'w-3 h-3 rounded-full bg-yellow-500 animate-pulse';
-            indicatorEl.title = `A conectar a ${streamId}...`;
-            console.log(`[Streamr] A iniciar subscrição no stream de coordenação: ${streamId}`);
+            indicatorEl.title = `Connecting to ${streamId}...`;
+            console.log(`[Streamr] Starting subscription to coordination stream: ${streamId}`);
 
             try {
                 coordinationSubscription = await streamrClient.subscribe(streamId, (message) => {
-                    // 1. Atualizar estado na primeira mensagem recebida
+                    // 1. Update state on first message received
                     if (!isCoordinationStreamConnected) {
                         isCoordinationStreamConnected = true;
                         indicatorEl.className = 'w-3 h-3 rounded-full bg-green-500';
-                        indicatorEl.title = `Subscrito, a receber dados.`;
-                        console.log(`[Streamr] Estado atualizado: A receber primeira mensagem de ${streamId}.`);
+                        indicatorEl.title = `Subscribed, receiving data.`;
+                        console.log(`[Streamr] State update: Receiving first message from ${streamId}.`);
                     }
                     
-                    // 2. Adicionar mensagem à UI
+                    // 2. Add message to UI
                     addStreamMessageToUI(message);
                 });
 
-                // Atualizar estado da UI imediatamente após subscrição bem-sucedida (Promise resolvida)
-                indicatorEl.className = 'w-3 h-3 rounded-full bg-gray-400'; // Mudar cor para indicar subscrição bem-sucedida, mas ainda sem dados
-                indicatorEl.title = `Subscrito no stream. A aguardar primeira mensagem...`;
-                console.log(`[Streamr] Subscrição em ${streamId} bem-sucedida. A aguardar dados.`);
+                // Update UI state immediately after successful subscription (Promise resolved)
+                indicatorEl.className = 'w-3 h-3 rounded-full bg-gray-400'; // Change color to indicate successful subscription, but no data yet
+                indicatorEl.title = `Subscribed to stream. Awaiting first message...`;
+                console.log(`[Streamr] Subscription to ${streamId} successful. Awaiting data.`);
 
             } catch (error) {
-                console.error(`[Streamr] Erro ao subscrever em ${streamId}:`, error);
+                console.error(`[Streamr] Error subscribing to ${streamId}:`, error);
                 indicatorEl.className = 'w-3 h-3 rounded-full bg-red-500';
-                indicatorEl.title = `Erro ao subscrever no stream.`;
+                indicatorEl.title = `Error subscribing to stream.`;
             }
         }
 
@@ -884,12 +1187,12 @@
             const messagesContainerEl = document.getElementById('stream-messages-container');
             if (!messagesContainerEl) return;
 
-            // Contar nós únicos de mensagens de heartbeat
+            // Count unique nodes from heartbeat messages
             if (message && message.msgType === 'heartbeat' && message.peerDescriptor && message.peerDescriptor.nodeId) {
                 const nodeId = message.peerDescriptor.nodeId;
                 const isUnreachable = message.peerDescriptor?.websocket?.tls === false;
 
-                // Contar todos os nós ativos (alcançáveis e inalcançáveis)
+                // Count all active nodes (reachable and unreachable)
                 if (!activeNodes.has(nodeId)) {
                     activeNodes.add(nodeId);
                     const nodesCountEl = document.getElementById('active-nodes-count-value');
@@ -902,7 +1205,7 @@
                     }
                 }
 
-                // Contar nós inalcançáveis
+                // Count unreachable nodes
                 if (isUnreachable && !unreachableNodes.has(nodeId)) {
                     unreachableNodes.add(nodeId);
                     const unreachableNodesCountEl = document.getElementById('unreachable-nodes-count-value');
@@ -916,14 +1219,14 @@
                 }
             }
 
-            // Remover placeholder se existir
+            // Remove placeholder if it exists
             const placeholder = messagesContainerEl.querySelector('.text-gray-500.text-sm.text-center');
             if (placeholder) {
                 placeholder.remove();
             }
 
             const messageWrapper = document.createElement('div');
-            // Estilo minimalista com uma borda superior, exceto para o primeiro item (o mais novo)
+            // Minimalist style with a top border, except for the first (newest) item
             messageWrapper.className = 'stream-message-entry py-2 border-t border-[#333333]/50 first:border-t-0';
 
             const timestamp = new Date().toLocaleTimeString();
@@ -943,47 +1246,47 @@
                 <pre class="whitespace-pre-wrap break-all text-xs text-gray-400"><code>${formattedMessage}</code></pre>
             `;
 
-            // Adicionar nova mensagem no início
+            // Add new message at the top
             messagesContainerEl.prepend(messageWrapper);
             
-            // Forçar o limite máximo de mensagens
+            // Enforce max message limit
             while (messagesContainerEl.children.length > MAX_STREAM_MESSAGES) {
                 messagesContainerEl.removeChild(messagesContainerEl.lastChild);
             }
         }
 
-        // --- Lógica de Pesquisa ---
+        // --- Search Logic ---
         function handleSearchChange(value) {
-            // Atrasar a entrada de pesquisa para evitar chamadas excessivas à API
+            // Debounce search input to avoid excessive API calls
             if (searchTimeout) {
                 clearTimeout(searchTimeout);
             }
             searchTimeout = setTimeout(() => {
                 const trimmedValue = value.trim();
                 
-                // Se a consulta de pesquisa for menor que MIN_SEARCH_LENGTH e não estiver vazia, redefinir para vazia.
+                // If the search query is less than MIN_SEARCH_LENGTH and not empty, reset to empty.
                 const newQuery = (trimmedValue.length > 0 && trimmedValue.length < MIN_SEARCH_LENGTH) ? '' : trimmedValue;
 
                 if (searchQuery !== newQuery) {
                     searchQuery = newQuery;
-                    loadedOperatorCount = 0; // Redefinir paginação
+                    loadedOperatorCount = 0; // Reset pagination
                     fetchAndRenderOperatorsList(false, 0, searchQuery);
                 }
-            }, 300); // 300ms de atraso
+            }, 300); // 300ms delay
         }
         
         /**
-         * Verificação simples para determinar se uma string é um endereço Ethereum válido (20 bytes / 40 caracteres)
-         * ou um endereço parcial (começando com 0x e contendo apenas caracteres hexadecimais).
+         * Simple check to determine if a string is a valid Ethereum address (20 bytes / 40 chars)
+         * or a partial address (starts with 0x and contains only hex chars).
          */
         const isAddressFilter = (query) => {
             const normalizedQuery = query.toLowerCase();
-            // Verificar se começa com '0x' e contém apenas caracteres hexadecimais válidos.
+            // Check if it starts with '0x' and contains only valid hex characters.
             return normalizedQuery.startsWith('0x') && /^[0-9a-f]+$/.test(normalizedQuery.substring(2));
         };
 
         /**
-         * Analisa o nome do operador a partir da string JSON de metadados.
+         * Parses the operator name from the metadata JSON string.
          */
         const getOperatorName = (metadataJsonString) => {
              try {
@@ -991,12 +1294,12 @@
                     const metadata = JSON.parse(metadataJsonString);
                     return metadata.name || null;
                 }
-            } catch(e) { /* ignorar erro de análise */ }
+            } catch(e) { /* ignore parse error */ }
             return null;
         }
 
 
-        // --- Lógica de Obtenção de Dados ---
+        // --- Data Fetching Logic ---
         async function getMaticBalance(address) {
             try {
                 const response = await fetch(POLYGON_RPC_URL, {
@@ -1009,18 +1312,18 @@
                         id: 1,
                     }),
                 });
-                if (!response.ok) return 'Erro';
+                if (!response.ok) return 'Error';
                 const data = await response.json();
                 if (data.error) {
-                    console.error('Erro RPC:', data.error);
-                    return 'Erro';
+                    console.error('RPC Error:', data.error);
+                    return 'Error';
                 }
                 const balanceWei = BigInt(data.result);
                 const balanceMatic = Number(balanceWei) / 1e18;
-                return balanceMatic.toFixed(4); // Formatar para 4 casas decimais
+                return balanceMatic.toFixed(4); // Format to 4 decimal places
             } catch (error) {
-                console.error(`Falha ao obter saldo MATIC para ${address}:`, error);
-                return 'Erro';
+                console.error(`Failed to get MATIC balance for ${address}:`, error);
+                return 'Error';
             }
         }
         
@@ -1030,9 +1333,9 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ query })
             });
-            if (!response.ok) throw new Error(`Erro de rede: ${response.statusText}`);
+            if (!response.ok) throw new Error(`Network error: ${response.statusText}`);
             const result = await response.json();
-            if (result.errors) throw new Error(`Erro GraphQL: ${result.errors.map(e => e.message).join(', ')}`);
+            if (result.errors) throw new Error(`GraphQL error: ${result.errors.map(e => e.message).join(', ')}`);
             return result.data;
         }
 
@@ -1044,7 +1347,7 @@
             if (filterQuery) {
                 const lowerCaseFilter = filterQuery.toLowerCase(); 
                 
-                // Caso 1: Pesquisa por fragmento de Endereço (filtragem fiável do lado do servidor)
+                // Case 1: Search by Address fragment (reliable server-side filtering)
                 if (isAddressFilter(lowerCaseFilter)) {
                     try {
                          const args = [
@@ -1074,21 +1377,21 @@
                         const data = await runQuery(query);
                         operators = data.operators;
                     } catch (e) {
-                         // Se a pesquisa de endereço falhar, registar o erro e prosseguir para exibir a mensagem de erro.
-                         console.error("A pesquisa de endereço GraphQL falhou:", e);
-                         operatorsGrid.innerHTML = `<p class="text-red-400 col-span-full">A pesquisa de endereço falhou: ${e.message}</p>`;
+                         // If the address search fails, log error and proceed to display the error message.
+                         console.error("GraphQL address search failed:", e);
+                         operatorsGrid.innerHTML = `<p class="text-red-400 col-span-full">Address search failed: ${e.message}</p>`;
                          showLoader(false);
                          loadMoreOperatorsBtn.classList.add('hidden');
                          return;
                     }
 
                 } 
-                // Caso 2: Pesquisa por Nome (filtragem do lado do cliente dos principais resultados)
+                // Case 2: Search by Name (client-side filtering of top results)
                 else {
-                    // Ao pesquisar por nome, devemos obter um conjunto maior e não ordenado (ou apenas os N principais)
-                    // e filtrar do lado do cliente, pois metadataJsonString_contains não é fiável ou não é totalmente suportado.
+                    // When searching by name, we should fetch a larger, unordered set (or just the top N)
+                    // and filter client-side, because metadataJsonString_contains is unreliable or not fully supported.
                     
-                    // Redefinimos skip para 0 para obter o conjunto inicial grande para filtragem.
+                    // We reset skip to 0 to get the initial large set for filtering.
                     const topResultsQuery = `
                         query GetTopOperatorsForClientSearch {
                             operators(first: 1000, orderBy: valueWithoutEarnings, orderDirection: desc) {
@@ -1107,36 +1410,36 @@
                     
                     const data = await runQuery(topResultsQuery);
                     
-                    // Lógica de filtragem do lado do cliente
+                    // Client-side filtering logic
                     operators = data.operators.filter(op => {
                         const name = getOperatorName(op.metadataJsonString);
                         if (!name) return false;
                         return name.toLowerCase().includes(lowerCaseFilter);
                     });
                     
-                    // Como obtivemos uma lista grande fixa e a filtramos, a paginação (Carregar Mais)
-                    // não é possível para pesquisas por nome.
+                    // Since we fetched a fixed large list and filtered it, pagination (Load More)
+                    // is not possible for name searches.
                 }
 
                 if (!isLoadMore) {
-                    // Esta é una nova pesquisa, portanto, limpe os resultados anteriores
+                    // This is a new search, so clear previous results
                     renderOperatorsList(operators);
                 } else {
-                    // Este caso idealmente não deveria acontecer no novo fluxo de pesquisa por nome,
-                    // mas mantemo-lo por consistência se o loadMore for acionado durante a pesquisa de endereço.
+                    // This case shouldn't ideally happen in the new name-search flow,
+                    // but we keep it for consistency if loadMore is triggered during address search.
                     appendOperatorsList(operators);
                 }
                 
-                // Para pesquisas por nome, esconder o botão Carregar Mais, pois apenas obtivemos um conjunto grande fixo.
+                // For name searches, hide Load More button as we only fetched one fixed large set.
                 loadMoreOperatorsBtn.classList.add('hidden');
 
-                // Se a pesquisa de endereço foi usada e recebemos uma página completa, mostrar Carregar Mais (reativando a paginação)
+                // If address search was used and we received a full page, show Load More (re-enabling pagination)
                 if (isAddressFilter(lowerCaseFilter) && operators.length === OPERATORS_PER_PAGE) {
                      loadMoreOperatorsBtn.classList.remove('hidden');
                 }
                 
             } else {
-                // Caso 3: Sem filtro (Lista classificada padrão, suporta paginação do lado do servidor)
+                // Case 3: No filter (Standard sorted list, supports server-side pagination)
                 const args = [
                     `first: ${OPERATORS_PER_PAGE}`, 
                     `skip: ${skip}`, 
@@ -1169,7 +1472,7 @@
                     renderOperatorsList(operators);
                 }
 
-                 // Mostrar 'Carregar Mais' se nenhum filtro for aplicado E recebermos uma página completa
+                 // Show 'Load More' if no filter is applied AND we received a full page
                 if (operators.length === OPERATORS_PER_PAGE) {
                     loadMoreOperatorsBtn.classList.remove('hidden');
                 } else {
@@ -1177,7 +1480,7 @@
                 }
             }
 
-            // Atualizar contagem carregada apenas para pesquisa de endereço ou caso sem filtro (onde ocorre a paginação real)
+            // Update loaded count only for address search or no-filter case (where real pagination happens)
             if (!filterQuery || isAddressFilter(filterQuery.toLowerCase())) {
                 loadedOperatorCount += operators.length;
             }
@@ -1187,24 +1490,24 @@
 
         async function loadMoreOperators(button) {
             button.disabled = true;
-            button.innerHTML = `<div class="w-4 h-4 border-2 border-white rounded-full border-t-transparent btn-spinner"></div> A carregar...`;
+            button.innerHTML = `<div class="w-4 h-4 border-2 border-white rounded-full border-t-transparent btn-spinner"></div> Loading...`;
             
             try {
-                // Passar a consulta de pesquisa atual ao carregar mais
+                // Pass the current search query when loading more
                 await fetchAndRenderOperatorsList(true, loadedOperatorCount, searchQuery);
             } catch (error) {
-                console.error("Falha ao carregar mais operadores:", error);
-                button.textContent = "Erro. Tente novamente.";
+                console.error("Failed to load more operators:", error);
+                button.textContent = "Error. Try again.";
             } finally {
                 button.disabled = false;
-                button.innerHTML = 'Carregar Mais Operadores';
+                button.innerHTML = 'Load More Operators';
             }
         }
         
         async function fetchAndRenderOperatorDetails(operatorId) {
             showLoader(true);
             showDetailView();
-            currentOperatorId = operatorId.toLowerCase(); // Usar minúsculas para todas as consultas
+            currentOperatorId = operatorId.toLowerCase(); // Use lowercase for all queries
             
             try {
                 const query = `
@@ -1259,7 +1562,7 @@
         
         async function loadMoreDelegators(button) {
             button.disabled = true;
-            button.innerHTML = `<div class="w-4 h-4 border-2 border-white rounded-full border-t-transparent btn-spinner"></div> A carregar...`;
+            button.innerHTML = `<div class="w-4 h-4 border-2 border-white rounded-full border-t-transparent btn-spinner"></div> Loading...`;
 
             try {
                 const query = `
@@ -1283,14 +1586,14 @@
                 currentDelegations.push(...newDelegations);
                 updateDelegatorsSection();
             } catch (error) {
-                console.error("Falha ao carregar mais delegadores:", error);
-                button.textContent = "Erro. Tente novamente.";
+                console.error("Failed to load more delegators:", error);
+                button.textContent = "Error. Try again.";
                 button.disabled = false;
             }
         }
 
 
-        // --- Funções de Renderização ---
+        // --- Render Functions ---
         function calculateWeightedApy(stakes) {
             if (!stakes || stakes.length === 0) return 0;
             
@@ -1299,7 +1602,7 @@
 
             for (const stake of stakes) {
                 if (stake.sponsorship && stake.sponsorship.spotAPY) {
-                    // stake.amountWei já é uma string de Wei. Converter para Number para matemática de ponto flutuante.
+                    // stake.amountWei is already a string of Wei. Convert to Number for floating point math.
                     const stakeAmount = Number(stake.amountWei);
                     const apy = Number(stake.sponsorship.spotAPY);
                     weightedApySum += stakeAmount * apy;
@@ -1316,12 +1619,12 @@
              try {
                  if (op.metadataJsonString) {
                      const metadata = JSON.parse(op.metadataJsonString);
-                     // operatorName já está definido acima
+                     // operatorName is already set above
                      if (metadata.imageIpfsCid) {
                          imageUrl = `https://ipfs.io/ipfs/${metadata.imageIpfsCid}`;
                      }
                  }
-             } catch(e) { /* ignorar erro de análise */ }
+             } catch(e) { /* ignore parse error */ }
              
              const weightedApy = calculateWeightedApy(op.stakes);
              const totalStakedData = convertWeiToData(op.valueWithoutEarnings); 
@@ -1330,7 +1633,7 @@
              <div class="bg-[#1E1E1E] p-5 rounded-xl border border-[#333333] card flex flex-col items-center text-center" onclick="fetchAndRenderOperatorDetails('${op.id}')">
                  <img src="${imageUrl || placeholderUrl}" 
                       onerror="this.src='${placeholderUrl}'; this.onerror=null;"
-                      alt="Avatar do Operador" 
+                      alt="Operator Avatar" 
                       class="w-16 h-16 rounded-full border-2 border-[#333333] object-cover mb-4">
                  <div class="w-full">
                      <h3 class="font-bold text-lg text-white truncate" title="${operatorName || op.id}">${operatorName || op.id}</h3>
@@ -1339,10 +1642,10 @@
                  <div class="mt-4 pt-4 border-t border-[#333333] w-full text-left space-y-2 text-sm">
                      <p><strong class="text-gray-400">APY:</strong> <span class="font-mono text-green-400">${Math.round(weightedApy * 100)}%</span></p>
                      <div>
-                         <strong class="text-gray-400">Total Apostado:</strong>
+                         <strong class="text-gray-400">Total Staked:</strong>
                          <span class="font-mono text-white block" data-tooltip-value="${totalStakedData}">${formatBigNumber(totalStakedData)} DATA</span>
                      </div>
-                     <p><strong class="text-gray-400">Delegadores:</strong> <span class="font-mono text-white">${op.delegatorCount > 0 ? op.delegatorCount - 1 : 0}</span></p>
+                     <p><strong class="text-gray-400">Delegators:</strong> <span class="font-mono text-white">${op.delegatorCount > 0 ? op.delegatorCount - 1 : 0}</span></p>
                  </div>
              </div>
              `;
@@ -1350,13 +1653,13 @@
 
         function renderOperatorsList(operators) {
             if (!operators || operators.length === 0) {
-                let message = 'Nenhum operador encontrado.';
-                // NOTA: Mantemos a lógica subjacente de que MIN_SEARCH_LENGTH é necessário
-                // mas exibimos uma mensagem mais simples ao utilizador agora que a dica desapareceu.
+                let message = 'No operators found.';
+                // NOTE: We keep the underlying logic that MIN_SEARCH_LENGTH is required
+                // but display a simpler message to the user now that the hint is gone.
                 if (searchQuery.length > 0) {
-                    message = `Nenhum operador encontrado para a sua pesquisa "${searchQuery}".`;
+                    message = `No operators found for your search "${searchQuery}".`;
                 } else if (document.getElementById('search-input').value.trim().length > 0) {
-                    message = `Por favor, refine a sua consulta de pesquisa.`;
+                    message = `Please refine your search query.`;
                 }
                 operatorsGrid.innerHTML = `<p class="text-gray-500 col-span-full">${message}</p>`;
                 return;
@@ -1377,7 +1680,7 @@
 
             if (!listEl || !footerEl || !headerEl) return;
 
-            headerEl.textContent = `Delegadores (${totalDelegatorCount > 0 ? totalDelegatorCount - 1 : 0})`;
+            headerEl.textContent = `Delegators (${totalDelegatorCount > 0 ? totalDelegatorCount - 1 : 0})`;
 
             listEl.innerHTML = currentDelegations.map(delegation => {
                 const delegatedData = convertWeiToData(delegation._valueDataWei);
@@ -1391,9 +1694,9 @@
             `}).join('');
             
             footerEl.innerHTML = '';
-            // Mostrar o botão "Carregar Mais" apenas se houver mais delegadores do que os atualmente exibidos.
+            // Show the "Load More" button only if there are more delegators than currently displayed.
             if (currentDelegations.length < (totalDelegatorCount -1)) {
-                footerEl.innerHTML = `<button onclick="loadMoreDelegators(this)" class="w-full bg-[#2C2C2C] hover:bg-[#3A3A3A] text-white font-bold py-2 px-4 rounded-lg transition-colors flex items-center justify-center">Carregar Mais</button>`;
+                footerEl.innerHTML = `<button onclick="loadMoreDelegators(this)" class="w-full bg-[#2C2C2C] hover:bg-[#3A3A3A] text-white font-bold py-2 px-4 rounded-lg transition-colors flex items-center justify-center">Load More</button>`;
             }
         }
 
@@ -1403,21 +1706,21 @@
             const selfDelegation = data.selfDelegation && data.selfDelegation.length > 0 ? data.selfDelegation[0] : null;
 
             if (!op) {
-                detailContent.innerHTML = '<p class="text-gray-500">Operador não encontrado.</p>';
+                detailContent.innerHTML = '<p class="text-gray-500">Operator not found.</p>';
                 return;
             }
 
-            // Definir estado para paginação
+            // Set state for pagination
             currentDelegations = op.delegations;
             totalDelegatorCount = op.delegatorCount;
 
             let operatorName = '';
             let imageUrl = null;
-            let redundancyFactor = '1 (Padrão)';
+            let redundancyFactor = '1 (Default)';
             const placeholderUrl = 'https://placehold.co/80x80/1E1E1E/a3a3a3?text=OP';
 
             try {
-                // Obter Fator de Redundância do último Heartbeat ou metadados
+                // Get Redundancy Factor from last Heartbeat or metadata
                 if (op.metadataJsonString) {
                     const meta = JSON.parse(op.metadataJsonString);
                     if (meta && meta.redundancyFactor !== undefined) {
@@ -1430,7 +1733,7 @@
                         redundancyFactor = meta.redundancyFactor;
                     }
                 }
-                // Obter Nome e Imagem do Operador de metadataJsonString
+                // Get Operator Name and Image from metadataJsonString
                 if (op.metadataJsonString) {
                     const meta = JSON.parse(op.metadataJsonString);
                     operatorName = meta.name || '';
@@ -1438,41 +1741,41 @@
                         imageUrl = `https://ipfs.io/ipfs/${meta.imageIpfsCid}`;
                     }
                 }
-            } catch (e) { console.error("Não foi possível analisar os metadados", e); }
+            } catch (e) { console.error("Could not parse metadata", e); }
 
 
-            // Calcular a parte dos lucros do próprio Operador da sua autodelegação
+            // Calculate the Operator's own share of profits from their self-delegation
             let operatorsOwnStakeWei = 0n;
             if (selfDelegation) {
-                // _valueDataWei é o valor real apostado para esta delegação específica (autodelegação).
+                // _valueDataWei is the actual staked value for this specific delegation (self-delegation).
                 operatorsOwnStakeWei = BigInt(selfDelegation._valueDataWei);
             }
 
             let operatorsShareOfEarningsWei = 0n;
-            // O valor total de stake usado para calcular a distribuição de lucros, excluindo os ganhos.
+            // The total stake value used to calculate profit distribution, excluding earnings.
             const totalStakeWei = BigInt(op.valueWithoutEarnings); 
             const totalProfitsWei = BigInt(op.cumulativeProfitsWei);
 
             if (totalStakeWei > 0n) {
-                // Calcular proporcionalmente a parte dos lucros do proprietário com base na sua proporção de stake.
+                // Proportionally calculate the owner's share of profits based on their stake ratio.
                 operatorsShareOfEarningsWei = (operatorsOwnStakeWei * totalProfitsWei) / totalStakeWei;
             }
             
-            // Distribuído a outros = Lucros Totais - Parte Proporcional de Lucros do Proprietário
+            // Distributed to others = Total Profits - Owner's Proportional Share of Profits
             const distributedToOthersWei = totalProfitsWei - operatorsShareOfEarningsWei;
 
-            // Calcular Lucros Totais Distribuídos (cumulativeProfitsWei)
+            // Calculate Total Distributed Earnings (cumulativeProfitsWei)
             const totalDistributedWei = operatorsShareOfEarningsWei + distributedToOthersWei; 
 
-            // A Fração de Corte do Operador é armazenada como uma fração (10^18), converter para percentagem.
+            // The Operator's Cut Fraction is stored as a fraction of 10^18, convert to percentage.
             const ownersCutPercent = (BigInt(op.operatorsCutFraction) * 100n) / BigInt('1000000000000000000');
             
             const apy = calculateWeightedApy(op.stakes);
             
             let ownersStakePercent = 0;
             if (totalStakeWei > 0n) {
-                // Calcular a percentagem de stake do proprietário em relação ao stake total (valueWithoutEarnings)
-                const percentageBigInt = (operatorsOwnStakeWei * 10000n) / totalStakeWei; // Multiplicar por 10000 para 2 casas decimais
+                // Calculate owner's stake percentage relative to total stake (valueWithoutEarnings)
+                const percentageBigInt = (operatorsOwnStakeWei * 10000n) / totalStakeWei; // Multiply by 10000 for 2 decimal places
                 ownersStakePercent = Number(percentageBigInt) / 100;
             }
 
@@ -1486,28 +1789,39 @@
             
             const sponsorshipsHtml = op.stakes && op.stakes.length > 0 ? op.stakes.map(stake => {
                 const sp = stake.sponsorship;
-                if (!sp) return ''; // Ignorar se os dados de patrocínio estiverem em falta
+                if (!sp) return ''; // Skip if sponsorship data is missing
                 const stakedData = convertWeiToData(stake.amountWei);
                 const balanceData = convertWeiToData(sp.remainingWei);
                 return `
-                <li class="py-2 border-b border-[#333333]">
-                    <div class="font-mono text-xs text-gray-300 truncate">${createAddressLink(sp.id)}</div>
+                <li class="py-3 border-b border-[#333333] relative">
+                    <div class="flex justify-between items-start">
+                        <div class="font-mono text-xs text-gray-300 truncate pr-8">${createAddressLink(sp.id)}</div>
+                        <div class="absolute top-2 right-0">
+                             <button class="text-gray-400 hover:text-white p-1" onclick="toggleSponsorshipMenu(event, '${sp.id}')">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" /></svg>
+                            </button>
+                            <div id="sponsorship-menu-${sp.id}" class="hidden absolute right-0 mt-2 w-48 bg-[#2C2C2C] border border-[#333333] rounded-md shadow-lg z-10">
+                                <a href="#" onclick="event.preventDefault(); handleEditStake('${sp.id}', '${stake.amountWei}')" class="block px-4 py-2 text-sm text-gray-200 hover:bg-[#444444]">Edit Stake</a>
+                                <a href="#" onclick="event.preventDefault(); handleCollectEarnings('${sp.id}')" class="block px-4 py-2 text-sm text-gray-200 hover:bg-[#444444]">Collect Earnings</a>
+                            </div>
+                        </div>
+                    </div>
                     <div class="text-xs grid grid-cols-2 gap-x-4 mt-1">
                        <div>
-                            <span class="text-gray-400">Apostado: 
+                            <span class="text-gray-400">Staked: 
                                 <strong class="text-white" data-tooltip-value="${stakedData}">${formatBigNumber(stakedData)} DATA</strong>
                             </span>
                        </div>
                        <div>
-                           <span class="text-gray-400">Fundos Restantes: 
+                           <span class="text-gray-400">Remaining Funds: 
                                 <strong class="text-white" data-tooltip-value="${balanceData}">${formatBigNumber(balanceData)} DATA</strong>
                            </span>
                        </div>
                        <span class="text-gray-400">APY: <strong class="text-green-400">${Math.round(Number(sp.spotAPY) * 100)}%</strong></span>
-                       <span class="${sp.isRunning ? 'text-green-400' : 'text-red-400'} font-semibold">${sp.isRunning ? 'Ativo' : 'Inativo'}</span>
+                       <span class="${sp.isRunning ? 'text-green-400' : 'text-red-400'} font-semibold">${sp.isRunning ? 'Running' : 'Not Running'}</span>
                     </div>
                 </li>
-            `}).join('') : '<li class="text-gray-500 text-sm">Não está a participar em nenhum patrocínio.</li>';
+            `}).join('') : '<li class="text-gray-500 text-sm">Not participating in any sponsorships.</li>';
             
             const slashesHtml = slashes.length > 0 ? slashes.map(slash => {
                 const slashData = convertWeiToData(slash.amount);
@@ -1515,11 +1829,11 @@
                  <li class="py-2 border-b border-[#333333]">
                     <p class="font-mono text-xs text-red-400 font-semibold" data-tooltip-value="${slashData}">${formatBigNumber(slashData)} DATA</p>
                     <div class="text-xs mt-1 text-gray-400">
-                       <p>Data: ${new Date(slash.date * 1000).toLocaleDateString('pt-PT')}</p>
-                       <div class="truncate">Patrocínio: ${createAddressLink(slash.sponsorship.id)}</div>
+                       <p>Date: ${new Date(slash.date * 1000).toLocaleDateString()}</p>
+                       <div class="truncate">Sponsorship: ${createAddressLink(slash.sponsorship.id)}</div>
                     </div>
                 </li>
-            `}).join('') : '<li class="text-gray-500 text-sm">Nenhum corte registado.</li>';
+            `}).join('') : '<li class="text-gray-500 text-sm">No slashing events recorded.</li>';
             
             const agentsHtml = op.controllers && op.controllers.length > 0 ? op.controllers.map(agent => {
                 const isOwner = op.owner && agent.toLowerCase() === op.owner.toLowerCase();
@@ -1527,9 +1841,9 @@
                 <li class="flex justify-between items-center py-2 border-b border-[#333333]">
                     <div class="font-mono text-xs text-gray-300 truncate">${createAddressLink(agent)}</div>
                      <div class="flex items-center gap-2">
-                        <span id="agent-balance-${agent}" class="font-mono text-xs text-gray-300 text-right" title="Saldo MATIC">...</span>
+                        <span id="agent-balance-${agent}" class="font-mono text-xs text-gray-300 text-right" title="MATIC Balance">...</span>
                         ${isOwner ? `
-                        <div class="flex items-center" title="Proprietário">
+                        <div class="flex items-center" title="Owner">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
                               <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" />
                             </svg>
@@ -1537,28 +1851,28 @@
                         ` : ''}
                     </div>
                 </li>
-            `}).join('') : '<li class="text-gray-500 text-sm">Nenhum agente atribuído.</li>';
+            `}).join('') : '<li class="text-gray-500 text-sm">No agents assigned.</li>';
 
             const nodesHtml = op.nodes && op.nodes.length > 0 ? op.nodes.map(nodeId => `
                 <li class="flex justify-between items-center py-2 border-b border-[#333333]">
                     <div class="font-mono text-xs text-gray-300 truncate">${createAddressLink(nodeId, 'address')}</div>
-                     <span id="node-balance-${nodeId}" class="font-mono text-xs text-gray-300 text-right" title="Saldo MATIC">...</span>
+                     <span id="node-balance-${nodeId}" class="font-mono text-xs text-gray-300 text-right" title="MATIC Balance">...</span>
                 </li>
-            `).join('') : '<li class="text-gray-500 text-sm">Nenhum nó em execução.</li>';
+            `).join('') : '<li class="text-gray-500 text-sm">No nodes running.</li>';
             
-            // Total de stake sem ganhos
+            // Total stake without earnings
             const stakeData = convertWeiToData(op.valueWithoutEarnings); 
             const totalEarningsData = convertWeiToData(op.cumulativeEarningsWei);
             const ownerCutData = convertWeiToData(op.cumulativeOperatorsCutWei);
-            const totalDistributedData = convertWeiToData(totalDistributedWei.toString()); // Usar o novo valor calculado
+            const totalDistributedData = convertWeiToData(totalDistributedWei.toString()); // Use the new calculated value
 
             detailContent.innerHTML = `
-                <!-- Bloco de Estatísticas -->
+                <!-- Stats Block -->
                 <div class="detail-section p-6">
                     <div class="flex items-center gap-6">
                         <img src="${imageUrl || placeholderUrl}" 
                              onerror="this.src='${placeholderUrl}'; this.onerror=null;"
-                             alt="Avatar do Operador" 
+                             alt="Operator Avatar" 
                              class="w-20 h-20 rounded-full border-2 border-[#333333] flex-shrink-0 object-cover">
                         <div class="flex-1 min-w-0">
                             <div class="flex items-start md:items-center justify-between flex-col md:flex-row gap-4">
@@ -1567,12 +1881,12 @@
                                     ${operatorName ? `<div class="font-mono text-sm text-gray-400 mt-1 break-words">${createAddressLink(op.id)}</div>` : ''}
                                 </div>
                                 
-                                <!-- Destaque APY: Agora text-4xl -->
+                                <!-- APY Highlight: Now text-4xl -->
                                 <div class="flex-shrink-0 text-right">
                                     <p class="text-sm text-gray-400 font-semibold mb-1">APY</p>
                                     <p class="text-4xl font-extrabold text-green-400 whitespace-nowrap mb-4">${Math.round(apy * 100)}%</p>
                                 </div>
-                                <!-- Fim do Destaque APY -->
+                                <!-- End APY Highlight -->
 
                             </div>
                         </div>
@@ -1584,105 +1898,105 @@
                             <p class="text-2xl font-semibold text-white" data-tooltip-value="${stakeData}">${formatBigNumber(stakeData)}</p>
                         </div>
                         <div>
-                            <p class="text-sm text-gray-400">Stake Implementado (DATA)</p>
+                            <p class="text-sm text-gray-400">Deployed Stake (DATA)</p>
                             <p class="text-2xl font-semibold text-white" data-tooltip-value="${deployedStakeData}">${formatBigNumber(deployedStakeData)}</p>
                         </div>
                          <div>
-                            <p class="text-sm text-gray-400">% Stake do Proprietário</p>
+                            <p class="text-sm text-gray-400">% Owner's Stake</p>
                             <p class="text-2xl font-semibold text-white">${Math.round(ownersStakePercent)}%</p>
                         </div>
                         <div>
-                            <p class="text-sm text-gray-400">% Corte do Proprietário</p>
+                            <p class="text-sm text-gray-400">% Owner's Cut</p>
                             <p class="text-2xl font-semibold text-white">${ownersCutPercent}%</p>
                         </div>
                         <div>
-                            <p class="text-sm text-gray-400">Ganhos Totais (DATA)</p>
+                            <p class="text-sm text-gray-400">Total Earnings (DATA)</p>
                             <p class="text-2xl font-semibold text-white" data-tooltip-value="${totalEarningsData}">${formatBigNumber(totalEarningsData)}</p>
                         </div>
                         <div>
-                            <p class="text-sm text-gray-400">Lucros do Proprietário do Corte (DATA)</p>
+                            <p class="text-sm text-gray-400">Owner's Earnings from Cut (DATA)</p>
                             <p class="text-2xl font-semibold text-white" data-tooltip-value="${ownerCutData}">${formatBigNumber(ownerCutData)}</p>
                         </div>
-                        <!-- Lucros Totais de Staking ocupando 1 coluna neste layout -->
+                        <!-- Total Staking Earnings taking up 1 column in this layout -->
                         <div>
-                            <p class="text-sm text-gray-400">Lucros Totais Distribuídos (DATA)</p>
+                            <p class="text-sm text-gray-400">Total Distributed Earnings (DATA)</p>
                             <p class="text-2xl font-semibold text-white" data-tooltip-value="${totalDistributedData}">${formatBigNumber(totalDistributedData)}</p>
                         </div>
-                        <!-- Nós Ativos -->
+                        <!-- Active Nodes -->
                         <div>
-                            <p class="text-sm text-gray-400">Nós</p>
+                            <p class="text-sm text-gray-400">Nodes</p>
                             <p id="active-nodes-stats-value" class="text-2xl font-semibold text-white">0</p>
                         </div>
                     </div>
                 </div>
                 
-                <!-- Bloco O Meu Stake & Ações (Visível apenas se a carteira estiver conectada) -->
-                <div id="my-stake-section" class="detail-section p-6 hidden">
-                     <h3 class="text-xl font-semibold text-white mb-4">O seu Stake</h3>
+                <!-- My Stake & Actions Block (Visible only if wallet is connected) -->
+                <div id="my-stake-section" class="detail-section p-6 hidden mt-8">
+                     <h3 class="text-xl font-semibold text-white mb-4">Your Stake</h3>
                      <div class="flex items-center justify-between">
                          <div>
-                             <p class="text-3xl font-semibold text-white" id="my-stake-value">A carregar...</p>
+                             <p class="text-3xl font-semibold text-white" id="my-stake-value">Loading...</p>
                          </div>
                          <div class="flex gap-4">
-                             <button id="delegate-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed">Delegar</button>
-                             <button id="undelegate-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded-lg transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed">Anular Delegação</button>
+                             <button id="delegate-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed">Delegate</button>
+                             <button id="undelegate-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded-lg transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed">Undelegate</button>
                          </div>
                      </div>
                 </div>
 
-                <!-- Bloco de Listas -->
+                <!-- Lists Block -->
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
                     <div class="detail-section p-6">
-                        <h3 id="delegators-header" class="text-xl font-semibold text-white mb-4">Delegadores</h3>
+                        <h3 id="delegators-header" class="text-xl font-semibold text-white mb-4">Delegators</h3>
                         <ul id="delegators-list" class="max-h-96 overflow-y-auto pr-2"></ul>
                         <div id="delegators-footer" class="mt-4"></div>
                     </div>
                     <div class="detail-section p-6">
-                        <h3 class="text-xl font-semibold text-white mb-4">Patrocínios (${op.stakes ? op.stakes.length : 0})</h3>
+                        <h3 class="text-xl font-semibold text-white mb-4">Sponsorships (${op.stakes ? op.stakes.length : 0})</h3>
                         <ul class="max-h-96 overflow-y-auto pr-2">${sponsorshipsHtml}</ul>
                     </div>
                      <div class="detail-section p-6">
-                        <h3 class="text-xl font-semibold text-white mb-4">Cortes (${slashes.length})</h3>
+                        <h3 class="text-xl font-semibold text-white mb-4">Slashing Events (${slashes.length})</h3>
                         <ul class="max-h-96 overflow-y-auto pr-2">${slashesHtml}</ul>
                     </div>
                     <div class="detail-section p-6">
-                        <h3 class="text-xl font-semibold text-white mb-4">Agentes (${op.controllers ? op.controllers.length : 0})</h3>
+                        <h3 class="text-xl font-semibold text-white mb-4">Agents (${op.controllers ? op.controllers.length : 0})</h3>
                         <ul class="max-h-96 overflow-y-auto pr-2">${agentsHtml}</ul>
                     </div>
                     <div class="detail-section p-6">
-                        <h3 class="text-xl font-semibold text-white mb-4">Carteiras dos Nós (${op.nodes ? op.nodes.length : 0})</h3>
+                        <h3 class="text-xl font-semibold text-white mb-4">Node Wallets (${op.nodes ? op.nodes.length : 0})</h3>
                         <ul class="max-h-96 overflow-y-auto pr-2">${nodesHtml}</ul>
                     </div>
                 </div>
 
-                <!-- Bloco do Stream de Coordenação do Streamr -->
+                <!-- Streamr Coordination Stream Block -->
                 <div class="detail-section p-6 mt-8">
                     <div class="flex items-center justify-between mb-4 flex-wrap gap-y-2">
-                        <h3 class="text-xl font-semibold text-white">Stream de Coordenação</h3>
+                        <h3 class="text-xl font-semibold text-white">Coordination Stream</h3>
                         <div class="flex items-center gap-2 text-sm">
-                            <div class="flex items-center gap-2" title="A aguardar conexão...">
+                            <div class="flex items-center gap-2" title="Awaiting connection...">
                                 <div id="stream-status-indicator" class="w-3 h-3 rounded-full bg-gray-500"></div>
                             </div>
                              <div class="bg-[#2C2C2C] text-gray-200 font-semibold px-3 py-1 rounded-lg">
-                                Nós Ativos: <span id="active-nodes-count-value" class="text-white font-bold">0</span>
+                                Active Nodes: <span id="active-nodes-count-value" class="text-white font-bold">0</span>
                             </div>
-                            <div id="unreachable-nodes-container" class="hidden bg-[#2C2C2C] text-gray-200 font-semibold px-3 py-1 rounded-lg" title="Nós que estão ativos mas podem não ser alcançáveis por todos os pares.">
-                                Inalcançáveis: <span id="unreachable-nodes-count-value" class="text-orange-400 font-bold">0</span>
+                            <div id="unreachable-nodes-container" class="hidden bg-[#2C2C2C] text-gray-200 font-semibold px-3 py-1 rounded-lg" title="Nodes that are active but may not be reachable by all peers.">
+                                Unreachable: <span id="unreachable-nodes-count-value" class="text-orange-400 font-bold">0</span>
                             </div>
                             <div class="bg-[#2C2C2C] text-gray-200 font-semibold px-3 py-1 rounded-lg">
-                                Redundância: <span class="text-white font-bold">${redundancyFactor}</span>
+                                Redundancy: <span class="text-white font-bold">${redundancyFactor}</span>
                             </div>
                         </div>
                     </div>
                     <div id="stream-messages-container" class="max-h-96 overflow-y-auto pr-2 bg-black/50 p-2">
                         <div class="text-gray-500 text-sm text-center py-4">
-                             As mensagens em direto aparecerão aqui.
+                             Live messages will appear here.
                         </div>
                     </div>
                 </div>
             `;
             
-            // --- Adicionar Ouvintes de Eventos para os botões Delegar/Anular Delegação ---
+            // --- Add Event Listeners for Delegate/Undelegate buttons ---
             const delegateBtn = document.getElementById('delegate-btn');
             const undelegateBtn = document.getElementById('undelegate-btn');
 
@@ -1694,11 +2008,11 @@
             }
             // -----------------------------------------------------------------
 
-            // --- INTEGRAÇÃO STREAMR: Iniciar subscrição APÓS renderizar os elementos da vista detalhada ---
+            // --- STREAMR INTEGRATION: Start subscription AFTER rendering the detail view elements ---
             setupStreamrSubscription(currentOperatorId);
             // ------------------------------------------------------------------------------------
 
-            // Renderização inicial da lista de delegadores
+            // Initial render of delegators list
             updateDelegatorsSection();
             fetchAndRenderBalances(op);
             fetchMyStake(op.id);
@@ -1723,9 +2037,9 @@
             });
         }
         
-        // --- Controlo de Vista ---
+        // --- View Control ---
         function showListView() {
-            // Anular a subscrição do Streamr ao voltar para a lista
+            // Unsubscribe from Streamr when going back to the list
             unsubscribeFromCoordinationStream(); 
             operatorDetailView.style.display = 'none';
             operatorListView.style.display = 'block';
@@ -1736,13 +2050,28 @@
             window.scrollTo(0, 0);
         }
 
-        // --- Ouvintes de Eventos ---
+        function toggleSponsorshipMenu(event, sponsorshipId) {
+            event.stopPropagation(); // Prevent click from bubbling up to the window
+            const menu = document.getElementById(`sponsorship-menu-${sponsorshipId}`);
+            
+            // Close any other open menu
+            if (activeSponsorshipMenu && activeSponsorshipMenu !== menu) {
+                activeSponsorshipMenu.classList.add('hidden');
+            }
+
+            menu.classList.toggle('hidden');
+            activeSponsorshipMenu = menu.classList.contains('hidden') ? null : menu;
+        }
+
+        // --- Event Listeners ---
         backToListBtn.addEventListener('click', showListView);
         connectWalletBtn.addEventListener('click', connectWithWallet);
         guestBtn.addEventListener('click', connectAsGuest);
         closeAlertBtn.addEventListener('click', () => customAlertModal.classList.add('hidden'));
         txModalCancel.addEventListener('click', () => manageTransactionModal(false));
         txModalClose.addEventListener('click', () => manageTransactionModal(false));
+        stakeModalCancel.addEventListener('click', () => stakeModal.classList.add('hidden'));
+        stakeModalClose.addEventListener('click', () => stakeModal.classList.add('hidden'));
 
 
         const mainContainer = document.getElementById('main-container');
@@ -1770,10 +2099,18 @@
             }
         });
         
-        // --- Inicialização ---
+        // Add a global click listener to close the menu when clicking outside
+        window.addEventListener('click', () => {
+            if (activeSponsorshipMenu) {
+                activeSponsorshipMenu.classList.add('hidden');
+                activeSponsorshipMenu = null;
+            }
+        });
+        
+        // --- Initialization ---
         document.addEventListener('DOMContentLoaded', () => {
-             // Iniciar o fluxo de login imediatamente
-             // Sem showLoader aqui, pois o loginModal serve como bloqueador/carregador inicial
+             // Kick off the login flow immediately
+             // No showLoader here, as the loginModal serves as the initial blocker/loader
              loginModal.classList.remove('hidden');
         });
     </script>
