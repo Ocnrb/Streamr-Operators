@@ -69,7 +69,7 @@
             <div id="loginContent">
                 <h2 class="text-2xl font-bold mb-4 text-white">Streamr Explorer</h2>
                 <p class="mb-6 text-gray-400">Connect your wallet for full functionality, or continue as a guest to explore.</p>
-                <button id="connectWalletBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors mb-4 flex items-center justify-center gap-2">
+                <button id="connectWalletBtn" class="w-full bg-blue-700 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors mb-4 flex items-center justify-center gap-2">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>
                     Connect Wallet
                 </button>
@@ -2059,7 +2059,7 @@
                              <p class="text-3xl font-semibold text-white" id="my-stake-value">Loading...</p>
                          </div>
                          <div class="flex gap-4">
-                             <button id="delegate-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed">Delegate</button>
+                             <button id="delegate-btn" class="bg-blue-700 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed">Delegate</button>
                              <button id="undelegate-btn" class="bg-sky-600 hover:bg-sky-700 text-white font-bold py-2 px-6 rounded-lg transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed">Undelegate</button>
                          </div>
                      </div>
@@ -2090,7 +2090,7 @@
                     <div class="detail-section p-6">
                         <div class="flex justify-between items-center mb-4">
                             <h3 class="text-xl font-semibold text-white">Sponsorships (${op.stakes ? op.stakes.length : 0})</h3>
-                            ${op.stakes && op.stakes.length > 0 ? `<button onclick="handleCollectAllEarnings()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-1 px-3 rounded-lg text-xs">Collect All</button>` : ''}
+                            ${op.stakes && op.stakes.length > 0 ? `<button onclick="handleCollectAllEarnings()" class="bg-blue-700 hover:bg-indigo-700 text-white font-bold py-1 px-3 rounded-lg text-xs">Collect All</button>` : ''}
                         </div>
                         <ul class="max-h-96 overflow-y-auto pr-2">${sponsorshipsHtml}</ul>
                     </div>
@@ -2296,4 +2296,5 @@
     </script>
 </body>
 </html>
+
 
