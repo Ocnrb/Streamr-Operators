@@ -69,9 +69,10 @@
 <body class="text-gray-200">
 
     <!-- Login Modal -->
-    <div id="loginModal" class="fixed inset-0 bg-[#121212] flex items-center justify-center p-4 z-50">
+    <div id="loginModal" class="fixed inset-0 bg-[#121212] flex items-center justify-center p-4 z-50 hidden">
         <div class="bg-[#1E1E1E] rounded-lg p-8 max-w-sm w-full text-gray-300 text-center shadow-2xl border border-[#333333]">
-            <div id="loginContent">
+            
+            <div id="walletLoginView">
                 <h2 class="text-2xl font-bold mb-4 text-white">Streamr Explorer</h2>
                 <p class="mb-6 text-gray-400">Connect your wallet for full functionality, or continue as a guest to explore.</p>
                 <button id="connectWalletBtn" class="w-full bg-blue-800 hover:bg-blue-900 text-white font-bold py-3 px-4 rounded-lg transition-colors mb-4 flex items-center justify-center gap-2">
@@ -81,7 +82,24 @@
                 <button id="guestBtn" class="w-full bg-[#444444] hover:bg-[#555555] text-white font-bold py-3 px-4 rounded-lg transition-colors">
                     Continue as Guest
                 </button>
+                <div class="mt-4">
+                    <button id="showPrivateKeyLoginBtn" class="text-gray-400 hover:text-white text-sm">Or connect with private key</button>
+                </div>
             </div>
+
+            <div id="privateKeyLoginView" class="hidden">
+                <h3 class="text-xl font-bold mb-4 text-white">Connect with Private Key</h3>
+                <div class="bg-red-900 border border-red-700 text-red-200 px-4 py-3 rounded-lg relative mb-4 text-sm text-left">
+                    <strong class="font-bold">Security Warning!</strong>
+                    <p class="block">Pasting your private key is risky. Only use a agent wallet with limited permissions and funds.</p>
+                    <p class="block mt-2"><strong class="underline">Never use your owner's wallet key.</strong></p>
+                    <p class="block mt-2">Your Private Key is stored locally.</p>
+                </div>
+                <input type="password" id="private-key-input" placeholder="Enter your private key" class="w-full p-3 bg-[#121212] border border-[#333333] rounded-lg text-white mb-4 focus:outline-none focus:ring-2 focus:ring-[#555555]">
+                <button id="connectPrivateKeyBtn" class="w-full bg-blue-800 hover:bg-blue-900 text-white font-bold py-3 px-4 rounded-lg transition-colors mb-4">Connect</button>
+                <button id="backToWalletLoginBtn" class="text-gray-400 hover:text-white text-sm">Back to main login</button>
+            </div>
+
             <div id="loadingContent" class="hidden">
                 <div class="flex justify-center items-center mb-4">
                     <div class="loader rounded-full border-4 border-t-4 border-[#555555] border-t-transparent h-8 w-8"></div>
@@ -373,6 +391,14 @@
         const customAlertMessage = document.getElementById('customAlertMessage');
         const closeAlertBtn = document.getElementById('closeAlertBtn');
         const walletInfoEl = document.getElementById('wallet-info');
+        // Private Key Login elements
+        const walletLoginView = document.getElementById('walletLoginView');
+        const privateKeyLoginView = document.getElementById('privateKeyLoginView');
+        const showPrivateKeyLoginBtn = document.getElementById('showPrivateKeyLoginBtn');
+        const backToWalletLoginBtn = document.getElementById('backToWalletLoginBtn');
+        const connectPrivateKeyBtn = document.getElementById('connectPrivateKeyBtn');
+        const privateKeyInput = document.getElementById('private-key-input');
+
 
         // --- Transaction Modal Elements ---
         const transactionModal = document.getElementById('transactionModal');
@@ -391,6 +417,7 @@
         const stakeModalConfirm = document.getElementById('stake-modal-confirm');
 
         // Global State
+        let signer = null; // Holds the ethers signer object for transactions
         let currentOperatorId = null;
         let currentOperatorData = null; // Store full operator data for dynamic UI updates
         let currentDelegations = [];
@@ -495,40 +522,37 @@
             const loadingSubText = document.getElementById('loading-sub-text');
 
             if (state === 'loading') {
-                loginContent.classList.add('hidden');
+                walletLoginView.classList.add('hidden');
+                privateKeyLoginView.classList.add('hidden');
                 loadingContent.classList.remove('hidden');
+
                 if (mode === 'guest') {
                     loadingMainText.textContent = 'Loading...';
                     loadingSubText.textContent = 'Fetching operator data, please wait.';
-                } else { // 'wallet'
+                } else { // 'wallet' or 'privateKey'
                     loadingMainText.textContent = 'Connecting...';
-                    loadingSubText.textContent = 'Please follow the instructions in your wallet.';
+                    loadingSubText.textContent = mode === 'privateKey' ? 'Setting up your session...' : 'Please follow the instructions in your wallet.';
                 }
             } else { // 'buttons' state
-                loginContent.classList.remove('hidden');
                 loadingContent.classList.add('hidden');
+                walletLoginView.classList.remove('hidden');
+                privateKeyLoginView.classList.add('hidden');
             }
         }
         
         // --- Streamr & Initialization Logic ---
         async function cleanupClient() {
             if (coordinationSubscription) {
-                try {
-                    await coordinationSubscription.unsubscribe();
-                } catch (e) { /* ignore */ }
+                try { await coordinationSubscription.unsubscribe(); } catch (e) { /* ignore */ }
                 coordinationSubscription = null;
-                isCoordinationStreamConnected = false; // Reset state
+                isCoordinationStreamConnected = false;
             }
             if (priceSubscription) {
-                 try {
-                    await priceSubscription.unsubscribe();
-                } catch (e) { /* ignore */ }
+                 try { await priceSubscription.unsubscribe(); } catch (e) { /* ignore */ }
                 priceSubscription = null;
             }
             if (streamrClient) {
-                try {
-                    await streamrClient.destroy();
-                } catch (e) { /* ignore */ }
+                try { await streamrClient.destroy(); } catch (e) { /* ignore */ }
                 streamrClient = null;
             }
         }
@@ -536,17 +560,12 @@
         async function initializeApp() {
             await cleanupClient();
             try {
-                // 1. Initialize Streamr Client (always as guest/anonymous)
                 streamrClient = new StreamrClient();
                 console.log(`Streamr client initialized.`);
 
-                // 2. Set up DATA Price Stream
                 await setupDataPriceStream();
-
-                // 3. Load Operator List
                 await fetchAndRenderOperatorsList();
 
-                // 4. Hide Login/Loading, Show Main UI
                 loginModal.classList.add('hidden');
                 document.getElementById('main-container').classList.remove('hidden');
 
@@ -554,6 +573,19 @@
                 console.error("Initialization failed:", error);
                 showCustomAlert('Initialization Error', `Failed to initialize the application: ${error.message}`);
                 setLoginModalState('buttons');
+            }
+        }
+
+        function setupWalletListeners() {
+            if (window.ethereum) {
+                window.ethereum.on('accountsChanged', (accounts) => {
+                    console.log('Wallet account changed, reloading page.');
+                    window.location.reload();
+                });
+                window.ethereum.on('chainChanged', (chainId) => {
+                    console.log('Wallet network changed, reloading page.');
+                    window.location.reload();
+                });
             }
         }
         
@@ -565,12 +597,13 @@
             }
 
             try {
-                setLoginModalState('loading');
+                setLoginModalState('loading', 'wallet');
+                localStorage.removeItem('streamr-explorer-private-key'); // Clear private key on wallet connect
+
                 const provider = new ethers.providers.Web3Provider(injectedProvider);
                 await provider.send("eth_requestAccounts", []);
-                const signer = provider.getSigner();
-                const userAddress = await signer.getAddress();
-                myRealAddress = userAddress.toLowerCase();
+                signer = provider.getSigner();
+                myRealAddress = await signer.getAddress();
                 
                 const isCorrectNetwork = await checkAndSwitchNetwork();
                 if (!isCorrectNetwork) {
@@ -578,37 +611,18 @@
                     return; 
                 }
 
-                // Update wallet info UI safely
-                walletInfoEl.innerHTML = ''; // Clear previous content
-                const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-                svg.setAttribute('class', 'w-5 h-5 text-green-400');
-                svg.setAttribute('fill', 'currentColor');
-                svg.setAttribute('viewBox', '0 0 20 20');
-                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-                path.setAttribute('fill-rule', 'evenodd');
-                path.setAttribute('d', 'M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z');
-                path.setAttribute('clip-rule', 'evenodd');
-                svg.appendChild(path);
-
-                const span = document.createElement('span');
-                span.textContent = `${myRealAddress.substring(0, 6)}...${myRealAddress.substring(myRealAddress.length - 4)}`;
-
-                walletInfoEl.appendChild(svg);
-                walletInfoEl.appendChild(span);
-                
-                walletInfoEl.classList.remove('hidden');
-                walletInfoEl.classList.add('flex');
-
-
+                updateWalletUI(myRealAddress);
+                setupWalletListeners();
                 await initializeApp();
                 sessionStorage.setItem('authMethod', 'metamask');
 
             } catch (err) {
                 console.error("Detailed error during wallet connection:", err);
                 myRealAddress = '';
+                signer = null;
                 walletInfoEl.classList.add('hidden');
                 let errorMessage = "Wallet connection request was rejected or failed.";
-                if (err.code === 4001 || (err.info && err.info.error && err.info.error.code === 4001) ) {
+                if (err.code === 4001 || (err.info?.error?.code === 4001) ) {
                     errorMessage = "The signature request was rejected in your wallet.";
                 }
                 showCustomAlert('Wallet Connection Failed', errorMessage);
@@ -616,34 +630,77 @@
             }
         }
 
+        async function connectWithPrivateKey(privateKey) {
+            try {
+                setLoginModalState('loading', 'privateKey');
+                const provider = new ethers.providers.JsonRpcProvider(POLYGON_RPC_URL);
+                signer = new ethers.Wallet(privateKey, provider);
+                myRealAddress = await signer.getAddress();
+
+                updateWalletUI(myRealAddress);
+                localStorage.setItem('streamr-explorer-private-key', privateKey);
+                sessionStorage.removeItem('authMethod');
+
+                await initializeApp();
+
+            } catch (e) {
+                console.error("Private key connection failed:", e);
+                showCustomAlert('Connection Failed', 'The provided private key is invalid.');
+                myRealAddress = '';
+                signer = null;
+                localStorage.removeItem('streamr-explorer-private-key');
+                setLoginModalState('buttons');
+            }
+        }
+
+
         async function connectAsGuest() {
             setLoginModalState('loading', 'guest');
             myRealAddress = '';
+            signer = null;
             walletInfoEl.classList.add('hidden');
+            localStorage.removeItem('streamr-explorer-private-key');
             sessionStorage.removeItem('authMethod');
             await initializeApp();
         }
+
+        function updateWalletUI(address) {
+            walletInfoEl.innerHTML = '';
+            const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            svg.setAttribute('class', 'w-5 h-5 text-green-400');
+            svg.setAttribute('fill', 'currentColor');
+            svg.setAttribute('viewBox', '0 0 20 20');
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            path.setAttribute('fill-rule', 'evenodd');
+            path.setAttribute('d', 'M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z');
+            path.setAttribute('clip-rule', 'evenodd');
+            svg.appendChild(path);
+
+            const span = document.createElement('span');
+            span.textContent = `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
+
+            walletInfoEl.appendChild(svg);
+            walletInfoEl.appendChild(span);
+            
+            walletInfoEl.classList.remove('hidden');
+            walletInfoEl.classList.add('flex');
+        }
+
 
         // --- Streamr Price Logic ---
         async function setupDataPriceStream() {
              dataPriceValueEl.textContent = 'Subscribing...';
              
              try {
-                // Unsubscribe from any previous price stream
-                if (priceSubscription) {
-                    await priceSubscription.unsubscribe();
-                }
+                if (priceSubscription) await priceSubscription.unsubscribe();
 
                 priceSubscription = await streamrClient.subscribe(DATA_PRICE_STREAM_ID, (message) => {
-                    // Extract 'bestBid' from Binance stream message.
                     if (message && message.bestBid !== undefined) {
                         dataPriceUSD = parseFloat(message.bestBid);
                         dataPriceValueEl.textContent = `$${dataPriceUSD.toFixed(4)}`;
                     }
                 });
-
                 console.log(`Subscribed to DATA price stream: ${DATA_PRICE_STREAM_ID}`);
-
              } catch (error) {
                  console.error("Error setting up DATA price stream:", error);
                  dataPriceValueEl.textContent = 'Stream Error';
@@ -684,7 +741,7 @@
             } else if (state === 'loading') {
                 if (statusSection) statusSection.classList.remove('hidden');
                 if (statusText) statusText.textContent = options.text || 'Awaiting confirmation...';
-                if (statusSubtext) statusSubtext.textContent = options.subtext || 'Please confirm the transaction in your wallet.';
+                if (statusSubtext) statusSubtext.textContent = options.subtext || (signer.provider.constructor.name.includes('Web3Provider') ? 'Please confirm the transaction in your wallet.' : 'Processing transaction...');
             } else if (state === 'success') {
                 if (statusSection) statusSection.classList.remove('hidden');
                 if (receiptSection) receiptSection.classList.remove('hidden');
@@ -727,7 +784,7 @@
             transactionModal.classList.remove('hidden');
 
             try {
-                const provider = new ethers.providers.Web3Provider(window.ethereum);
+                const provider = signer.provider;
                 let balanceWei;
                 if (mode === 'delegate') {
                     const tokenAddress = ethers.utils.getAddress(DATA_TOKEN_ADDRESS_POLYGON);
@@ -786,7 +843,11 @@
         }
 
         async function handleDelegate() {
-            if (!myRealAddress || !currentOperatorId) return;
+            if (!signer) {
+                showCustomAlert('Action Required', 'Please connect a wallet to delegate.');
+                return;
+            }
+            if (!currentOperatorId) return;
 
             const isCorrectNetwork = await checkAndSwitchNetwork();
             if (!isCorrectNetwork) return;
@@ -809,8 +870,6 @@
 
                 try {
                     setModalState('tx-modal', 'loading', { text: "Checking balance...", subtext: "Please wait." });
-                    const provider = new ethers.providers.Web3Provider(window.ethereum);
-                    const signer = provider.getSigner();
                     const tokenAddress = ethers.utils.getAddress(DATA_TOKEN_ADDRESS_POLYGON);
                     const dataTokenContract = new ethers.Contract(tokenAddress, DATA_TOKEN_ABI, signer);
                     const userBalanceWei = await dataTokenContract.balanceOf(myRealAddress);
@@ -845,7 +904,11 @@
         }
 
         async function handleUndelegate() {
-            if (!myRealAddress || !currentOperatorId) return;
+            if (!signer) {
+                showCustomAlert('Action Required', 'Please connect a wallet to undelegate.');
+                return;
+            }
+            if (!currentOperatorId) return;
 
             const isCorrectNetwork = await checkAndSwitchNetwork();
             if (!isCorrectNetwork) return;
@@ -868,8 +931,6 @@
                 
                 try {
                     setModalState('tx-modal', 'loading', { text: "Checking balance...", subtext: "Please wait." });
-                    const provider = new ethers.providers.Web3Provider(window.ethereum);
-                    const signer = provider.getSigner();
                     const operatorContract = new ethers.Contract(currentOperatorId, OPERATOR_CONTRACT_ABI, signer);
                     const userBalanceWei = await operatorContract.balanceOf(myRealAddress);
                     let amountWei;
@@ -904,7 +965,7 @@
 
 
         async function handleProcessQueue(button) {
-            if (!myRealAddress) {
+            if (!signer) {
                 showCustomAlert('Action Required', 'Please connect your wallet to process the queue.');
                 return;
             }
@@ -922,18 +983,12 @@
             setModalState('tx-modal', 'loading', { text: "Preparing transaction...", subtext: "This will pay out queued undelegations with the operator's available DATA." });
 
             try {
-                const provider = new ethers.providers.Web3Provider(window.ethereum);
-                const signer = provider.getSigner();
                 const operatorContract = new ethers.Contract(currentOperatorId, OPERATOR_CONTRACT_ABI, signer);
-
                 const tx = await operatorContract.payOutQueue(0);
-
                 setModalState('tx-modal', 'loading', { text: 'Processing Transaction...', subtext: 'Waiting for the transaction to be confirmed on the blockchain.' });
-
                 const receipt = await tx.wait();
                 setModalState('tx-modal', 'success', { txHash: receipt.transactionHash });
                 refreshOperatorGraphData(); 
-
             } catch (e) {
                 console.error("Queue processing failed:", e);
                 const message = getFriendlyErrorMessage(e);
@@ -946,7 +1001,7 @@
 
         async function handleEditStake(anchorElement, sponsorshipId, currentStakeWei) {
              if (anchorElement.classList.contains('processing')) return;
-             if (!myRealAddress) {
+             if (!signer) {
                 showCustomAlert('Action Required', 'Please connect your wallet to manage stake.');
                 return;
             }
@@ -961,8 +1016,7 @@
 
             stakeModalFreeFunds.textContent = 'Loading...';
             try {
-                const provider = new ethers.providers.Web3Provider(window.ethereum);
-                const tokenContract = new ethers.Contract(DATA_TOKEN_ADDRESS_POLYGON, DATA_TOKEN_ABI, provider);
+                const tokenContract = new ethers.Contract(DATA_TOKEN_ADDRESS_POLYGON, DATA_TOKEN_ABI, signer.provider);
                 const freeFundsWei = await tokenContract.balanceOf(currentOperatorId);
                 stakeModalFreeFunds.textContent = `${formatBigNumber(convertWeiToData(freeFundsWei))} DATA`;
             } catch (e) {
@@ -986,15 +1040,13 @@
                 
                 try {
                     setModalState('stake-modal', 'loading', { text: "Preparing transaction...", subtext: "Please wait." });
-                    const provider = new ethers.providers.Web3Provider(window.ethereum);
-                    const signer = provider.getSigner();
                     const operatorContract = new ethers.Contract(currentOperatorId, OPERATOR_CONTRACT_ABI, signer);
                     const targetAmountWei = ethers.utils.parseEther(targetAmount);
                     const currentAmountWei = ethers.BigNumber.from(currentSponsorshipContext.currentStakeWei);
                     let tx;
                     if (targetAmountWei.gt(currentAmountWei)) {
                         const differenceWei = targetAmountWei.sub(currentAmountWei);
-                        const tokenContract = new ethers.Contract(DATA_TOKEN_ADDRESS_POLYGON, DATA_TOKEN_ABI, provider);
+                        const tokenContract = new ethers.Contract(DATA_TOKEN_ADDRESS_POLYGON, DATA_TOKEN_ABI, signer.provider);
                         const freeFundsWei = await tokenContract.balanceOf(currentOperatorId);
                         if (differenceWei.gt(freeFundsWei)) {
                             showCustomAlert('Insufficient Funds', 'The operator does not have enough free funds to increase the stake by this amount.');
@@ -1025,7 +1077,7 @@
 
         async function handleCollectEarnings(anchorElement, sponsorshipId) {
             if (anchorElement.classList.contains('processing')) return;
-            if (!myRealAddress) {
+            if (!signer) {
                 showCustomAlert('Action Required', 'Please connect your wallet to collect earnings.');
                 return;
             }
@@ -1043,18 +1095,12 @@
             setModalState('tx-modal', 'loading', { text: "Preparing transaction...", subtext: "Please wait." });
 
             try {
-                const provider = new ethers.providers.Web3Provider(window.ethereum);
-                const signer = provider.getSigner();
                 const operatorContract = new ethers.Contract(currentOperatorId, OPERATOR_CONTRACT_ABI, signer);
-                
                 const tx = await operatorContract.withdrawEarningsFromSponsorships([sponsorshipId]);
-                
                 setModalState('tx-modal', 'loading', { text: 'Processing Transaction...', subtext: 'Waiting for the transaction to be confirmed on the blockchain.' });
-                
                 const receipt = await tx.wait();
                 setModalState('tx-modal', 'success', { txHash: receipt.transactionHash });
                 refreshOperatorGraphData();
-
             } catch (e) {
                 console.error("Earnings collection failed:", e);
                 const message = getFriendlyErrorMessage(e);
@@ -1066,7 +1112,7 @@
         }
 
         async function handleCollectAllEarnings(button) {
-            if (!myRealAddress) {
+            if (!signer) {
                 showCustomAlert('Action Required', 'Please connect your wallet to collect earnings.');
                 return;
             }
@@ -1088,20 +1134,13 @@
             setModalState('tx-modal', 'loading', { text: "Preparing transaction...", subtext: "This will collect earnings from all sponsorships." });
 
             try {
-                const provider = new ethers.providers.Web3Provider(window.ethereum);
-                const signer = provider.getSigner();
                 const operatorContract = new ethers.Contract(currentOperatorId, OPERATOR_CONTRACT_ABI, signer);
-
                 const allSponsorshipIds = currentOperatorData.stakes.map(stake => stake.sponsorship.id);
-                
                 const tx = await operatorContract.withdrawEarningsFromSponsorships(allSponsorshipIds);
-                
                 setModalState('tx-modal', 'loading', { text: 'Processing Transaction...', subtext: 'Waiting for the transaction to be confirmed on the blockchain.' });
-                
                 const receipt = await tx.wait();
                 setModalState('tx-modal', 'success', { txHash: receipt.transactionHash });
                 refreshOperatorGraphData();
-
             } catch (e) {
                 console.error("Collect all earnings failed:", e);
                 const message = getFriendlyErrorMessage(e);
@@ -1122,15 +1161,13 @@
              myStakeSection.classList.remove('hidden');
 
              try {
-                const provider = new ethers.providers.Web3Provider(window.ethereum);
+                const provider = signer?.provider || new ethers.providers.JsonRpcProvider(POLYGON_RPC_URL);
                 const operatorContract = new ethers.Contract(operatorId, OPERATOR_CONTRACT_ABI, provider);
                 const myStakeWei = await operatorContract.balanceInData(myRealAddress);
                 const myStakeData = convertWeiToData(myStakeWei.toString());
                 
                 myStakeValueEl.textContent = `${formatBigNumber(myStakeData)} DATA`;
                 myStakeValueEl.classList.remove('text-red-400');
-
-
              } catch(e) {
                 console.error("Failed to get user's stake (assuming 0):", e);
                 myStakeValueEl.textContent = '0.00 DATA';
@@ -1759,7 +1796,7 @@
                         <div><p class="text-sm text-gray-400">Stake (DATA)</p><p class="text-2xl font-semibold text-white" data-tooltip-value="${stakeData}">${formatBigNumber(stakeData)}</p></div>
                         <div><p class="text-sm text-gray-400">Total Earnings (DATA)</p><p class="text-2xl font-semibold text-white" data-tooltip-value="${totalEarningsData}">${formatBigNumber(totalEarningsData)}</p></div>
                         <div><p class="text-sm text-gray-400">% Owner's Cut</p><p class="text-2xl font-semibold text-white">${ownersCutPercent}%</p></div>
-                        <div><p class="text-sm text-gray-400">Nodes</p><p id="active-nodes-stats-value" class="text-2xl font-semibold text-white">0</p></div>
+                        <div><p class="text-sm text-gray-400">Nodes</p><p id="active-nodes-stats-value" class="text-2xl font-semibold text-white">${activeNodes.size}</p></div>
                     </div>
                     <div id="extended-stats" class="hidden mt-6">
                         <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
@@ -1956,6 +1993,26 @@
         stakeModalCancel.addEventListener('click', () => stakeModal.classList.add('hidden'));
         document.getElementById('stake-modal-close').addEventListener('click', () => stakeModal.classList.add('hidden'));
 
+        showPrivateKeyLoginBtn.addEventListener('click', () => {
+            walletLoginView.classList.add('hidden');
+            privateKeyLoginView.classList.remove('hidden');
+        });
+
+        backToWalletLoginBtn.addEventListener('click', () => {
+            privateKeyLoginView.classList.add('hidden');
+            walletLoginView.classList.remove('hidden');
+        });
+
+        connectPrivateKeyBtn.addEventListener('click', () => {
+            const key = privateKeyInput.value.trim();
+            if (key) {
+                connectWithPrivateKey(key);
+            } else {
+                showCustomAlert('Input Error', 'Please enter a private key.');
+            }
+        });
+
+
         mainContainer.addEventListener('mouseover', (e) => {
             const target = e.target.closest('[data-tooltip-value], [data-tooltip-content]');
             if (!target) return;
@@ -1987,10 +2044,16 @@
         });
         
         // --- Initialization ---
-        document.addEventListener('DOMContentLoaded', () => {
-             loginModal.classList.remove('hidden');
+        document.addEventListener('DOMContentLoaded', async () => {
+             const savedKey = localStorage.getItem('streamr-explorer-private-key');
+             if (savedKey) {
+                 await connectWithPrivateKey(savedKey);
+             } else {
+                loginModal.classList.remove('hidden');
+             }
         });
     </script>
 </body>
 </html>
+
 
