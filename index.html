@@ -91,7 +91,7 @@
                 <h3 class="text-xl font-bold mb-4 text-white">Connect with Private Key</h3>
                 <div class="bg-red-900 border border-red-700 text-red-200 px-4 py-3 rounded-lg relative mb-4 text-sm text-left">
                     <strong class="font-bold">Security Warning!</strong>
-                    <p class="block">Pasting your private key is risky. Only use an agent wallet with limited funds and permissions.</p>
+                    <p class="block">Pasting your private key is risky. Only use a agent wallet with limited permissions and funds.</p>
                     <p class="block mt-2"><strong class="underline">Never use your owner's wallet key.</strong></p>
                     <p class="block mt-2">Your Private Key is stored locally.</p>
                 </div>
@@ -1711,6 +1711,12 @@
                 const sponsorshipUrl = `https://streamr.network/hub/network/sponsorships/${sp.id}`;
                 const sponsorshipDisplayText = escapeHtml(sp.stream?.id || sp.id);
 
+                const isAgent = myRealAddress && op.controllers?.some(agent => agent.toLowerCase() === myRealAddress.toLowerCase());
+                
+                const editStakeLink = isAgent 
+                    ? `<a href="#" onclick="event.preventDefault(); handleEditStake(this, '${sp.id}', '${stake.amountWei}')" class="block px-4 py-2 text-sm text-gray-200 hover:bg-[#444444]">Edit Stake</a>`
+                    : `<span class="block px-4 py-2 text-sm text-gray-500 opacity-50 cursor-not-allowed" title="You must be an agent for this operator to edit stake.">Edit Stake</span>`;
+
                 return `
                 <li class="relative flex justify-between items-center py-3 border-b border-[#333333]">
                     <div class="flex-1 min-w-0">
@@ -1725,7 +1731,7 @@
                     <div class="flex-shrink-0 ml-4">
                          <button class="text-gray-400 hover:text-white p-1" onclick="toggleSponsorshipMenu(event, '${sp.id}')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" /></svg></button>
                         <div id="sponsorship-menu-${sp.id}" class="hidden absolute right-0 w-48 bg-[#2C2C2C] border border-[#333333] rounded-md shadow-lg z-20">
-                            <a href="#" onclick="event.preventDefault(); handleEditStake(this, '${sp.id}', '${stake.amountWei}')" class="block px-4 py-2 text-sm text-gray-200 hover:bg-[#444444]">Edit Stake</a>
+                            ${editStakeLink}
                             <a href="#" onclick="event.preventDefault(); handleCollectEarnings(this, '${sp.id}')" class="block px-4 py-2 text-sm text-gray-200 hover:bg-[#444444]">Collect Earnings</a>
                         </div>
                     </div>
@@ -2055,6 +2061,4 @@
     </script>
 </body>
 </html>
-
-
 
