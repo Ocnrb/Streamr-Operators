@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale-1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Streamr Operator Explorer</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Ethers.js Library (stable version) for Wallet Connection -->
@@ -91,7 +91,7 @@
                 <h3 class="text-xl font-bold mb-4 text-white">Connect with Private Key</h3>
                 <div class="bg-red-900 border border-red-700 text-red-200 px-4 py-3 rounded-lg relative mb-4 text-sm text-left">
                     <strong class="font-bold">Security Warning!</strong>
-                    <p class="block">Pasting your private key is risky. Only use a agent wallet with limited permissions and funds.</p>
+                    <p class="block">Pasting your private key is risky. Only use an agent wallet with limited funds and permissions.</p>
                     <p class="block mt-2"><strong class="underline">Never use your owner's wallet key.</strong></p>
                     <p class="block mt-2">Your Private Key is stored locally.</p>
                 </div>
@@ -213,9 +213,15 @@
     <div id="settingsModal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50 hidden">
         <div class="bg-[#1E1E1E] rounded-lg p-8 max-w-md w-full text-gray-300 border border-[#333333] shadow-2xl">
             <h2 class="text-2xl font-bold mb-4 text-white">Settings</h2>
-            <div class="mb-4">
-                <label for="api-key-input" class="block text-sm font-medium text-gray-400 mb-2">The Graph API Key</label>
-                <input type="text" id="api-key-input" placeholder="Enter your The Graph API key" class="w-full p-3 bg-[#121212] border border-[#333333] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#555555]">
+            <div class="space-y-4">
+                <div>
+                    <label for="thegraph-api-key-input" class="block text-sm font-medium text-gray-400 mb-2">The Graph API Key</label>
+                    <input type="text" id="thegraph-api-key-input" placeholder="Enter your The Graph API key" class="w-full p-3 bg-[#121212] border border-[#333333] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#555555]">
+                </div>
+                 <div>
+                    <label for="polygonscan-api-key-input" class="block text-sm font-medium text-gray-400 mb-2">Polygonscan API Key</label>
+                    <input type="text" id="polygonscan-api-key-input" placeholder="Enter your Polygonscan API key" class="w-full p-3 bg-[#121212] border border-[#333333] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#555555]">
+                </div>
             </div>
             <div class="mt-6 flex gap-4">
                 <button id="settings-cancel-btn" class="w-full bg-[#444444] hover:bg-[#555555] text-white font-bold py-3 px-4 rounded-lg transition-colors">Cancel</button>
@@ -223,33 +229,33 @@
             </div>
         </div>
     </div>
-
-
+    
     <!-- Main Loader Overlay (for data fetching) -->
     <div id="loader-overlay" class="fixed inset-0 bg-[#121212] bg-opacity-75 flex items-center justify-center z-50 hidden">
         <div class="loader rounded-full border-8 border-t-8 border-[#555555] border-t-transparent h-24 w-24"></div>
     </div>
     
-    <div class="absolute top-4 right-4 z-20 flex items-center gap-4">
-        <div id="wallet-info" class="bg-[#1E1E1E] border border-[#333333] text-white p-3 rounded-lg shadow-lg text-sm hidden items-center gap-2">
-            <!-- Wallet info will be injected here -->
+    <header class="p-4 flex flex-wrap justify-between items-center gap-4">
+        <div class="flex-grow text-center lg:text-left">
+            <h1 class="text-3xl md:text-5xl font-bold text-white mb-2">Streamr Explorer</h1>
+            <p class="text-md text-gray-400">Browse and inspect operators on the Streamr network.</p>
         </div>
-        <div id="data-price-box" class="bg-[#1E1E1E] border border-[#333333] text-white p-3 rounded-lg shadow-lg text-sm flex items-center gap-2">
-            <span>DATA Price:</span>
-            <span id="data-price-value" class="font-bold text-green-400">Loading...</span>
+        <div class="flex items-center justify-center lg:justify-end gap-2 flex-wrap">
+            <div id="wallet-info" class="bg-[#1E1E1E] border border-[#333333] text-white p-3 rounded-lg shadow-lg text-sm hidden items-center gap-2">
+                <!-- Wallet info will be injected here -->
+            </div>
+            <div id="data-price-box" class="bg-[#1E1E1E] border border-[#333333] text-white p-3 rounded-lg shadow-lg text-sm flex items-center gap-2">
+                <span>DATA Price:</span>
+                <span id="data-price-value" class="font-bold text-green-400">Loading...</span>
+            </div>
+            <button id="settings-btn" class="text-gray-400 hover:text-white transition-colors p-3 bg-[#1E1E1E] border border-[#333333] rounded-lg shadow-lg">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+            </button>
         </div>
-        <button id="settings-btn" class="text-gray-400 hover:text-white transition-colors">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-        </button>
-    </div>
+    </header>
 
 
     <div id="main-container" class="container mx-auto p-4 md:p-8 hidden">
-        <header class="text-center mb-10">
-            <h1 class="text-3xl md:text-5xl font-bold text-white mb-2">Streamr Explorer</h1>
-            <p class="text-md text-gray-400">Browse and inspect operators on the Streamr network.</p>
-        </header>
-
         <!-- Operator List View -->
         <main id="operator-list-view">
             <!-- Search Bar -->
@@ -382,8 +388,11 @@
 
         // --- API & SDK Constants ---
         const SUBGRAPH_ID = 'EGWFdhhiWypDuz22Uy7b3F69E9MEkyfU9iAQMttkH5Rj';
-        let apiKey = localStorage.getItem('the-graph-api-key') || 'bb77dd994c8e90edcbd73661a326f068';
-        let API_URL = `https://gateway-arbitrum.network.thegraph.com/api/${apiKey}/subgraphs/id/${SUBGRAPH_ID}`;
+        let graphApiKey = localStorage.getItem('the-graph-api-key') || 'bb77dd994c8e90edcbd73661a326f068';
+        let API_URL = `https://gateway-arbitrum.network.thegraph.com/api/${graphApiKey}/subgraphs/id/${SUBGRAPH_ID}`;
+        let polygonscanApiKey = localStorage.getItem('polygonscan-api-key') || '4IYW9RG6W87Y9B9IGCSD6Z8PVJEIBW5S41';
+
+
         const DATA_PRICE_STREAM_ID = 'binance-streamr.eth/DATAUSDT/ticker';
 
         const loaderOverlay = document.getElementById('loader-overlay');
@@ -418,7 +427,8 @@
         // Settings Modal Elements
         const settingsBtn = document.getElementById('settings-btn');
         const settingsModal = document.getElementById('settingsModal');
-        const apiKeyInput = document.getElementById('api-key-input');
+        const theGraphApiKeyInput = document.getElementById('thegraph-api-key-input');
+        const polygonscanApiKeyInput = document.getElementById('polygonscan-api-key-input');
         const settingsCancelBtn = document.getElementById('settings-cancel-btn');
         const settingsSaveBtn = document.getElementById('settings-save-btn');
 
@@ -1349,8 +1359,8 @@
 
                 if (isUnreachable && !unreachableNodes.has(nodeId)) {
                     unreachableNodes.add(nodeId);
-                    const unreachableCountEl = document.getElementById('unreachable-nodes-count-value');
-                    const unreachableContainer = document.getElementById('unreachable-nodes-container');
+                    const unreachableNodesCountEl = document.getElementById('unreachable-nodes-count-value');
+                    const unreachableNodesContainer = document.getElementById('unreachable-nodes-container');
                     unreachableCountEl.textContent = unreachableNodes.size;
                     if (unreachableNodes.size > 0) {
                         unreachableContainer.classList.remove('hidden');
@@ -1431,7 +1441,12 @@
                 const response = await fetch(POLYGON_RPC_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ jsonrpc: '2.0', method: 'eth_getBalance', params: [address, 'latest'], id: 1 }),
+                    body: JSON.stringify({
+                        jsonrpc: '2.0',
+                        method: 'eth_getBalance',
+                        params: [address, 'latest'],
+                        id: 1,
+                    }),
                 });
                 if (!response.ok) return 'Error';
                 const data = await response.json();
@@ -1441,7 +1456,7 @@
                 }
                 const balanceWei = BigInt(data.result);
                 const balanceMatic = Number(balanceWei) / 1e18;
-                return balanceMatic.toFixed(2);
+                return balanceMatic.toFixed(2); // Format to 2 decimal places
             } catch (error) {
                 console.error(`Failed to get MATIC balance for ${address}:`, error);
                 return 'Error';
@@ -1536,6 +1551,7 @@
             button.innerHTML = `<div class="w-4 h-4 border-2 border-white rounded-full border-t-transparent btn-spinner"></div> Loading...`;
             
             try {
+                // Pass the current search query when loading more
                 await fetchAndRenderOperatorsList(true, loadedOperatorCount, searchQuery);
             } catch (error) {
                 console.error("Failed to load more operators:", error);
@@ -1832,7 +1848,9 @@
             const nodesHtml = op.nodes?.length > 0 ? op.nodes.map(nodeId => `
                 <li class="flex justify-between items-center py-2 border-b border-[#333333]">
                     <div class="font-mono text-xs text-gray-300 truncate">${createAddressLink(nodeId, 'address')}</div>
-                     <span id="node-balance-${nodeId}" class="font-mono text-xs text-gray-300 text-right" title="POL Balance">...</span>
+                     <div class="flex items-center gap-2">
+                        <span id="node-balance-${nodeId}" class="font-mono text-xs text-gray-300 text-right" title="POL Balance">...</span>
+                    </div>
                 </li>`).join('') : '<li class="text-gray-500 text-sm">No nodes running.</li>';
             
             const queueHtml = op.queueEntries?.length > 0 ? op.queueEntries.map(entry => `
@@ -2234,7 +2252,8 @@
         });
 
         settingsBtn.addEventListener('click', () => {
-            apiKeyInput.value = localStorage.getItem('the-graph-api-key') || '';
+            theGraphApiKeyInput.value = localStorage.getItem('the-graph-api-key') || '';
+            polygonscanApiKeyInput.value = localStorage.getItem('polygonscan-api-key') || '';
             settingsModal.classList.remove('hidden');
         });
 
@@ -2243,14 +2262,22 @@
         });
 
         settingsSaveBtn.addEventListener('click', () => {
-            const newApiKey = apiKeyInput.value.trim();
-            if (newApiKey) {
-                localStorage.setItem('the-graph-api-key', newApiKey);
+            const newGraphApiKey = theGraphApiKeyInput.value.trim();
+            if (newGraphApiKey) {
+                localStorage.setItem('the-graph-api-key', newGraphApiKey);
             } else {
-                localStorage.removeItem('the-graph-api-key'); // Revert to default if cleared
+                localStorage.removeItem('the-graph-api-key');
             }
+
+            const newPolygonscanApiKey = polygonscanApiKeyInput.value.trim();
+            if (newPolygonscanApiKey) {
+                localStorage.setItem('polygonscan-api-key', newPolygonscanApiKey);
+            } else {
+                localStorage.removeItem('polygonscan-api-key');
+            }
+
             showCustomAlert('Settings Saved', 'The application will now reload with the new settings.');
-            setTimeout(() => window.location.reload(), 2000); // Reload to apply changes
+            setTimeout(() => window.location.reload(), 2000);
         });
 
 
