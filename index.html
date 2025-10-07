@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale-1.0">
     <title>Streamr Operator Explorer</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Ethers.js Library (stable version) for Wallet Connection -->
@@ -209,6 +209,21 @@
         </div>
     </div>
 
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-[#1E1E1E] rounded-lg p-8 max-w-md w-full text-gray-300 border border-[#333333] shadow-2xl">
+            <h2 class="text-2xl font-bold mb-4 text-white">Settings</h2>
+            <div class="mb-4">
+                <label for="api-key-input" class="block text-sm font-medium text-gray-400 mb-2">The Graph API Key</label>
+                <input type="text" id="api-key-input" placeholder="Enter your The Graph API key" class="w-full p-3 bg-[#121212] border border-[#333333] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#555555]">
+            </div>
+            <div class="mt-6 flex gap-4">
+                <button id="settings-cancel-btn" class="w-full bg-[#444444] hover:bg-[#555555] text-white font-bold py-3 px-4 rounded-lg transition-colors">Cancel</button>
+                <button id="settings-save-btn" class="w-full bg-blue-800 hover:bg-blue-900 text-white font-bold py-3 px-4 rounded-lg transition-colors">Save & Reload</button>
+            </div>
+        </div>
+    </div>
+
 
     <!-- Main Loader Overlay (for data fetching) -->
     <div id="loader-overlay" class="fixed inset-0 bg-[#121212] bg-opacity-75 flex items-center justify-center z-50 hidden">
@@ -223,6 +238,9 @@
             <span>DATA Price:</span>
             <span id="data-price-value" class="font-bold text-green-400">Loading...</span>
         </div>
+        <button id="settings-btn" class="text-gray-400 hover:text-white transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+        </button>
     </div>
 
 
@@ -363,10 +381,9 @@
 
 
         // --- API & SDK Constants ---
-        const API_KEY = 'bb77dd994c8e90edcbd73661a326f068';
         const SUBGRAPH_ID = 'EGWFdhhiWypDuz22Uy7b3F69E9MEkyfU9iAQMttkH5Rj';
-        const API_URL = `https://gateway-arbitrum.network.thegraph.com/api/${API_KEY}/subgraphs/id/${SUBGRAPH_ID}`;
-
+        let apiKey = localStorage.getItem('the-graph-api-key') || 'bb77dd994c8e90edcbd73661a326f068';
+        let API_URL = `https://gateway-arbitrum.network.thegraph.com/api/${apiKey}/subgraphs/id/${SUBGRAPH_ID}`;
         const DATA_PRICE_STREAM_ID = 'binance-streamr.eth/DATAUSDT/ticker';
 
         const loaderOverlay = document.getElementById('loader-overlay');
@@ -398,6 +415,12 @@
         const backToWalletLoginBtn = document.getElementById('backToWalletLoginBtn');
         const connectPrivateKeyBtn = document.getElementById('connectPrivateKeyBtn');
         const privateKeyInput = document.getElementById('private-key-input');
+        // Settings Modal Elements
+        const settingsBtn = document.getElementById('settings-btn');
+        const settingsModal = document.getElementById('settingsModal');
+        const apiKeyInput = document.getElementById('api-key-input');
+        const settingsCancelBtn = document.getElementById('settings-cancel-btn');
+        const settingsSaveBtn = document.getElementById('settings-save-btn');
 
 
         // --- Transaction Modal Elements ---
@@ -439,7 +462,8 @@
         let detailsRefreshInterval = null;
         let isStatsPanelExpanded = false;
         let isDelegatorViewActive = true;
-
+        let reputationViewIndex = 0; // 0: slashing, 1: flagsAgainst, 2: flagsBy
+        let walletViewIndex = 0; // 0: agents, 1: nodes
 
         // --- Streamr State ---
         let streamrClient = null;
@@ -1216,6 +1240,17 @@
             return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="text-gray-300 hover:text-white transition-colors" title="${escapeHtml(address)}">${abbreviated}</a>`;
         };
 
+        const createEntityLink = (entity) => {
+            if (!entity || !entity.id) return 'Unknown';
+            const name = parseOperatorMetadata(entity.metadataJsonString).name;
+            const address = entity.id;
+            const abbreviated = `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
+            const url = `https://polygonscan.com/address/${address}`;
+            const displayText = escapeHtml(name || abbreviated);
+            const titleText = escapeHtml(name ? `${name} (${address})` : address);
+            return `<a href="#" onclick="showDetailView('${address}'); return false;" class="text-gray-300 hover:text-white transition-colors" title="${titleText}">${displayText}</a>`;
+        }
+
         function escapeHtml(unsafe) {
             if (typeof unsafe !== 'string') {
                 return '';
@@ -1539,6 +1574,34 @@
                         queueEntries(orderBy: date, orderDirection: asc) { id amount delegator { id } date }
                       }
                       selfDelegation: delegations(where: {operator: "${currentOperatorId}", isSelfDelegation: true}, first: 1) { _valueDataWei }
+                      flagsAgainst: flags(where: {target: "${currentOperatorId}"}, orderBy: flaggingTimestamp, orderDirection: desc) {
+                            id
+                            flagger { id, metadataJsonString }
+                            sponsorship { id stream { id } }
+                            flaggingTimestamp
+                            result
+                            votes(orderBy: timestamp, orderDirection: desc) {
+                                id
+                                voter { id, metadataJsonString }
+                                voterWeight
+                                votedKick
+                                timestamp
+                            }
+                      }
+                      flagsAsFlagger: flags(where: {flagger: "${currentOperatorId}"}, orderBy: flaggingTimestamp, orderDirection: desc, first: 100) {
+                        id
+                        target { id, metadataJsonString }
+                        sponsorship { id stream { id } }
+                        flaggingTimestamp
+                        result
+                         votes(orderBy: timestamp, orderDirection: desc) {
+                            id
+                            voter { id, metadataJsonString }
+                            voterWeight
+                            votedKick
+                            timestamp
+                        }
+                      }
                       slashingEvents(where: {operator: "${currentOperatorId}"}, orderBy: date, orderDirection: desc, first: 100) { id amount date sponsorship { id stream { id } } }
                     }`;
                 const data = await runQuery(query);
@@ -1653,6 +1716,8 @@
 
         function renderOperatorDetails(data, isFirstLoad) {
             const op = data.operator;
+            const flagsAsFlagger = data.flagsAsFlagger;
+            const flagsAgainst = data.flagsAgainst;
             if (!op) {
                 detailContent.innerHTML = '<p class="text-gray-500">Operator not found.</p>';
                 return;
@@ -1715,7 +1780,7 @@
                 
                 const editStakeLink = isAgent 
                     ? `<a href="#" onclick="event.preventDefault(); handleEditStake(this, '${sp.id}', '${stake.amountWei}')" class="block px-4 py-2 text-sm text-gray-200 hover:bg-[#444444]">Edit Stake</a>`
-                    : `<span class="block px-4 py-2 text-sm text-gray-500 opacity-50 cursor-not-allowed" title="You must be an agent for this operator to edit stake.">Edit Stake</span>`;
+                    : `<span class="block px-4 py-2 text-sm text-gray-500 opacity-50 cursor-not-allowed" data-tooltip-content="You must be an agent for this operator to edit stake.">Edit Stake</span>`;
 
                 return `
                 <li class="relative flex justify-between items-center py-3 border-b border-[#333333]">
@@ -1778,6 +1843,54 @@
                     </div>
                     <div class="text-xs mt-1 text-gray-400"><p>Queued: ${new Date(entry.date * 1000).toLocaleString()}</p></div>
                 </li>`).join('') : '<li class="text-gray-500 text-sm">The undelegation queue is empty.</li>';
+            
+            const createFlagHtml = (flag, isTarget) => {
+                const sponsorshipUrl = `https://streamr.network/hub/network/sponsorships/${flag.sponsorship.id}`;
+                const sponsorshipDisplayText = escapeHtml(flag.sponsorship.stream?.id || flag.sponsorship.id);
+                const votesHtml = flag.votes.map(vote => `
+                    <li class="flex justify-between items-center text-xs py-1">
+                        <span>${createEntityLink(vote.voter)}</span>
+                        <div class="flex items-center gap-2">
+                            <span class="font-mono">${formatBigNumber(convertWeiToData(vote.voterWeight))}</span>
+                            <span class="${vote.votedKick ? 'text-red-400' : 'text-green-400'} font-semibold">${vote.votedKick ? 'Kick' : 'Keep'}</span>
+                        </div>
+                    </li>
+                `).join('');
+
+                let resultText = flag.result || 'Pending';
+                if (resultText.toUpperCase() === 'FAILED' || resultText.toUpperCase() === 'VOTE_FAILED') {
+                    resultText = 'False Flag';
+                }
+
+                const flagPartyText = isTarget 
+                    ? `Flagged by: ${createEntityLink(flag.flagger)}` 
+                    : `Flagged: ${createEntityLink(flag.target)}`;
+
+                return `
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <p class="text-xs text-gray-400">${flagPartyText}</p>
+                            <p class="text-xs text-gray-400 truncate">Sponsorship: <a href="${sponsorshipUrl}" target="_blank" rel="noopener noreferrer" class="text-gray-300 hover:text-white transition-colors" title="${sponsorshipDisplayText}">${sponsorshipDisplayText}</a></p>
+                             <p class="text-xs text-gray-400">Result: <span class="font-semibold">${resultText}</span></p>
+                        </div>
+                        <button onclick="toggleVoteList('${flag.id}')" class="text-gray-400 hover:text-white p-1">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                        </button>
+                    </div>
+                    <ul id="votes-${flag.id}" class="hidden mt-2 pl-4 border-l-2 border-gray-700">
+                        ${votesHtml || '<li class="text-xs text-gray-500">No votes recorded yet.</li>'}
+                    </ul>
+                `;
+            };
+            
+            const flagsAgainstHtml = flagsAgainst?.length > 0 
+                ? flagsAgainst.map(flag => `<li class="py-2 border-b border-[#333333]">${createFlagHtml(flag, true)}</li>`).join('') 
+                : '<li class="text-gray-500 text-sm">No flags recorded against this operator.</li>';
+            
+            const flagsByHtml = flagsAsFlagger?.length > 0 
+                ? flagsAsFlagger.map(flag => `<li class="py-2 border-b border-[#333333]">${createFlagHtml(flag, false)}</li>`).join('') 
+                : '<li class="text-gray-500 text-sm">This operator has not flagged anyone.</li>';
+
 
             const stakeData = convertWeiToData(op.valueWithoutEarnings); 
             const totalEarningsData = convertWeiToData(op.cumulativeEarningsWei);
@@ -1826,8 +1939,8 @@
                 </div>`;
 
             const listsHtml = `
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
-                    <div class="detail-section p-6">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-8">
+                    <div class="detail-section p-6 lg:col-span-1">
                         <div class="flex justify-between items-center mb-4">
                             <h3 id="delegator-queue-title" class="text-xl font-semibold text-white">Delegators (${op.delegatorCount > 0 ? op.delegatorCount - 1 : 0})</h3>
                             <button onclick="toggleDelegatorQueueView()" title="Switch View" class="text-gray-400 hover:text-white p-1"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg></button>
@@ -1838,16 +1951,49 @@
                             <ul class="max-h-96 overflow-y-auto pr-2">${queueHtml}</ul>
                         </div>
                     </div>
-                    <div class="detail-section p-6">
+                    <div class="detail-section p-6 lg:col-span-1">
                         <div class="flex justify-between items-center mb-4">
                             <h3 class="text-xl font-semibold text-white">Sponsorships (${op.stakes?.length || 0})</h3>
                             ${op.stakes?.length > 0 ? `<button onclick="handleCollectAllEarnings(this)" class="bg-blue-800 hover:bg-blue-900 text-white font-bold py-1 px-3 rounded-lg text-xs disabled:opacity-50 flex items-center justify-center">Collect All</button>` : ''}
                         </div>
                         <ul class="max-h-96 overflow-y-auto pr-2">${sponsorshipsHtml}</ul>
                     </div>
-                     <div class="detail-section p-6"><h3 class="text-xl font-semibold text-white mb-4">Slashing Events (${slashes.length})</h3><ul class="max-h-96 overflow-y-auto pr-2">${slashesHtml}</ul></div>
-                    <div class="detail-section p-6"><h3 class="text-xl font-semibold text-white mb-4">Agents (${op.controllers?.length || 0})</h3><ul class="max-h-96 overflow-y-auto pr-2">${agentsHtml}</ul></div>
-                    <div class="detail-section p-6"><h3 class="text-xl font-semibold text-white mb-4">Node Wallets (${op.nodes?.length || 0})</h3><ul class="max-h-96 overflow-y-auto pr-2">${nodesHtml}</ul></div>
+                    <div class="detail-section p-6 lg:col-span-2">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 id="reputation-title" class="text-xl font-semibold text-white">Slashing Events (${slashes.length})</h3>
+                            <button onclick="toggleReputationView(this)" title="Switch View" class="text-gray-400 hover:text-white p-1">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
+                            </button>
+                        </div>
+                        <div class="mt-4" 
+                            data-slashes-count="${slashes.length}"
+                            data-flags-against-count="${flagsAgainst?.length || 0}"
+                            data-flags-by-count="${flagsAsFlagger?.length || 0}">
+                            <div id="slashing-content">
+                                <ul class="max-h-96 overflow-y-auto pr-2">${slashesHtml}</ul>
+                            </div>
+                            <div id="flags-against-content" class="hidden">
+                                <ul class="max-h-96 overflow-y-auto pr-2">${flagsAgainstHtml}</ul>
+                            </div>
+                            <div id="flags-by-content" class="hidden">
+                                <ul class="max-h-96 overflow-y-auto pr-2">${flagsByHtml}</ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="detail-section p-6 lg:col-span-2">
+                         <div class="flex justify-between items-center mb-4">
+                            <h3 id="wallets-title" class="text-xl font-semibold text-white">Agents (${op.controllers?.length || 0})</h3>
+                            <button onclick="toggleWalletsView(this)" title="Switch View" class="text-gray-400 hover:text-white p-1">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
+                            </button>
+                        </div>
+                        <div id="agents-content" data-agents-count="${op.controllers?.length || 0}">
+                            <ul class="max-h-96 overflow-y-auto pr-2">${agentsHtml}</ul>
+                        </div>
+                        <div id="nodes-content" class="hidden" data-nodes-count="${op.nodes?.length || 0}">
+                            <ul class="max-h-96 overflow-y-auto pr-2">${nodesHtml}</ul>
+                        </div>
+                    </div>
                 </div>`;
 
             const streamHtml = `
@@ -1896,12 +2042,16 @@
                 newArrowEl.classList.add('rotate-180');
             }
             if (!isDelegatorViewActive) {
-                // Temporarily flip state so the toggle function lands on the correct view
                 isDelegatorViewActive = true; 
                 toggleDelegatorQueueView();
             } else {
                 updateDelegatorsSection();
             }
+            
+            // Restore reputation view
+            toggleReputationView(document.querySelector('#reputation-title + button'), true);
+            // Restore wallet view
+            toggleWalletsView(document.querySelector('#wallets-title + button'), true);
         }
 
         function fetchAndRenderBalances(operatorData) {
@@ -1926,6 +2076,8 @@
             operatorListView.style.display = 'none';
             operatorDetailView.style.display = 'block';
             window.scrollTo(0, 0);
+            reputationViewIndex = 0; // Reset reputation view on new operator
+            walletViewIndex = 0; // Reset wallet view on new operator
             fetchAndRenderOperatorDetails(operatorId);
         }
 
@@ -1987,6 +2139,69 @@
                 updateDelegatorsSection();
             }
         }
+        
+        function toggleVoteList(flagId) {
+            const voteList = document.getElementById(`votes-${flagId}`);
+            if (voteList) {
+                voteList.classList.toggle('hidden');
+            }
+        }
+        
+        function toggleReputationView(button, isRefresh = false) {
+            if (!isRefresh) {
+                reputationViewIndex = (reputationViewIndex + 1) % 3; // Cycle 0, 1, 2
+            }
+
+            const container = button.closest('.detail-section');
+            const titleEl = container.querySelector('#reputation-title');
+            const slashingContent = container.querySelector('#slashing-content');
+            const flagsAgainstContent = container.querySelector('#flags-against-content');
+            const flagsByContent = container.querySelector('#flags-by-content');
+            
+            const slashesCount = container.querySelector('[data-slashes-count]').dataset.slashesCount;
+            const flagsAgainstCount = container.querySelector('[data-flags-against-count]').dataset.flagsAgainstCount;
+            const flagsByCount = container.querySelector('[data-flags-by-count]').dataset.flagsByCount;
+
+            slashingContent.classList.add('hidden');
+            flagsAgainstContent.classList.add('hidden');
+            flagsByContent.classList.add('hidden');
+
+            if (reputationViewIndex === 0) {
+                titleEl.textContent = `Slashing Events (${slashesCount})`;
+                slashingContent.classList.remove('hidden');
+            } else if (reputationViewIndex === 1) {
+                titleEl.textContent = `Flags Against Operator (${flagsAgainstCount})`;
+                flagsAgainstContent.classList.remove('hidden');
+            } else { // reputationViewIndex === 2
+                titleEl.textContent = `Flags Initiated by Operator (${flagsByCount})`;
+                flagsByContent.classList.remove('hidden');
+            }
+        }
+        
+        function toggleWalletsView(button, isRefresh = false) {
+            if (!isRefresh) {
+                walletViewIndex = (walletViewIndex + 1) % 2; // Cycle 0, 1
+            }
+
+            const container = button.closest('.detail-section');
+            const titleEl = container.querySelector('#wallets-title');
+            const agentsContent = container.querySelector('#agents-content');
+            const nodesContent = container.querySelector('#nodes-content');
+            
+            const agentsCount = agentsContent.dataset.agentsCount;
+            const nodesCount = nodesContent.dataset.nodesCount;
+
+            agentsContent.classList.add('hidden');
+            nodesContent.classList.add('hidden');
+
+            if (walletViewIndex === 0) {
+                titleEl.textContent = `Agents (${agentsCount})`;
+                agentsContent.classList.remove('hidden');
+            } else { // walletViewIndex === 1
+                titleEl.textContent = `Node Wallets (${nodesCount})`;
+                nodesContent.classList.remove('hidden');
+            }
+        }
 
 
         // --- Event Listeners ---
@@ -2016,6 +2231,26 @@
             } else {
                 showCustomAlert('Input Error', 'Please enter a private key.');
             }
+        });
+
+        settingsBtn.addEventListener('click', () => {
+            apiKeyInput.value = localStorage.getItem('the-graph-api-key') || '';
+            settingsModal.classList.remove('hidden');
+        });
+
+        settingsCancelBtn.addEventListener('click', () => {
+            settingsModal.classList.add('hidden');
+        });
+
+        settingsSaveBtn.addEventListener('click', () => {
+            const newApiKey = apiKeyInput.value.trim();
+            if (newApiKey) {
+                localStorage.setItem('the-graph-api-key', newApiKey);
+            } else {
+                localStorage.removeItem('the-graph-api-key'); // Revert to default if cleared
+            }
+            showCustomAlert('Settings Saved', 'The application will now reload with the new settings.');
+            setTimeout(() => window.location.reload(), 2000); // Reload to apply changes
         });
 
 
