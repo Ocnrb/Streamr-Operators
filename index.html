@@ -210,7 +210,7 @@
 
     <div id="main-container" class="container mx-auto p-4 md:p-8 hidden">
         <header class="text-center mb-10">
-            <h1 class="text-3xl md:text-5xl font-bold text-white mb-2">Streamr Operator Explorer</h1>
+            <h1 class="text-3xl md:text-5xl font-bold text-white mb-2">Streamr Explorer</h1>
             <p class="text-md text-gray-400">Browse and inspect operators on the Streamr network.</p>
         </header>
 
@@ -719,7 +719,6 @@
             descriptionEl.textContent = mode === 'delegate' ? 'Enter the amount of DATA to delegate.' : 'Enter the amount of Operator Tokens to undelegate.';
             balanceLabelEl.textContent = 'Your Balance:';
             txModalBalanceValue.textContent = 'Loading...';
-            txModalConfirm.dataset.action = mode; // Set action for the event listener
 
             const minimumDelegationContainer = txModalMinimumValue.parentElement;
             minimumDelegationContainer.style.display = mode === 'delegate' ? 'flex' : 'none';
@@ -793,51 +792,56 @@
             if (!isCorrectNetwork) return;
 
             manageTransactionModal(true, 'delegate');
-        }
+            
+            txModalConfirm.addEventListener('click', async () => {
+                const amount = txModalAmount.value.replace(',', '.');
+                if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
+                    showCustomAlert('Invalid Amount', 'Please enter a valid amount greater than zero.');
+                    return;
+                }
+                if (!ethers.utils.isAddress(currentOperatorId)) {
+                    showCustomAlert('Transaction Error', 'Invalid Operator ID. Please refresh and try again.');
+                    return;
+                }
+                
+                txModalConfirm.disabled = true;
+                txModalConfirm.innerHTML = `<div class="w-4 h-4 border-2 border-white rounded-full border-t-transparent btn-spinner"></div> Processing...`;
 
-        async function confirmDelegate() {
-            let amount = txModalAmount.value.replace(',', '.');
-            if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
-                showCustomAlert('Invalid Amount', 'Please enter a valid amount greater than zero.');
-                return;
-            }
-            setModalState('tx-modal', 'loading', { text: "Checking balance...", subtext: "Please wait." });
-            try {
-                const provider = new ethers.providers.Web3Provider(window.ethereum);
-                const signer = provider.getSigner();
-                const tokenAddress = ethers.utils.getAddress(DATA_TOKEN_ADDRESS_POLYGON);
-                const dataTokenContract = new ethers.Contract(tokenAddress, DATA_TOKEN_ABI, signer);
-                
-                const userBalanceWei = await dataTokenContract.balanceOf(myRealAddress);
-                
-                let amountWei;
                 try {
-                    amountWei = ethers.utils.parseEther(amount);
-                } catch (e) {
-                    showCustomAlert('Invalid Amount', 'Please enter a valid number.');
-                    setModalState('tx-modal', 'input');
-                    return;
+                    setModalState('tx-modal', 'loading', { text: "Checking balance...", subtext: "Please wait." });
+                    const provider = new ethers.providers.Web3Provider(window.ethereum);
+                    const signer = provider.getSigner();
+                    const tokenAddress = ethers.utils.getAddress(DATA_TOKEN_ADDRESS_POLYGON);
+                    const dataTokenContract = new ethers.Contract(tokenAddress, DATA_TOKEN_ABI, signer);
+                    const userBalanceWei = await dataTokenContract.balanceOf(myRealAddress);
+                    let amountWei;
+                    try {
+                        amountWei = ethers.utils.parseEther(amount);
+                    } catch (e) {
+                        showCustomAlert('Invalid Amount', 'Please enter a valid number.');
+                        setModalState('tx-modal', 'input');
+                        return;
+                    }
+                    if (amountWei.gt(userBalanceWei)) {
+                        showCustomAlert('Insufficient Balance', 'You do not have enough DATA to delegate that amount.');
+                        setModalState('tx-modal', 'input');
+                        return;
+                    }
+                    setModalState('tx-modal', 'loading');
+                    const tx = await dataTokenContract.transferAndCall(currentOperatorId, amountWei, '0x');
+                    setModalState('tx-modal', 'loading', { text: 'Processing Transaction...', subtext: 'Waiting for the transaction to be confirmed on the blockchain.' });
+                    const receipt = await tx.wait();
+                    setModalState('tx-modal', 'success', { txHash: receipt.transactionHash });
+                    fetchMyStake(currentOperatorId);
+                } catch(e) {
+                    console.error("Delegation failed:", e);
+                    const message = getFriendlyErrorMessage(e);
+                    setModalState('tx-modal', 'error', { message });
+                } finally {
+                    txModalConfirm.disabled = false;
+                    txModalConfirm.textContent = 'Confirm';
                 }
-
-                if (amountWei.gt(userBalanceWei)) {
-                    showCustomAlert('Insufficient Balance', 'You do not have enough DATA to delegate that amount.');
-                    setModalState('tx-modal', 'input');
-                    return;
-                }
-
-                setModalState('tx-modal', 'loading');
-                
-                const tx = await dataTokenContract.transferAndCall(currentOperatorId, amountWei, '0x');
-                setModalState('tx-modal', 'loading', { text: 'Processing Transaction...', subtext: 'Waiting for the transaction to be confirmed on the blockchain.' });
-
-                const receipt = await tx.wait();
-                setModalState('tx-modal', 'success', { txHash: receipt.transactionHash });
-                fetchMyStake(currentOperatorId);
-            } catch(e) {
-                console.error("Delegation failed:", e);
-                const message = getFriendlyErrorMessage(e);
-                setModalState('tx-modal', 'error', { message });
-            }
+            }, { once: true });
         }
 
         async function handleUndelegate() {
@@ -847,57 +851,65 @@
             if (!isCorrectNetwork) return;
 
             manageTransactionModal(true, 'undelegate');
-        }
 
-        async function confirmUndelegate() {
-            const amount = txModalAmount.value.replace(',', '.');
-            if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
-                showCustomAlert('Invalid Amount', 'Please enter a valid amount greater than zero.');
-                return;
-            }
-            setModalState('tx-modal', 'loading', { text: "Checking balance...", subtext: "Please wait." });
-            try {
-                const provider = new ethers.providers.Web3Provider(window.ethereum);
-                const signer = provider.getSigner();
-                const operatorContract = new ethers.Contract(currentOperatorId, OPERATOR_CONTRACT_ABI, signer);
+            txModalConfirm.addEventListener('click', async () => {
+                const amount = txModalAmount.value.replace(',', '.');
+                if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
+                    showCustomAlert('Invalid Amount', 'Please enter a valid amount greater than zero.');
+                    return;
+                }
+                 if (!ethers.utils.isAddress(currentOperatorId)) {
+                    showCustomAlert('Transaction Error', 'Invalid Operator ID. Please refresh and try again.');
+                    return;
+                }
 
-                const userBalanceWei = await operatorContract.balanceOf(myRealAddress);
-            
-                let amountWei;
+                txModalConfirm.disabled = true;
+                txModalConfirm.innerHTML = `<div class="w-4 h-4 border-2 border-white rounded-full border-t-transparent btn-spinner"></div> Processing...`;
+                
                 try {
-                    amountWei = ethers.utils.parseEther(amount);
+                    setModalState('tx-modal', 'loading', { text: "Checking balance...", subtext: "Please wait." });
+                    const provider = new ethers.providers.Web3Provider(window.ethereum);
+                    const signer = provider.getSigner();
+                    const operatorContract = new ethers.Contract(currentOperatorId, OPERATOR_CONTRACT_ABI, signer);
+                    const userBalanceWei = await operatorContract.balanceOf(myRealAddress);
+                    let amountWei;
+                    try {
+                        amountWei = ethers.utils.parseEther(amount);
+                    } catch (e) {
+                        showCustomAlert('Invalid Amount', 'Please enter a valid number.');
+                        setModalState('tx-modal', 'input');
+                        return;
+                    }
+                    if (amountWei.gt(userBalanceWei)) {
+                        showCustomAlert('Insufficient Balance', 'You do not have enough Operator Tokens to undelegate that amount.');
+                        setModalState('tx-modal', 'input');
+                        return;
+                    }
+                    setModalState('tx-modal', 'loading');
+                    const tx = await operatorContract.undelegate(amountWei);
+                    setModalState('tx-modal', 'loading', { text: 'Processing Transaction...', subtext: 'Waiting for the transaction to be confirmed on the blockchain.' });
+                    const receipt = await tx.wait();
+                    setModalState('tx-modal', 'success', { txHash: receipt.transactionHash });
+                    fetchMyStake(currentOperatorId);
                 } catch (e) {
-                    showCustomAlert('Invalid Amount', 'Please enter a valid number.');
-                    setModalState('tx-modal', 'input');
-                    return;
+                    console.error("Undelegation failed:", e);
+                    const message = getFriendlyErrorMessage(e);
+                    setModalState('tx-modal', 'error', { message });
+                } finally {
+                    txModalConfirm.disabled = false;
+                    txModalConfirm.textContent = 'Confirm';
                 }
-
-                if (amountWei.gt(userBalanceWei)) {
-                    showCustomAlert('Insufficient Balance', 'You do not have enough Operator Tokens to undelegate that amount.');
-                    setModalState('tx-modal', 'input');
-                    return;
-                }
-
-                setModalState('tx-modal', 'loading');
-                const tx = await operatorContract.undelegate(amountWei);
-
-                setModalState('tx-modal', 'loading', { text: 'Processing Transaction...', subtext: 'Waiting for the transaction to be confirmed on the blockchain.' });
-
-                const receipt = await tx.wait();
-                setModalState('tx-modal', 'success', { txHash: receipt.transactionHash });
-
-                fetchMyStake(currentOperatorId);
-            } catch (e) {
-                console.error("Undelegation failed:", e);
-                const message = getFriendlyErrorMessage(e);
-                setModalState('tx-modal', 'error', { message });
-            }
+            }, { once: true });
         }
 
 
         async function handleProcessQueue(button) {
             if (!myRealAddress) {
                 showCustomAlert('Action Required', 'Please connect your wallet to process the queue.');
+                return;
+            }
+            if (!ethers.utils.isAddress(currentOperatorId)) {
+                showCustomAlert('Action Error', 'Invalid Operator ID. Please refresh and try again.');
                 return;
             }
             
@@ -932,7 +944,8 @@
             }
         }
 
-        async function handleEditStake(sponsorshipId, currentStakeWei) {
+        async function handleEditStake(anchorElement, sponsorshipId, currentStakeWei) {
+             if (anchorElement.classList.contains('processing')) return;
              if (!myRealAddress) {
                 showCustomAlert('Action Required', 'Please connect your wallet to manage stake.');
                 return;
@@ -945,7 +958,6 @@
             const currentStakeData = convertWeiToData(currentStakeWei);
             stakeModalCurrentStake.textContent = `${formatBigNumber(currentStakeData)} DATA`;
             stakeModalAmount.value = parseFloat(currentStakeData);
-            stakeModalConfirm.dataset.action = 'editStake';
 
             stakeModalFreeFunds.textContent = 'Loading...';
             try {
@@ -957,64 +969,68 @@
                 console.error("Failed to get free funds:", e);
                 stakeModalFreeFunds.textContent = 'Error';
             }
-        }
 
-        async function confirmStakeEdit() {
-            const targetAmount = stakeModalAmount.value.replace(',', '.');
-            if (!targetAmount || isNaN(targetAmount) || parseFloat(targetAmount) < 0) {
-                showCustomAlert('Invalid Amount', 'Please enter a valid number.');
-                return;
-            }
-
-            setModalState('stake-modal', 'loading', { text: "Preparing transaction...", subtext: "Please wait." });
-
-            try {
-                const provider = new ethers.providers.Web3Provider(window.ethereum);
-                const signer = provider.getSigner();
-                const operatorContract = new ethers.Contract(currentOperatorId, OPERATOR_CONTRACT_ABI, signer);
-
-                const targetAmountWei = ethers.utils.parseEther(targetAmount);
-                const currentAmountWei = ethers.BigNumber.from(currentSponsorshipContext.currentStakeWei);
-
-                let tx;
-
-                if (targetAmountWei.gt(currentAmountWei)) {
-                    // Increasing stake
-                    const differenceWei = targetAmountWei.sub(currentAmountWei);
-                    const tokenContract = new ethers.Contract(DATA_TOKEN_ADDRESS_POLYGON, DATA_TOKEN_ABI, provider);
-                    const freeFundsWei = await tokenContract.balanceOf(currentOperatorId);
-
-                    if (differenceWei.gt(freeFundsWei)) {
-                        showCustomAlert('Insufficient Funds', 'The operator does not have enough free funds to increase the stake by this amount.');
-                        setModalState('stake-modal', 'input');
-                        return;
-                    }
-                    tx = await operatorContract.stake(currentSponsorshipContext.id, differenceWei);
-                } else if (targetAmountWei.lt(currentAmountWei)) {
-                    // Decreasing stake
-                    tx = await operatorContract.reduceStakeTo(currentSponsorshipContext.id, targetAmountWei);
-                } else {
-                    // No change
-                    stakeModal.classList.add('hidden');
+             stakeModalConfirm.addEventListener('click', async () => {
+                const targetAmount = stakeModalAmount.value.replace(',', '.');
+                if (!targetAmount || isNaN(targetAmount) || parseFloat(targetAmount) < 0) {
+                    showCustomAlert('Invalid Amount', 'Please enter a valid number.');
+                    return;
+                }
+                if (!ethers.utils.isAddress(currentOperatorId) || !ethers.utils.isAddress(currentSponsorshipContext.id)) {
+                    showCustomAlert('Transaction Error', 'Invalid Operator or Sponsorship ID. Please refresh and try again.');
                     return;
                 }
 
-                setModalState('stake-modal', 'loading');
-                const receipt = await tx.wait();
-                setModalState('stake-modal', 'success', { txHash: receipt.transactionHash });
-                refreshOperatorGraphData();
-
-            } catch(e) {
-                console.error("Stake edit failed:", e);
-                const message = getFriendlyErrorMessage(e);
-                setModalState('stake-modal', 'error', { message });
-            }
+                stakeModalConfirm.disabled = true;
+                stakeModalConfirm.innerHTML = `<div class="w-4 h-4 border-2 border-white rounded-full border-t-transparent btn-spinner"></div> Processing...`;
+                
+                try {
+                    setModalState('stake-modal', 'loading', { text: "Preparing transaction...", subtext: "Please wait." });
+                    const provider = new ethers.providers.Web3Provider(window.ethereum);
+                    const signer = provider.getSigner();
+                    const operatorContract = new ethers.Contract(currentOperatorId, OPERATOR_CONTRACT_ABI, signer);
+                    const targetAmountWei = ethers.utils.parseEther(targetAmount);
+                    const currentAmountWei = ethers.BigNumber.from(currentSponsorshipContext.currentStakeWei);
+                    let tx;
+                    if (targetAmountWei.gt(currentAmountWei)) {
+                        const differenceWei = targetAmountWei.sub(currentAmountWei);
+                        const tokenContract = new ethers.Contract(DATA_TOKEN_ADDRESS_POLYGON, DATA_TOKEN_ABI, provider);
+                        const freeFundsWei = await tokenContract.balanceOf(currentOperatorId);
+                        if (differenceWei.gt(freeFundsWei)) {
+                            showCustomAlert('Insufficient Funds', 'The operator does not have enough free funds to increase the stake by this amount.');
+                            setModalState('stake-modal', 'input');
+                            return;
+                        }
+                        tx = await operatorContract.stake(currentSponsorshipContext.id, differenceWei);
+                    } else if (targetAmountWei.lt(currentAmountWei)) {
+                        tx = await operatorContract.reduceStakeTo(currentSponsorshipContext.id, targetAmountWei);
+                    } else {
+                        stakeModal.classList.add('hidden');
+                        return;
+                    }
+                    setModalState('stake-modal', 'loading');
+                    const receipt = await tx.wait();
+                    setModalState('stake-modal', 'success', { txHash: receipt.transactionHash });
+                    refreshOperatorGraphData();
+                } catch(e) {
+                    console.error("Stake edit failed:", e);
+                    const message = getFriendlyErrorMessage(e);
+                    setModalState('stake-modal', 'error', { message });
+                } finally {
+                    stakeModalConfirm.disabled = false;
+                    stakeModalConfirm.textContent = 'Confirm';
+                }
+            }, { once: true });
         }
 
         async function handleCollectEarnings(anchorElement, sponsorshipId) {
             if (anchorElement.classList.contains('processing')) return;
             if (!myRealAddress) {
                 showCustomAlert('Action Required', 'Please connect your wallet to collect earnings.');
+                return;
+            }
+            if (!ethers.utils.isAddress(currentOperatorId) || !ethers.utils.isAddress(sponsorshipId)) {
+                showCustomAlert('Action Error', 'Invalid Operator or Sponsorship ID. Please refresh and try again.');
                 return;
             }
             
@@ -1056,6 +1072,10 @@
             }
             if (!currentOperatorData || !currentOperatorData.stakes || currentOperatorData.stakes.length === 0) {
                 showCustomAlert('No Sponsorships', 'There are no sponsorships to collect earnings from.');
+                return;
+            }
+             if (!ethers.utils.isAddress(currentOperatorId)) {
+                showCustomAlert('Action Error', 'Invalid Operator ID. Please refresh and try again.');
                 return;
             }
             
@@ -1722,7 +1742,7 @@
             const totalDistributedData = convertWeiToData(totalDistributedWei.toString());
 
             const headerStatsHtml = `
-                <div class="detail-section p-6">
+                <div class="detail-section px-6 pt-6 pb-2">
                     <div class="flex items-center gap-6">
                         <img src="${imageUrl || placeholderUrl}" onerror="this.src='${placeholderUrl}'; this.onerror=null;" alt="Operator Avatar" class="w-20 h-20 rounded-full border-2 border-[#333333] flex-shrink-0 object-cover" ${operatorDescription ? `data-tooltip-content="${escapeHtml(operatorDescription)}"` : ''}>
                         <div class="flex-1 min-w-0">
@@ -1749,7 +1769,7 @@
                             <div><p class="text-sm text-gray-400">% Owner's Stake</p><p class="text-2xl font-semibold text-white" data-tooltip-content="${selfDelegationTooltip}">${Math.round(ownersStakePercent)}%</p></div>
                         </div>
                     </div>
-                    <div class="mt-2 text-center"><button id="toggle-stats-btn" onclick="toggleStatsPanel()" class="text-gray-400 hover:text-white transition"><svg id="stats-arrow" class="w-6 h-6 mx-auto transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg></button></div>
+                    <div class="mt-4 text-center"><button id="toggle-stats-btn" onclick="toggleStatsPanel()" class="text-gray-400 hover:text-white transition"><svg id="stats-arrow" class="w-6 h-6 mx-auto transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 9l-7 7-7-7"></path></svg></button></div>
                 </div>
                 <div id="my-stake-section" class="detail-section p-6 hidden mt-8">
                      <h3 class="text-xl font-semibold text-white mb-4">Your Stake</h3>
@@ -1935,33 +1955,6 @@
         document.getElementById('tx-modal-close').addEventListener('click', () => manageTransactionModal(false));
         stakeModalCancel.addEventListener('click', () => stakeModal.classList.add('hidden'));
         document.getElementById('stake-modal-close').addEventListener('click', () => stakeModal.classList.add('hidden'));
-
-        txModalConfirm.addEventListener('click', async () => {
-            const action = txModalConfirm.dataset.action;
-            txModalConfirm.disabled = true;
-            txModalConfirm.innerHTML = `<div class="w-4 h-4 border-2 border-white rounded-full border-t-transparent btn-spinner"></div> Processing...`;
-
-            try {
-                if (action === 'delegate') await confirmDelegate();
-                else if (action === 'undelegate') await confirmUndelegate();
-            } finally {
-                txModalConfirm.disabled = false;
-                txModalConfirm.textContent = 'Confirm';
-            }
-        });
-
-        stakeModalConfirm.addEventListener('click', async () => {
-            const action = stakeModalConfirm.dataset.action;
-            stakeModalConfirm.disabled = true;
-            stakeModalConfirm.innerHTML = `<div class="w-4 h-4 border-2 border-white rounded-full border-t-transparent btn-spinner"></div> Processing...`;
-            
-            try {
-                if (action === 'editStake') await confirmStakeEdit();
-            } finally {
-                stakeModalConfirm.disabled = false;
-                stakeModalConfirm.textContent = 'Confirm';
-            }
-        });
 
         mainContainer.addEventListener('mouseover', (e) => {
             const target = e.target.closest('[data-tooltip-value], [data-tooltip-content]');
