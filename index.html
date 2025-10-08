@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2305,14 +2306,27 @@
 
         settingsSaveBtn.addEventListener('click', () => {
             const newGraphApiKey = theGraphApiKeyInput.value.trim();
+            
+            // Use default key if input is empty
+            const keyToUse = newGraphApiKey || 'bb77dd994c8e90edcbd73661a326f068';
+            
+            // Update local storage
             if (newGraphApiKey) {
                 localStorage.setItem('the-graph-api-key', newGraphApiKey);
             } else {
                 localStorage.removeItem('the-graph-api-key');
             }
+            
+            // Update variables in memory immediately
+            graphApiKey = keyToUse;
+            API_URL = `https://gateway-arbitrum.network.thegraph.com/api/${graphApiKey}/subgraphs/id/${SUBGRAPH_ID}`;
 
-            showCustomAlert('Settings Saved', 'The application will now reload with the new settings.');
-            setTimeout(() => window.location.reload(), 2000);
+            settingsModal.classList.add('hidden');
+            showCustomAlert('Settings Saved', 'Data will be refreshed with the new API key.');
+            
+            // Re-fetch the data immediately to apply the new key
+            loadedOperatorCount = 0; // Reset pagination
+            fetchAndRenderOperatorsList(false, 0, searchQuery); // Re-fetch with current search query
         });
 
 
@@ -2353,4 +2367,5 @@
     </script>
 </body>
 </html>
+
 
