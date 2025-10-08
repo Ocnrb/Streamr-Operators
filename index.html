@@ -82,22 +82,6 @@
                 <button id="guestBtn" class="w-full bg-[#444444] hover:bg-[#555555] text-white font-bold py-3 px-4 rounded-lg transition-colors">
                     Continue as Guest
                 </button>
-                <div class="mt-4">
-                    <button id="showPrivateKeyLoginBtn" class="text-gray-400 hover:text-white text-sm">Or connect with private key</button>
-                </div>
-            </div>
-
-            <div id="privateKeyLoginView" class="hidden">
-                <h3 class="text-xl font-bold mb-4 text-white">Connect with Private Key</h3>
-                <div class="bg-red-900 border border-red-700 text-red-200 px-4 py-3 rounded-lg relative mb-4 text-sm text-left">
-                    <strong class="font-bold">Security Warning!</strong>
-                    <p class="block">Pasting your private key is risky. Only use an agent wallet with limited funds and permissions.</p>
-                    <p class="block mt-2"><strong class="underline">Never use your owner's wallet key.</strong></p>
-                    <p class="block mt-2">Your Private Key is stored locally.</p>
-                </div>
-                <input type="password" id="private-key-input" placeholder="Enter your private key" class="w-full p-3 bg-[#121212] border border-[#333333] rounded-lg text-white mb-4 focus:outline-none focus:ring-2 focus:ring-[#555555]">
-                <button id="connectPrivateKeyBtn" class="w-full bg-blue-800 hover:bg-blue-900 text-white font-bold py-3 px-4 rounded-lg transition-colors mb-4">Connect</button>
-                <button id="backToWalletLoginBtn" class="text-gray-400 hover:text-white text-sm">Back to main login</button>
             </div>
 
             <div id="loadingContent" class="hidden">
@@ -129,12 +113,15 @@
             <!-- Input Section -->
             <div id="tx-modal-input-section">
                 <p id="tx-modal-description" class="mb-4 text-gray-400">Enter the amount of DATA to delegate.</p>
-                <input 
-                    type="number" 
-                    id="tx-modal-amount" 
-                    placeholder="0.0" 
-                    class="w-full p-3 bg-[#121212] border border-[#333333] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#555555] transition-colors"
-                >
+                <div class="relative">
+                    <input 
+                        type="number" 
+                        id="tx-modal-amount" 
+                        placeholder="0.0" 
+                        class="w-full p-3 pr-16 bg-[#121212] border border-[#333333] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#555555] transition-colors"
+                    >
+                    <button id="tx-modal-max-btn" class="absolute inset-y-0 right-0 flex items-center pr-3 text-sm font-bold text-blue-500 hover:text-blue-400">MAX</button>
+                </div>
                 <div class="flex justify-between mt-2 text-sm">
                      <span id="tx-modal-balance-label" class="text-gray-400">Your Balance:</span>
                      <span id="tx-modal-balance-value" class="text-gray-300">Loading...</span>
@@ -173,12 +160,15 @@
             <!-- Input Section -->
             <div id="stake-modal-input-section">
                 <p id="stake-modal-description" class="mb-4 text-gray-400">Enter the new total stake amount for this sponsorship.</p>
-                <input 
-                    type="number" 
-                    id="stake-modal-amount" 
-                    placeholder="0.0" 
-                    class="w-full p-3 bg-[#121212] border border-[#333333] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#555555] transition-colors"
-                >
+                <div class="relative">
+                    <input 
+                        type="number" 
+                        id="stake-modal-amount" 
+                        placeholder="0.0" 
+                        class="w-full p-3 pr-16 bg-[#121212] border border-[#333333] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#555555] transition-colors"
+                    >
+                    <button id="stake-modal-max-btn" class="absolute inset-y-0 right-0 flex items-center pr-3 text-sm font-bold text-blue-500 hover:text-blue-400">MAX</button>
+                </div>
                 <div class="flex justify-between mt-2 text-sm">
                      <span class="text-gray-400">Your Current Stake:</span>
                      <span id="stake-modal-current-stake" class="text-gray-300">Loading...</span>
@@ -217,10 +207,6 @@
                 <div>
                     <label for="thegraph-api-key-input" class="block text-sm font-medium text-gray-400 mb-2">The Graph API Key</label>
                     <input type="text" id="thegraph-api-key-input" placeholder="Enter your The Graph API key" class="w-full p-3 bg-[#121212] border border-[#333333] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#555555]">
-                </div>
-                 <div>
-                    <label for="polygonscan-api-key-input" class="block text-sm font-medium text-gray-400 mb-2">Polygonscan API Key</label>
-                    <input type="text" id="polygonscan-api-key-input" placeholder="Enter your Polygonscan API key" class="w-full p-3 bg-[#121212] border border-[#333333] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#555555]">
                 </div>
             </div>
             <div class="mt-6 flex gap-4">
@@ -390,9 +376,7 @@
         const SUBGRAPH_ID = 'EGWFdhhiWypDuz22Uy7b3F69E9MEkyfU9iAQMttkH5Rj';
         let graphApiKey = localStorage.getItem('the-graph-api-key') || 'bb77dd994c8e90edcbd73661a326f068';
         let API_URL = `https://gateway-arbitrum.network.thegraph.com/api/${graphApiKey}/subgraphs/id/${SUBGRAPH_ID}`;
-        let polygonscanApiKey = localStorage.getItem('polygonscan-api-key') || '4IYW9RG6W87Y9B9IGCSD6Z8PVJEIBW5S41';
-
-
+        
         const DATA_PRICE_STREAM_ID = 'binance-streamr.eth/DATAUSDT/ticker';
 
         const loaderOverlay = document.getElementById('loader-overlay');
@@ -419,16 +403,10 @@
         const walletInfoEl = document.getElementById('wallet-info');
         // Private Key Login elements
         const walletLoginView = document.getElementById('walletLoginView');
-        const privateKeyLoginView = document.getElementById('privateKeyLoginView');
-        const showPrivateKeyLoginBtn = document.getElementById('showPrivateKeyLoginBtn');
-        const backToWalletLoginBtn = document.getElementById('backToWalletLoginBtn');
-        const connectPrivateKeyBtn = document.getElementById('connectPrivateKeyBtn');
-        const privateKeyInput = document.getElementById('private-key-input');
         // Settings Modal Elements
         const settingsBtn = document.getElementById('settings-btn');
         const settingsModal = document.getElementById('settingsModal');
         const theGraphApiKeyInput = document.getElementById('thegraph-api-key-input');
-        const polygonscanApiKeyInput = document.getElementById('polygonscan-api-key-input');
         const settingsCancelBtn = document.getElementById('settings-cancel-btn');
         const settingsSaveBtn = document.getElementById('settings-save-btn');
 
@@ -464,16 +442,22 @@
         let searchTimeout = null; 
         const POLYGON_RPC_URL = 'https://polygon-rpc.com';
 
+        // --- Transaction State ---
+        let maxTxAmountWei = '0';
+        let maxStakeAmountWei = '0';
+
         // --- Management State ---
         let activeSponsorshipMenu = null;
         let currentSponsorshipContext = { id: null, currentStakeWei: '0' };
         
         // --- UI State ---
         let detailsRefreshInterval = null;
-        let isStatsPanelExpanded = false;
-        let isDelegatorViewActive = true;
-        let reputationViewIndex = 0; // 0: slashing, 1: flagsAgainst, 2: flagsBy
-        let walletViewIndex = 0; // 0: agents, 1: nodes
+        let uiState = {
+            isStatsPanelExpanded: false,
+            isDelegatorViewActive: true,
+            reputationViewIndex: 0, // 0: slashing, 1: flagsAgainst, 2: flagsBy
+            walletViewIndex: 0 // 0: agents, 1: nodes
+        };
 
         // --- Streamr State ---
         let streamrClient = null;
@@ -557,20 +541,18 @@
 
             if (state === 'loading') {
                 walletLoginView.classList.add('hidden');
-                privateKeyLoginView.classList.add('hidden');
                 loadingContent.classList.remove('hidden');
 
                 if (mode === 'guest') {
                     loadingMainText.textContent = 'Loading...';
                     loadingSubText.textContent = 'Fetching operator data, please wait.';
-                } else { // 'wallet' or 'privateKey'
+                } else { // 'wallet'
                     loadingMainText.textContent = 'Connecting...';
-                    loadingSubText.textContent = mode === 'privateKey' ? 'Setting up your session...' : 'Please follow the instructions in your wallet.';
+                    loadingSubText.textContent = 'Please follow the instructions in your wallet.';
                 }
             } else { // 'buttons' state
                 loadingContent.classList.add('hidden');
                 walletLoginView.classList.remove('hidden');
-                privateKeyLoginView.classList.add('hidden');
             }
         }
         
@@ -632,7 +614,6 @@
 
             try {
                 setLoginModalState('loading', 'wallet');
-                localStorage.removeItem('streamr-explorer-private-key'); // Clear private key on wallet connect
 
                 const provider = new ethers.providers.Web3Provider(injectedProvider);
                 await provider.send("eth_requestAccounts", []);
@@ -664,36 +645,11 @@
             }
         }
 
-        async function connectWithPrivateKey(privateKey) {
-            try {
-                setLoginModalState('loading', 'privateKey');
-                const provider = new ethers.providers.JsonRpcProvider(POLYGON_RPC_URL);
-                signer = new ethers.Wallet(privateKey, provider);
-                myRealAddress = await signer.getAddress();
-
-                updateWalletUI(myRealAddress);
-                localStorage.setItem('streamr-explorer-private-key', privateKey);
-                sessionStorage.removeItem('authMethod');
-
-                await initializeApp();
-
-            } catch (e) {
-                console.error("Private key connection failed:", e);
-                showCustomAlert('Connection Failed', 'The provided private key is invalid.');
-                myRealAddress = '';
-                signer = null;
-                localStorage.removeItem('streamr-explorer-private-key');
-                setLoginModalState('buttons');
-            }
-        }
-
-
         async function connectAsGuest() {
             setLoginModalState('loading', 'guest');
             myRealAddress = '';
             signer = null;
             walletInfoEl.classList.add('hidden');
-            localStorage.removeItem('streamr-explorer-private-key');
             sessionStorage.removeItem('authMethod');
             await initializeApp();
         }
@@ -807,9 +763,10 @@
             const balanceLabelEl = document.getElementById('tx-modal-balance-label');
             
             titleEl.textContent = mode === 'delegate' ? 'Delegate to Operator' : 'Undelegate from Operator';
-            descriptionEl.textContent = mode === 'delegate' ? 'Enter the amount of DATA to delegate.' : 'Enter the amount of Operator Tokens to undelegate.';
+            descriptionEl.textContent = mode === 'delegate' ? 'Enter the amount of DATA to delegate.' : 'Enter the amount of DATA to undelegate.';
             balanceLabelEl.textContent = 'Your Balance:';
             txModalBalanceValue.textContent = 'Loading...';
+            maxTxAmountWei = '0'; // Reset max amount
 
             const minimumDelegationContainer = txModalMinimumValue.parentElement;
             minimumDelegationContainer.style.display = mode === 'delegate' ? 'flex' : 'none';
@@ -826,10 +783,11 @@
                     balanceWei = await dataTokenContract.balanceOf(myRealAddress);
                 } else { // 'undelegate' mode
                     const operatorContract = new ethers.Contract(currentOperatorId, OPERATOR_CONTRACT_ABI, provider);
-                    balanceWei = await operatorContract.balanceOf(myRealAddress);
+                    balanceWei = await operatorContract.balanceInData(myRealAddress);
                 }
+                maxTxAmountWei = balanceWei.toString(); // Store the raw wei value
                 const balanceFormatted = ethers.utils.formatEther(balanceWei);
-                const tokenSymbol = mode === 'delegate' ? 'DATA' : 'Operator Tokens';
+                const tokenSymbol = 'DATA';
                 txModalBalanceValue.textContent = `${formatBigNumber(parseFloat(balanceFormatted).toFixed(4))} ${tokenSymbol}`;
 
                 if (mode === 'delegate') {
@@ -849,6 +807,14 @@
                 txModalBalanceValue.textContent = 'Error';
                 txModalBalanceValue.classList.add('text-red-400');
             }
+
+            const maxBtn = document.getElementById('tx-modal-max-btn');
+            maxBtn.replaceWith(maxBtn.cloneNode(true)); // a little trick to remove old listeners
+            document.getElementById('tx-modal-max-btn').addEventListener('click', () => {
+                if (maxTxAmountWei !== '0') {
+                    txModalAmount.value = ethers.utils.formatEther(maxTxAmountWei);
+                }
+            });
         }
         
         function getFriendlyErrorMessage(error) {
@@ -950,8 +916,8 @@
             manageTransactionModal(true, 'undelegate');
 
             txModalConfirm.addEventListener('click', async () => {
-                const amount = txModalAmount.value.replace(',', '.');
-                if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
+                const amountData = txModalAmount.value.replace(',', '.');
+                if (!amountData || isNaN(amountData) || parseFloat(amountData) <= 0) {
                     showCustomAlert('Invalid Amount', 'Please enter a valid amount greater than zero.');
                     return;
                 }
@@ -966,22 +932,32 @@
                 try {
                     setModalState('tx-modal', 'loading', { text: "Checking balance...", subtext: "Please wait." });
                     const operatorContract = new ethers.Contract(currentOperatorId, OPERATOR_CONTRACT_ABI, signer);
-                    const userBalanceWei = await operatorContract.balanceOf(myRealAddress);
-                    let amountWei;
+                    const userBalanceDataWei = await operatorContract.balanceInData(myRealAddress);
+                    let amountDataWei;
                     try {
-                        amountWei = ethers.utils.parseEther(amount);
+                        amountDataWei = ethers.utils.parseEther(amountData);
                     } catch (e) {
                         showCustomAlert('Invalid Amount', 'Please enter a valid number.');
                         setModalState('tx-modal', 'input');
                         return;
                     }
-                    if (amountWei.gt(userBalanceWei)) {
-                        showCustomAlert('Insufficient Balance', 'You do not have enough Operator Tokens to undelegate that amount.');
+                    if (amountDataWei.gt(userBalanceDataWei)) {
+                        showCustomAlert('Insufficient Balance', 'You do not have enough staked DATA to undelegate that amount.');
                         setModalState('tx-modal', 'input');
                         return;
                     }
+                    
+                    if (!currentOperatorData || !currentOperatorData.operatorTokenTotalSupplyWei || currentOperatorData.operatorTokenTotalSupplyWei === '0') {
+                        showCustomAlert('Error', 'Could not retrieve operator token exchange rate. Please try again later.');
+                        setModalState('tx-modal', 'input');
+                        return;
+                    }
+                    const totalDataWei = ethers.BigNumber.from(currentOperatorData.valueWithoutEarnings);
+                    const totalTokensWei = ethers.BigNumber.from(currentOperatorData.operatorTokenTotalSupplyWei);
+                    const amountOperatorTokensWei = totalDataWei.isZero() ? ethers.BigNumber.from(0) : amountDataWei.mul(totalTokensWei).div(totalDataWei);
+
                     setModalState('tx-modal', 'loading');
-                    const tx = await operatorContract.undelegate(amountWei);
+                    const tx = await operatorContract.undelegate(amountOperatorTokensWei);
                     setModalState('tx-modal', 'loading', { text: 'Processing Transaction...', subtext: 'Waiting for the transaction to be confirmed on the blockchain.' });
                     const receipt = await tx.wait();
                     setModalState('tx-modal', 'success', { txHash: receipt.transactionHash });
@@ -1043,6 +1019,7 @@
 
             setModalState('stake-modal', 'input');
             stakeModal.classList.remove('hidden');
+            maxStakeAmountWei = '0';
 
             const currentStakeData = convertWeiToData(currentStakeWei);
             stakeModalCurrentStake.textContent = `${formatBigNumber(currentStakeData)} DATA`;
@@ -1053,10 +1030,19 @@
                 const tokenContract = new ethers.Contract(DATA_TOKEN_ADDRESS_POLYGON, DATA_TOKEN_ABI, signer.provider);
                 const freeFundsWei = await tokenContract.balanceOf(currentOperatorId);
                 stakeModalFreeFunds.textContent = `${formatBigNumber(convertWeiToData(freeFundsWei))} DATA`;
+                maxStakeAmountWei = ethers.BigNumber.from(currentSponsorshipContext.currentStakeWei).add(freeFundsWei).toString();
             } catch (e) {
                 console.error("Failed to get free funds:", e);
                 stakeModalFreeFunds.textContent = 'Error';
             }
+            
+            const maxBtn = document.getElementById('stake-modal-max-btn');
+            maxBtn.replaceWith(maxBtn.cloneNode(true)); // a little trick to remove old listeners
+            document.getElementById('stake-modal-max-btn').addEventListener('click', () => {
+                if (maxStakeAmountWei !== '0') {
+                    stakeModalAmount.value = ethers.utils.formatEther(maxStakeAmountWei);
+                }
+            });
 
              stakeModalConfirm.addEventListener('click', async () => {
                 const targetAmount = stakeModalAmount.value.replace(',', '.');
@@ -1360,8 +1346,8 @@
                 if (isUnreachable && !unreachableNodes.has(nodeId)) {
                     unreachableNodes.add(nodeId);
                     const unreachableNodesCountEl = document.getElementById('unreachable-nodes-count-value');
-                    const unreachableNodesContainer = document.getElementById('unreachable-nodes-container');
-                    unreachableCountEl.textContent = unreachableNodes.size;
+                    const unreachableContainer = document.getElementById('unreachable-nodes-container');
+                    unreachableNodesCountEl.textContent = unreachableNodes.size;
                     if (unreachableNodes.size > 0) {
                         unreachableContainer.classList.remove('hidden');
                     }
@@ -1571,7 +1557,7 @@
             
             try {
                 await refreshOperatorGraphData(true); // isFirstLoad = true
-                detailsRefreshInterval = setInterval(refreshOperatorGraphData, 30000);
+                detailsRefreshInterval = setInterval(() => refreshOperatorGraphData(false), 30000);
             } catch (error) {
                 detailContent.innerHTML = `<p class="text-red-400">${escapeHtml(error.message)}</p>`;
             } finally {
@@ -1621,7 +1607,14 @@
                       slashingEvents(where: {operator: "${currentOperatorId}"}, orderBy: date, orderDirection: desc, first: 100) { id amount date sponsorship { id stream { id } } }
                     }`;
                 const data = await runQuery(query);
-                renderOperatorDetails(data, isFirstLoad);
+                currentOperatorData = data.operator; // Keep current data fresh
+
+                if (isFirstLoad) {
+                    renderOperatorDetails(data);
+                } else {
+                    updateOperatorDetails(data);
+                }
+
             } catch (error) {
                 console.error("Failed to refresh operator data:", error);
                 if (isFirstLoad) {
@@ -1730,7 +1723,7 @@
             }
         }
 
-        function renderOperatorDetails(data, isFirstLoad) {
+        function renderOperatorDetails(data) {
             const op = data.operator;
             const flagsAsFlagger = data.flagsAsFlagger;
             const flagsAgainst = data.flagsAgainst;
@@ -1739,12 +1732,7 @@
                 return;
             }
 
-            // Preserve UI state across refreshes
-            const statsPanel = document.getElementById('extended-stats');
-            if (statsPanel) isStatsPanelExpanded = !statsPanel.classList.contains('hidden');
-            
             // Update global data stores
-            currentOperatorData = op;
             currentDelegations = op.delegations;
             totalDelegatorCount = op.delegatorCount;
             
@@ -1969,7 +1957,7 @@
                             <ul class="max-h-96 overflow-y-auto pr-2">${queueHtml}</ul>
                         </div>
                     </div>
-                    <div class="detail-section p-6 lg:col-span-1">
+                    <div id="sponsorships-section" class="detail-section p-6 lg:col-span-1">
                         <div class="flex justify-between items-center mb-4">
                             <h3 class="text-xl font-semibold text-white">Sponsorships (${op.stakes?.length || 0})</h3>
                             ${op.stakes?.length > 0 ? `<button onclick="handleCollectAllEarnings(this)" class="bg-blue-800 hover:bg-blue-900 text-white font-bold py-1 px-3 rounded-lg text-xs disabled:opacity-50 flex items-center justify-center">Collect All</button>` : ''}
@@ -2028,39 +2016,29 @@
                     <div id="stream-messages-container" class="max-h-96 overflow-y-auto pr-2 bg-black/50 p-2"><div class="text-gray-500 text-sm text-center py-4">Live messages will appear here.</div></div>
                 </div>`;
 
-            if (isFirstLoad) {
-                detailContent.innerHTML = `
-                    <div id="operator-header-stats">${headerStatsHtml}</div>
-                    <div id="operator-lists">${listsHtml}</div>
-                    <div id="operator-stream">${streamHtml}</div>
-                `;
-                
-                document.getElementById('delegate-btn').addEventListener('click', handleDelegate);
-                document.getElementById('undelegate-btn').addEventListener('click', handleUndelegate); 
+            
+            detailContent.innerHTML = `
+                <div id="operator-header-stats">${headerStatsHtml}</div>
+                <div id="operator-lists">${listsHtml}</div>
+                <div id="operator-stream">${streamHtml}</div>
+            `;
+            
+            document.getElementById('delegate-btn').addEventListener('click', handleDelegate);
+            document.getElementById('undelegate-btn').addEventListener('click', handleUndelegate); 
 
-                setupStreamrSubscription(op.id);
-                fetchAndRenderBalances(op);
-                fetchMyStake(op.id);
-            } else {
-                document.getElementById('operator-header-stats').innerHTML = headerStatsHtml;
-                document.getElementById('operator-lists').innerHTML = listsHtml;
-
-                document.getElementById('delegate-btn').addEventListener('click', handleDelegate);
-                document.getElementById('undelegate-btn').addEventListener('click', handleUndelegate); 
-                
-                fetchAndRenderBalances(op); // Re-fetch balances on refresh
-                fetchMyStake(op.id);
-            }
+            setupStreamrSubscription(op.id);
+            fetchAndRenderBalances(op);
+            fetchMyStake(op.id);
             
             // Restore UI states after any render
             const newExtendedStatsEl = document.getElementById('extended-stats');
             const newArrowEl = document.getElementById('stats-arrow');
-            if (isStatsPanelExpanded && newExtendedStatsEl && newArrowEl) {
+            if (uiState.isStatsPanelExpanded && newExtendedStatsEl && newArrowEl) {
                 newExtendedStatsEl.classList.remove('hidden');
                 newArrowEl.classList.add('rotate-180');
             }
-            if (!isDelegatorViewActive) {
-                isDelegatorViewActive = true; 
+            if (!uiState.isDelegatorViewActive) {
+                uiState.isDelegatorViewActive = true; 
                 toggleDelegatorQueueView();
             } else {
                 updateDelegatorsSection();
@@ -2070,6 +2048,89 @@
             toggleReputationView(document.querySelector('#reputation-title + button'), true);
             // Restore wallet view
             toggleWalletsView(document.querySelector('#wallets-title + button'), true);
+        }
+
+        function updateOperatorDetails(data) {
+            const op = data.operator;
+            const selfDelegation = data.selfDelegation?.[0];
+
+            const { name: operatorName } = parseOperatorMetadata(op.metadataJsonString);
+            const safeOperatorName = escapeHtml(operatorName || op.id);
+            
+            const operatorsOwnStakeWei = selfDelegation ? BigInt(selfDelegation._valueDataWei) : 0n;
+            const selfDelegationData = convertWeiToData(operatorsOwnStakeWei.toString());
+            const totalStakeWei = BigInt(op.valueWithoutEarnings);
+            const totalProfitsWei = BigInt(op.cumulativeProfitsWei);
+            const operatorsShareOfEarningsWei = totalStakeWei > 0n ? (operatorsOwnStakeWei * totalProfitsWei) / totalStakeWei : 0n;
+            const distributedToOthersWei = totalProfitsWei - operatorsShareOfEarningsWei;
+            const totalDistributedWei = operatorsShareOfEarningsWei + distributedToOthersWei;
+            const ownersCutPercent = (BigInt(op.operatorsCutFraction) * 100n) / BigInt('1000000000000000000');
+            const apy = calculateWeightedApy(op.stakes);
+            let ownersStakePercent = 0;
+            if (totalStakeWei > 0n) {
+                ownersStakePercent = Number((operatorsOwnStakeWei * 10000n) / totalStakeWei) / 100;
+            }
+            const deployedStakeWei = op.stakes?.reduce((sum, stake) => sum + BigInt(stake.amountWei), 0n) || 0n;
+            
+            // Update Text Content
+            document.querySelector('#operator-header-stats h2').textContent = safeOperatorName;
+            document.querySelector('#operator-header-stats .font-mono').innerHTML = createAddressLink(op.id);
+            document.querySelector('#operator-header-stats .text-4xl').textContent = `${Math.round(apy * 100)}%`;
+            const stats = document.querySelectorAll('#operator-header-stats .grid > div .text-2xl');
+            stats[0].textContent = formatBigNumber(convertWeiToData(op.valueWithoutEarnings));
+            stats[0].dataset.tooltipValue = convertWeiToData(op.valueWithoutEarnings);
+            stats[1].textContent = formatBigNumber(convertWeiToData(op.cumulativeEarningsWei));
+            stats[1].dataset.tooltipValue = convertWeiToData(op.cumulativeEarningsWei);
+            stats[2].textContent = `${ownersCutPercent}%`;
+            stats[3].textContent = activeNodes.size;
+
+            const extendedStats = document.querySelectorAll('#extended-stats .text-2xl');
+            extendedStats[0].textContent = formatBigNumber(convertWeiToData(totalDistributedWei.toString()));
+            extendedStats[0].dataset.tooltipValue = convertWeiToData(totalDistributedWei.toString());
+            extendedStats[1].textContent = formatBigNumber(convertWeiToData(op.cumulativeOperatorsCutWei));
+            extendedStats[1].dataset.tooltipValue = convertWeiToData(op.cumulativeOperatorsCutWei);
+            extendedStats[2].textContent = formatBigNumber(convertWeiToData(deployedStakeWei.toString()));
+            extendedStats[2].dataset.tooltipValue = convertWeiToData(deployedStakeWei.toString());
+            extendedStats[3].textContent = `${Math.round(ownersStakePercent)}%`;
+            extendedStats[3].dataset.tooltipContent = `${formatBigNumber(selfDelegationData)} DATA`;
+
+            // Re-render sponsorships list
+            const sponsorshipsHtml = op.stakes?.length > 0 ? op.stakes.map(stake => {
+                const sp = stake.sponsorship;
+                if (!sp) return '';
+                const stakedData = convertWeiToData(stake.amountWei);
+                const balanceData = convertWeiToData(sp.remainingWei);
+                const sponsorshipUrl = `https://streamr.network/hub/network/sponsorships/${sp.id}`;
+                const sponsorshipDisplayText = escapeHtml(sp.stream?.id || sp.id);
+                const isAgent = myRealAddress && op.controllers?.some(agent => agent.toLowerCase() === myRealAddress.toLowerCase());
+                const editStakeLink = isAgent 
+                    ? `<a href="#" onclick="event.preventDefault(); handleEditStake(this, '${sp.id}', '${stake.amountWei}')" class="block px-4 py-2 text-sm text-gray-200 hover:bg-[#444444]">Edit Stake</a>`
+                    : `<span class="block px-4 py-2 text-sm text-gray-500 opacity-50 cursor-not-allowed" data-tooltip-content="You must be an agent for this operator to edit stake.">Edit Stake</span>`;
+
+                return `
+                <li class="relative flex justify-between items-center py-3 border-b border-[#333333]">
+                    <div class="flex-1 min-w-0">
+                        <a href="${sponsorshipUrl}" target="_blank" rel="noopener noreferrer" class="font-mono text-xs text-gray-300 hover:text-white transition-colors truncate block" title="${sponsorshipDisplayText}">${sponsorshipDisplayText}</a>
+                        <div class="text-xs mt-2 space-y-1">
+                            <div class="flex justify-between items-center"><span class="text-gray-400">Staked:</span><strong class="text-white font-mono" data-tooltip-value="${stakedData}">${formatBigNumber(stakedData)} DATA</strong></div>
+                            <div class="flex justify-between items-center"><span class="text-gray-400">Remaining Funds:</span><strong class="text-white font-mono" data-tooltip-value="${balanceData}">${formatBigNumber(balanceData)} DATA</strong></div>
+                            <div class="flex justify-between items-center"><span class="text-gray-400">APY:</span><strong class="text-green-400 font-mono">${Math.round(Number(sp.spotAPY) * 100)}%</strong></div>
+                            <div class="flex justify-between items-center"><span class="text-gray-400">Status:</span><strong class="${sp.isRunning ? 'text-green-400' : 'text-red-400'} font-semibold">${sp.isRunning ? 'Active' : 'Inactive'}</strong></div>
+                        </div>
+                    </div>
+                    <div class="flex-shrink-0 ml-4">
+                         <button class="text-gray-400 hover:text-white p-1" onclick="toggleSponsorshipMenu(event, '${sp.id}')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" /></svg></button>
+                        <div id="sponsorship-menu-${sp.id}" class="hidden absolute right-0 w-48 bg-[#2C2C2C] border border-[#333333] rounded-md shadow-lg z-20">
+                            ${editStakeLink}
+                            <a href="#" onclick="event.preventDefault(); handleCollectEarnings(this, '${sp.id}')" class="block px-4 py-2 text-sm text-gray-200 hover:bg-[#444444]">Collect Earnings</a>
+                        </div>
+                    </div>
+                </li>`;
+            }).join('') : '<li class="text-gray-500 text-sm">Not participating in any sponsorships.</li>';
+            document.querySelector('#sponsorships-section ul').innerHTML = sponsorshipsHtml;
+
+            fetchAndRenderBalances(op);
+            fetchMyStake(op.id);
         }
 
         function fetchAndRenderBalances(operatorData) {
@@ -2094,8 +2155,8 @@
             operatorListView.style.display = 'none';
             operatorDetailView.style.display = 'block';
             window.scrollTo(0, 0);
-            reputationViewIndex = 0; // Reset reputation view on new operator
-            walletViewIndex = 0; // Reset wallet view on new operator
+            uiState.reputationViewIndex = 0; // Reset reputation view on new operator
+            uiState.walletViewIndex = 0; // Reset wallet view on new operator
             fetchAndRenderOperatorDetails(operatorId);
         }
 
@@ -2133,6 +2194,7 @@
         }
 
         function toggleStatsPanel() {
+            uiState.isStatsPanelExpanded = !uiState.isStatsPanelExpanded;
             const extendedStats = document.getElementById('extended-stats');
             const arrow = document.getElementById('stats-arrow');
             extendedStats.classList.toggle('hidden');
@@ -2140,7 +2202,7 @@
         }
 
         function toggleDelegatorQueueView() {
-            isDelegatorViewActive = !isDelegatorViewActive;
+            uiState.isDelegatorViewActive = !uiState.isDelegatorViewActive;
             const delegatorsContent = document.getElementById('delegators-content');
             const queueContent = document.getElementById('queue-content');
             const title = document.getElementById('delegator-queue-title');
@@ -2149,11 +2211,11 @@
 
             delegatorsContent.classList.toggle('hidden');
             queueContent.classList.toggle('hidden');
-            title.textContent = isDelegatorViewActive 
+            title.textContent = uiState.isDelegatorViewActive 
                 ? `Delegators (${op.delegatorCount > 0 ? op.delegatorCount - 1 : 0})`
                 : `Undelegation Queue (${op.queueEntries?.length || 0})`;
             
-            if (isDelegatorViewActive) {
+            if (uiState.isDelegatorViewActive) {
                 updateDelegatorsSection();
             }
         }
@@ -2167,7 +2229,7 @@
         
         function toggleReputationView(button, isRefresh = false) {
             if (!isRefresh) {
-                reputationViewIndex = (reputationViewIndex + 1) % 3; // Cycle 0, 1, 2
+                uiState.reputationViewIndex = (uiState.reputationViewIndex + 1) % 3; // Cycle 0, 1, 2
             }
 
             const container = button.closest('.detail-section');
@@ -2184,10 +2246,10 @@
             flagsAgainstContent.classList.add('hidden');
             flagsByContent.classList.add('hidden');
 
-            if (reputationViewIndex === 0) {
+            if (uiState.reputationViewIndex === 0) {
                 titleEl.textContent = `Slashing Events (${slashesCount})`;
                 slashingContent.classList.remove('hidden');
-            } else if (reputationViewIndex === 1) {
+            } else if (uiState.reputationViewIndex === 1) {
                 titleEl.textContent = `Flags Against Operator (${flagsAgainstCount})`;
                 flagsAgainstContent.classList.remove('hidden');
             } else { // reputationViewIndex === 2
@@ -2198,7 +2260,7 @@
         
         function toggleWalletsView(button, isRefresh = false) {
             if (!isRefresh) {
-                walletViewIndex = (walletViewIndex + 1) % 2; // Cycle 0, 1
+                uiState.walletViewIndex = (uiState.walletViewIndex + 1) % 2; // Cycle 0, 1
             }
 
             const container = button.closest('.detail-section');
@@ -2212,7 +2274,7 @@
             agentsContent.classList.add('hidden');
             nodesContent.classList.add('hidden');
 
-            if (walletViewIndex === 0) {
+            if (uiState.walletViewIndex === 0) {
                 titleEl.textContent = `Agents (${agentsCount})`;
                 agentsContent.classList.remove('hidden');
             } else { // walletViewIndex === 1
@@ -2232,28 +2294,8 @@
         stakeModalCancel.addEventListener('click', () => stakeModal.classList.add('hidden'));
         document.getElementById('stake-modal-close').addEventListener('click', () => stakeModal.classList.add('hidden'));
 
-        showPrivateKeyLoginBtn.addEventListener('click', () => {
-            walletLoginView.classList.add('hidden');
-            privateKeyLoginView.classList.remove('hidden');
-        });
-
-        backToWalletLoginBtn.addEventListener('click', () => {
-            privateKeyLoginView.classList.add('hidden');
-            walletLoginView.classList.remove('hidden');
-        });
-
-        connectPrivateKeyBtn.addEventListener('click', () => {
-            const key = privateKeyInput.value.trim();
-            if (key) {
-                connectWithPrivateKey(key);
-            } else {
-                showCustomAlert('Input Error', 'Please enter a private key.');
-            }
-        });
-
         settingsBtn.addEventListener('click', () => {
             theGraphApiKeyInput.value = localStorage.getItem('the-graph-api-key') || '';
-            polygonscanApiKeyInput.value = localStorage.getItem('polygonscan-api-key') || '';
             settingsModal.classList.remove('hidden');
         });
 
@@ -2267,13 +2309,6 @@
                 localStorage.setItem('the-graph-api-key', newGraphApiKey);
             } else {
                 localStorage.removeItem('the-graph-api-key');
-            }
-
-            const newPolygonscanApiKey = polygonscanApiKeyInput.value.trim();
-            if (newPolygonscanApiKey) {
-                localStorage.setItem('polygonscan-api-key', newPolygonscanApiKey);
-            } else {
-                localStorage.removeItem('polygonscan-api-key');
             }
 
             showCustomAlert('Settings Saved', 'The application will now reload with the new settings.');
@@ -2313,12 +2348,7 @@
         
         // --- Initialization ---
         document.addEventListener('DOMContentLoaded', async () => {
-             const savedKey = localStorage.getItem('streamr-explorer-private-key');
-             if (savedKey) {
-                 await connectWithPrivateKey(savedKey);
-             } else {
-                loginModal.classList.remove('hidden');
-             }
+             loginModal.classList.remove('hidden');
         });
     </script>
 </body>
