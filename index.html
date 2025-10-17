@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Streamr Operator Explorer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Ethers.js Library (stable version) for Wallet Connection -->
+    <script src="./libs/ethers.umd.min.js"></script>
+    <!-- Chart.js Library -->
+    <script src="./libs/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #121212; /* Darker bg */
+        }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #1E1E1E; }
+        ::-webkit-scrollbar-thumb { background: #555; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #777; }
+        .loader, .spinner {
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            from {
+                transform: rotate(0deg);
+            }
+            to {
+                transform: rotate(360deg);
+            }
+        }
+        .card {
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+            cursor: pointer;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2), 0 4px 6px -2px rgba(0, 0, 0, 0.1);
+        }
+        .detail-section {
+            background-color: #1E1E1E; /* Darker section bg */
+            border: 1px solid #333333; /* Darker border */
+            border-radius: 0.75rem; /* rounded-xl */
+        }
+        #operator-detail-view { display: none; }
+        .btn-spinner {
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            margin-right: 0.5rem;
+        }
+        #price-refresh-btn.spinning svg {
+             animation: spin 1s linear infinite;
+        }
+        .stream-message-entry {
+            animation: slideIn 0.3s ease-out;
+        }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        /* Class to prevent clicks on anchor tags */
+        a.processing {
+            pointer-events: none;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body class="text-gray-200">
+
+    <!-- Login Modal -->
+    <div id="loginModal" class="fixed inset-0 bg-[#121212] flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-[#1E1E1E] rounded-lg p-8 max-w-sm w-full text-gray-300 text-center shadow-2xl border border-[#333333]">
+            
+            <div id="walletLoginView">
+                <h2 class="text-2xl font-bold mb-4 text-white">Streamr Explorer</h2>
+                <p class="mb-6 text-gray-400">Connect your wallet for full functionality, or continue as a guest to explore.</p>
+                <button id="connectWalletBtn" class="w-full bg-blue-800 hover:bg-blue-900 text-white font-bold py-3 px-4 rounded-lg transition-colors mb-4 flex items-center justify-center gap-2">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>
+                    Connect Wallet
+                </button>
+                <button id="guestBtn" class="w-full bg-[#444444] hover:bg-[#555555] text-white font-bold py-3 px-4 rounded-lg transition-colors">
+                    Continue as Guest
+                </button>
+            </div>
+
+            <div id="loadingContent" class="hidden">
+                <div class="flex justify-center items-center mb-4">
+                    <div class="loader rounded-full border-4 border-t-4 border-[#555555] border-t-transparent h-8 w-8"></div>
+                </div>
+                <p id="loading-main-text" class="text-lg text-white">Connecting...</p>
+                <p id="loading-sub-text" class="text-sm text-gray-400 mt-2">Please follow the instructions in your wallet.</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Custom Alert Modal (for Ethers errors) -->
+    <div id="customAlertModal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-[#1E1E1E] rounded-lg p-8 max-w-md w-full text-gray-300 border border-[#333333]">
+            <h2 id="customAlertTitle" class="text-2xl font-bold mb-4 text-white">Alert</h2>
+            <p id="customAlertMessage" class="mb-6"></p>
+            <button id="closeAlertBtn" class="mt-6 w-full bg-[#333333] hover:bg-[#444444] text-white font-bold py-2 px-4 rounded-lg transition-colors">
+                OK
+            </button>
+        </div>
+    </div>
+
+    <!-- Transaction Modal -->
+    <div id="transactionModal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-[#1E1E1E] rounded-lg p-8 max-w-md w-full text-gray-300 border border-[#333333] shadow-2xl">
+            <h2 id="tx-modal-title" class="text-2xl font-bold mb-4 text-white">Delegate to Operator</h2>
+            
+            <!-- Input Section -->
+            <div id="tx-modal-input-section">
+                <p id="tx-modal-description" class="mb-4 text-gray-400">Enter the amount of DATA to delegate.</p>
+                <div class="relative">
+                    <input 
+                        type="number" 
+                        id="tx-modal-amount" 
+                        placeholder="0.0" 
+                        class="w-full p-3 pr-16 bg-[#121212] border border-[#333333] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#555555] transition-colors"
+                    >
+                    <button id="tx-modal-max-btn" class="absolute inset-y-0 right-0 flex items-center pr-3 text-sm font-bold text-blue-500 hover:text-blue-400">MAX</button>
+                </div>
+                <div class="flex justify-between mt-2 text-sm">
+                     <span id="tx-modal-balance-label" class="text-gray-400">Your Balance:</span>
+                     <span id="tx-modal-balance-value" class="text-gray-300">Loading...</span>
+                </div>
+                <div class="flex justify-between mt-1 text-sm text-gray-500">
+                     <span>Minimum to delegate:</span>
+                     <span id="tx-modal-minimum-value">Loading...</span>
+                </div>
+                <div class="mt-6 flex gap-4">
+                    <button id="tx-modal-cancel" class="w-full bg-[#444444] hover:bg-[#555555] text-white font-bold py-3 px-4 rounded-lg transition-colors">Cancel</button>
+                    <button id="tx-modal-confirm" class="w-full bg-[#333333] hover:bg-[#444444] text-white font-bold py-3 px-4 rounded-lg transition-colors flex justify-center items-center" disabled:opacity-50>Confirm</button>
+                </div>
+            </div>
+
+            <!-- Status Section -->
+            <div id="tx-modal-status-section" class="hidden text-center">
+                <div id="tx-modal-loader" class="flex justify-center items-center mb-4">
+                    <div class="loader rounded-full border-4 border-t-4 border-[#555555] border-t-transparent h-8 w-8"></div>
+                </div>
+                <p id="tx-modal-status-text" class="text-lg text-white">Awaiting confirmation...</p>
+                <p id="tx-modal-status-subtext" class="text-sm text-gray-400 mt-2">Please confirm the transaction in your wallet.</p>
+                 <div id="tx-modal-receipt" class="hidden mt-4 text-left">
+                    <p class="text-green-400 font-bold">Transaction Successful!</p>
+                    <a id="tx-modal-receipt-link" href="#" target="_blank" rel="noopener noreferrer" class="text-gray-300 hover:text-white text-sm break-all">View on Polygonscan</a>
+                </div>
+                <button id="tx-modal-close" class="mt-6 w-full bg-[#333333] hover:bg-[#444444] text-white font-bold py-2 px-4 rounded-lg transition-colors hidden">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stake Management Modal -->
+    <div id="stakeModal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-[#1E1E1E] rounded-lg p-8 max-w-md w-full text-gray-300 border border-[#333333] shadow-2xl">
+            <h2 id="stake-modal-title" class="text-2xl font-bold mb-4 text-white">Manage Stake</h2>
+            
+            <!-- Input Section -->
+            <div id="stake-modal-input-section">
+                <p id="stake-modal-description" class="mb-4 text-gray-400">Enter the new total stake amount for this sponsorship.</p>
+                <div class="relative">
+                    <input 
+                        type="number" 
+                        id="stake-modal-amount" 
+                        placeholder="0.0" 
+                        class="w-full p-3 pr-16 bg-[#121212] border border-[#333333] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#555555] transition-colors"
+                    >
+                    <button id="stake-modal-max-btn" class="absolute inset-y-0 right-0 flex items-center pr-3 text-sm font-bold text-blue-500 hover:text-blue-400">MAX</button>
+                </div>
+                <div class="flex justify-between mt-2 text-sm">
+                     <span class="text-gray-400">Your Current Stake:</span>
+                     <span id="stake-modal-current-stake" class="text-gray-300">Loading...</span>
+                </div>
+                <div class="flex justify-between mt-1 text-sm">
+                     <span class="text-gray-400">Operator's Free Funds:</span>
+                     <span id="stake-modal-free-funds" class="text-gray-300">Loading...</span>
+                </div>
+                <div class="mt-6 flex gap-4">
+                    <button id="stake-modal-cancel" class="w-full bg-[#444444] hover:bg-[#555555] text-white font-bold py-3 px-4 rounded-lg transition-colors">Cancel</button>
+                    <button id="stake-modal-confirm" class="w-full bg-[#333333] hover:bg-[#444444] text-white font-bold py-3 px-4 rounded-lg transition-colors flex justify-center items-center" disabled:opacity-50>Confirm</button>
+                </div>
+            </div>
+
+            <!-- Status Section (re-using transaction modal's logic) -->
+            <div id="stake-modal-status-section" class="hidden text-center">
+                 <div id="stake-modal-loader" class="flex justify-center items-center mb-4">
+                    <div class="loader rounded-full border-4 border-t-4 border-[#555555] border-t-transparent h-8 w-8"></div>
+                </div>
+                <p id="stake-modal-status-text" class="text-lg text-white">Awaiting confirmation...</p>
+                <p id="stake-modal-status-subtext" class="text-sm text-gray-400 mt-2">Please confirm the transaction in your wallet.</p>
+                 <div id="stake-modal-receipt" class="hidden mt-4 text-left">
+                    <p class="text-green-400 font-bold">Transaction Successful!</p>
+                    <a id="stake-modal-receipt-link" href="#" target="_blank" rel="noopener noreferrer" class="text-gray-300 hover:text-white text-sm break-all">View on Polygonscan</a>
+                </div>
+                <button id="stake-modal-close" class="mt-6 w-full bg-[#333333] hover:bg-[#444444] text-white font-bold py-2 px-4 rounded-lg transition-colors hidden">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-[#1E1E1E] rounded-lg p-8 max-w-md w-full text-gray-300 border border-[#333333] shadow-2xl">
+            <h2 class="text-2xl font-bold mb-4 text-white">Settings</h2>
+            <div class="space-y-4">
+                <div>
+                    <label for="thegraph-api-key-input" class="block text-sm font-medium text-gray-400 mb-2">The Graph API Key</label>
+                    <input type="text" id="thegraph-api-key-input" placeholder="Enter your The Graph API key" class="w-full p-3 bg-[#121212] border border-[#333333] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#555555]">
+                </div>
+            </div>
+            <div class="mt-6 flex gap-4">
+                <button id="settings-cancel-btn" class="w-full bg-[#444444] hover:bg-[#555555] text-white font-bold py-3 px-4 rounded-lg transition-colors">Cancel</button>
+                <button id="settings-save-btn" class="w-full bg-blue-800 hover:bg-blue-900 text-white font-bold py-3 px-4 rounded-lg transition-colors">Save & Reload</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Main Loader Overlay (for data fetching) -->
+    <div id="loader-overlay" class="fixed inset-0 bg-[#121212] bg-opacity-75 flex items-center justify-center z-50 hidden">
+        <div class="loader rounded-full border-8 border-t-8 border-[#555555] border-t-transparent h-24 w-24"></div>
+    </div>
+    
+    <header class="p-4 flex flex-wrap justify-between items-center gap-4">
+        <div class="flex-grow text-center lg:text-left">
+            <h1 class="text-3xl md:text-5xl font-bold text-white mb-2">Streamr Explorer</h1>
+            <p class="text-md text-gray-400">Browse and inspect operators on the Streamr network.</p>
+        </div>
+        <div class="flex items-center justify-center lg:justify-end gap-2 flex-wrap">
+            <div id="wallet-info" class="bg-[#1E1E1E] border border-[#333333] text-white p-3 rounded-lg shadow-lg text-sm hidden items-center gap-2">
+                <!-- Wallet info will be injected here -->
+            </div>
+            <div id="data-price-box" class="bg-[#1E1E1E] border border-[#333333] text-white p-3 rounded-lg shadow-lg text-sm flex items-center gap-2">
+                <span>DATA Price:</span>
+                <span id="data-price-value" class="font-bold text-green-400">Loading...</span>
+            </div>
+            <button id="settings-btn" class="text-gray-400 hover:text-white transition-colors p-3 bg-[#1E1E1E] border border-[#333333] rounded-lg shadow-lg">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+            </button>
+        </div>
+    </header>
+
+
+    <div id="main-container" class="container mx-auto p-4 md:p-8 hidden">
+        <!-- Operator List View -->
+        <main id="operator-list-view">
+            <!-- Search Bar -->
+            <div class="mb-6 relative">
+                <input 
+                    type="text" 
+                    id="search-input" 
+                    placeholder="Search" 
+                    class="w-full p-4 pl-12 bg-[#1E1E1E] border border-[#333333] rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-[#555555] transition-colors"
+                >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6" id="operators-grid">
+                <!-- Operator cards will be inserted here -->
+            </div>
+            <!-- Load More button for the operator list -->
+            <div class="mt-8 text-center" id="load-more-container">
+                 <button id="load-more-operators-btn" class="bg-[#2C2C2C] hover:bg-[#3A3A3A] text-white font-bold py-3 px-8 rounded-xl transition-colors hidden disabled:opacity-50">
+                    Load More Operators
+                </button>
+            </div>
+        </main>
+
+        <!-- Operator Detail View -->
+        <div id="operator-detail-view" class="space-y-8">
+            <div>
+                <button id="back-to-list-btn" class="bg-[#333333] hover:bg-[#444444] text-white font-bold py-2 px-4 rounded-lg transition-colors flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>
+                    Back to List
+                </button>
+            </div>
+            <div id="detail-content">
+                <!-- Detailed content will be inserted here -->
+            </div>
+        </div>
+    </div>
+
+    <div id="custom-tooltip" class="hidden absolute z-30 px-3 py-2 text-sm font-medium text-white bg-black rounded-lg shadow-sm border border-[#333333] max-w-xs break-words">
+        <!-- Tooltip content will be injected here -->
+    </div>
+
+    <!-- Streamr SDK -->
+    <script src="./libs/streamr-sdk.web.js"></script>
+    
+    <!-- Main Application Script -->
+    <script type="module" src="main.js"></script>
+
+</body>
+</html>
