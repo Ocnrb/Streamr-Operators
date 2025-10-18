@@ -596,7 +596,7 @@ export function renderOperatorDetails(data, globalState) {
 
     detailContent.innerHTML = headerStatsHtml + listsHtml + streamHtml;
 
-    // Now call update and restore states
+    // call update and restore states
     updateOperatorDetails(data, globalState);
     updateDelegatorsSection(globalState.currentDelegations, globalState.totalDelegatorCount);
 
@@ -616,19 +616,33 @@ export function updateOperatorDetails(data, globalState) {
 
     const selfDelegation = selfDelegationData?.[0];
 
-    // Calculations
-    const totalStakeData = convertWeiToData(op.valueWithoutEarnings);
-    const totalEarningsData = convertWeiToData(op.cumulativeEarningsWei);
-    const ownersCutPercent = (BigInt(op.operatorsCutFraction) * 100n) / BigInt('1000000000000000000');
+    // --- CALCULATION LOGIC ---
 
-    const operatorsOwnStakeWei = selfDelegation ? BigInt(selfDelegation._valueDataWei) : 0n;
+    // 1. Get direct values from The Graph
     const totalStakeWei = BigInt(op.valueWithoutEarnings);
+    const totalEarningsWei = BigInt(op.cumulativeEarningsWei);
+    const ownerCutWei = BigInt(op.cumulativeOperatorsCutWei);
+    const operatorsOwnStakeWei = selfDelegation ? BigInt(selfDelegation._valueDataWei) : 0n;
+
+    // 2. Calculate "Total Distributed" the correct and simple way
+    // Total Distributed = Total Earnings - Owner's Earnings from Cut
+    const distributedToDelegatorsWei = totalEarningsWei - ownerCutWei;
+
+    // 3. Other calculations (remain the same)
+    const ownersCutPercent = (BigInt(op.operatorsCutFraction) * 100n) / BigInt('1000000000000000000');
     const ownersStakePercent = totalStakeWei > 0n ? Number((operatorsOwnStakeWei * 10000n) / totalStakeWei) / 100 : 0;
     const deployedStakeWei = op.stakes?.reduce((sum, stake) => sum + BigInt(stake.amountWei), 0n) || 0n;
-    const totalProfitsWei = BigInt(op.cumulativeProfitsWei);
-    const operatorsShareOfEarningsWei = totalStakeWei > 0n ? (operatorsOwnStakeWei * totalProfitsWei) / totalStakeWei : 0n;
-    const distributedToOthersWei = totalProfitsWei - operatorsShareOfEarningsWei;
+
+    // Convert to DATA for display
+    const totalStakeData = convertWeiToData(op.valueWithoutEarnings);
+    const totalEarningsData = convertWeiToData(op.cumulativeEarningsWei);
+    const ownerCutData = convertWeiToData(op.cumulativeOperatorsCutWei);
+    const distributedData = convertWeiToData(distributedToDelegatorsWei.toString());
+    const deployedData = convertWeiToData(deployedStakeWei.toString());
     const ownerStakeData = convertWeiToData(operatorsOwnStakeWei.toString());
+
+
+    // --- UPDATE UI WITH VALUES ---
 
     // Update Header Stats
     const headerStakeEl = document.getElementById('header-stat-stake');
@@ -649,21 +663,19 @@ export function updateOperatorDetails(data, globalState) {
     }
 
     // Update Extended Stats
-    const distributedData = convertWeiToData(distributedToOthersWei.toString());
     const distributedEl = document.getElementById('extended-stat-distributed');
     if (distributedEl) {
+        // Display calculated value
         distributedEl.textContent = formatBigNumber(distributedData);
         distributedEl.setAttribute('data-tooltip-value', distributedData);
     }
 
-    const ownerCutData = convertWeiToData(op.cumulativeOperatorsCutWei);
     const ownerCutEl = document.getElementById('extended-stat-owner-cut');
     if (ownerCutEl) {
         ownerCutEl.textContent = formatBigNumber(ownerCutData);
         ownerCutEl.setAttribute('data-tooltip-value', ownerCutData);
     }
 
-    const deployedData = convertWeiToData(deployedStakeWei.toString());
     const deployedEl = document.getElementById('extended-stat-deployed');
     if (deployedEl) {
         deployedEl.textContent = formatBigNumber(deployedData);
