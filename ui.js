@@ -456,13 +456,24 @@ export function renderOperatorDetails(data, globalState) {
             </li>`;
     }).join('') : '<li class="text-gray-500 text-sm">Not participating in any sponsorships.</li>';
 
-    const slashesHtml = slashingEvents.length > 0 ? slashingEvents.map(slash => `
+    const slashesHtml = slashingEvents.length > 0 ? slashingEvents.map(slash => {
+        const sp = slash.sponsorship;
+        let sponsorshipHtml = '<p class="text-xs text-gray-400">Sponsorship: Unknown</p>';
+        if (sp) {
+            const sponsorshipUrl = `https://streamr.network/hub/network/sponsorships/${sp.id}`;
+            const sponsorshipDisplayText = escapeHtml(sp.stream?.id || sp.id);
+            sponsorshipHtml = `<p class="text-xs text-gray-400 truncate">Sponsorship: <a href="${sponsorshipUrl}" target="_blank" rel="noopener noreferrer" class="text-gray-300 hover:text-white transition-colors" title="${sponsorshipDisplayText}">${sponsorshipDisplayText}</a></p>`;
+        }
+
+        return `
             <li class="py-2 border-b border-[#333333]">
                 <p class="font-mono text-xs text-red-400 font-semibold" data-tooltip-value="${convertWeiToData(slash.amount)}">${formatBigNumber(convertWeiToData(slash.amount))} DATA</p>
                 <div class="text-xs mt-1 text-gray-400">
                     <p>Date: ${new Date(slash.date * 1000).toLocaleDateString()}</p>
+                    ${sponsorshipHtml}
                 </div>
-            </li>`).join('') : '<li class="text-gray-500 text-sm">No slashing events recorded.</li>';
+            </li>`;
+        }).join('') : '<li class="text-gray-500 text-sm">No slashing events recorded.</li>';
 
     const agentsHtml = op.controllers?.length > 0 ? op.controllers.map(agent => `
         <li class="flex justify-between items-center py-2 border-b border-[#333333]">
@@ -838,4 +849,3 @@ export function addStreamMessageToUI(message, activeNodes, unreachableNodes) {
         messagesContainerEl.removeChild(messagesContainerEl.lastChild);
     }
 }
-
