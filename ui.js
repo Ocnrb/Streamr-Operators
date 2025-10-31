@@ -146,6 +146,10 @@ function createOperatorCardHtml(op) {
     const totalStakedData = convertWeiToData(op.valueWithoutEarnings);
     const safeOperatorName = escapeHtml(name || op.id);
 
+    // Adiciona lógica para a cor da APY
+    const roundedApy = Math.round(weightedApy * 100);
+    const apyColorClass = roundedApy === 0 ? 'text-red-400' : 'text-green-400';
+
     return `
      <div class="bg-[#1E1E1E] p-5 rounded-xl border border-[#333333] card flex flex-col items-center text-center" data-operator-id="${op.id}">
          <img src="${imageUrl || placeholderUrl}" onerror="this.src='${placeholderUrl}'; this.onerror=null;" alt="Operator Avatar" class="w-16 h-16 rounded-full border-2 border-[#333333] object-cover mb-4" ${description ? `data-tooltip-content="${escapeHtml(description)}"` : ''}>
@@ -154,7 +158,7 @@ function createOperatorCardHtml(op) {
              ${name ? `<div class="font-mono text-xs text-gray-500 truncate mt-1">${createAddressLink(op.id)}</div>` : ''}
          </div>
          <div class="mt-4 pt-4 border-t border-[#333333] w-full text-left space-y-2 text-sm">
-             <p><strong class="text-gray-400">APY:</strong> <span class="font-mono text-green-400">${Math.round(weightedApy * 100)}%</span></p>
+             <p><strong class="text-gray-400">APY:</strong> <span class="font-mono ${apyColorClass}">${roundedApy}%</span></p>
              <div><strong class="text-gray-400">Total Staked:</strong> <span class="font-mono text-white block" data-tooltip-value="${totalStakedData}">${formatBigNumber(totalStakedData)} DATA</span></div>
              <p><strong class="text-gray-400">Delegators:</strong> <span class="font-mono text-white">${op.delegatorCount > 0 ? op.delegatorCount - 1 : 0}</span></p>
          </div>
@@ -248,7 +252,7 @@ export function renderSponsorshipsHistory(history) {
                     <p class="text-xs text-gray-500 font-mono mt-1">${date}</p>
                 </div>
                 <div class="text-right flex-shrink-0">
-                    <p class="font-mono text-sm text-white" data-tooltip-value="${event.amount}">${formatBigNumber(event.amount.toString())} ${event.token}</p>
+                    <p class="font-mono text-sm text-white" ${event.token.toUpperCase() === 'DATA' ? `data-tooltip-value="${Math.round(event.amount)}"` : ''}>${formatBigNumber(Math.round(event.amount).toString())} ${escapeHtml(event.token)}</p>
                 </div>
             </li>`;
         }
@@ -264,16 +268,15 @@ export function renderSponsorshipsHistory(history) {
                     <span class="tx-badge ${directionClass}">${event.relatedObject}</span>
                 </div>
                 <div class="flex-1 min-w-0">
-                    <p class="text-sm font-medium text-white truncate">${escapeHtml(event.methodId)}</p>
+                    <a href="${txUrl}" target="_blank" rel="noopener noreferrer" class="text-sm font-medium text-gray-300 hover:text-white truncate transition-colors block">
+                        ${escapeHtml(event.methodId)}
+                    </a>
                     <p class="text-xs text-gray-400 font-mono mt-1">
                         ${date}
                     </p>
                 </div>
                 <div class="text-right flex-shrink-0">
-                    <p class="font-mono text-sm text-white">${event.amount.toFixed(4)} ${escapeHtml(event.token)}</p>
-                    <a href="${txUrl}" target="_blank" rel="noopener noreferrer" class="text-xs text-blue-400 hover:text-blue-300 font-mono">
-                        ...${event.txHash.slice(-6)}
-                    </a>
+                    <p class="font-mono text-sm text-white" ${event.token.toUpperCase() === 'DATA' ? `data-tooltip-value="${Math.round(event.amount)}"` : ''}>${formatBigNumber(Math.round(event.amount).toString())} ${escapeHtml(event.token)}</p>
                 </div>
             </li>`;
         }
@@ -884,3 +887,8 @@ export function addStreamMessageToUI(message, activeNodes, unreachableNodes) {
         messagesContainerEl.removeChild(messagesContainerEl.lastChild);
     }
 }
+
+
+
+
+
