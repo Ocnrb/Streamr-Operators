@@ -39,7 +39,7 @@ export function updateGraphApiKey(newKey) {
     console.log("Graph API Key updated.");
 }
 
-//  Etherscan API Key Management
+// Etherscan API Key Management
 export function updateEtherscanApiKey(newKey) {
     etherscanApiKey = newKey || '4IYW9RG6W87Y9B9IGCSD6Z8PVJEIBW5S41'; // Use your default key as fallback
     console.log("Etherscan API Key updated.");
@@ -334,9 +334,27 @@ export async function fetchPolygonscanHistory(walletAddress) {
         // 3. Combine and Filter
         const allTxs = [...processedNormalTxs, ...processedTokenTxs];
 
-        // Filter out the 0 MATIC transactions *after* processing
+        // Lógica de filtro anterior (solicitada):
+        // Manter uma transação se:
+        // 1. For 'DATA' (qualquer valor)
+        // 2. For 'MATIC' E tiver um valor > 0
         const filteredFinalTxs = allTxs.filter(tx => {
-            return !(tx.token === nativeToken && tx.amount === 0);
+            const tokenSymbol = tx.token.toUpperCase();
+            const nativeTokenSymbol = nativeToken.toUpperCase();
+
+            // 1. Manter todas as transações 'DATA'
+            if (tokenSymbol === 'DATA') {
+                return true;
+            }
+
+            // 2. Manter transações 'MATIC' APENAS se o valor > 0
+            if (tokenSymbol === nativeTokenSymbol && tx.amount > 0) {
+                return true;
+            }
+            
+            // 3. Filtrar tudo o resto
+            // (Isto inclui outros tokens E transações MATIC de valor 0)
+            return false;
         });
 
         // Return the combined, processed, and filtered list
@@ -737,4 +755,5 @@ export async function cleanupClient() {
         streamrClient = null;
     }
 }
+
 

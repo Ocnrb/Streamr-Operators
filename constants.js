@@ -127,6 +127,7 @@ export const POLYGONSCAN_METHOD_IDS = {
     "0x0fd6ff49": "Heartbeat",
     "0x6c68c0e1": "Undelegate",
     "0xadc9772e": "Stake",
+    "0xa93a019f": "Force Unstake",
     "0xd1b68611": "Reduce Stake To",
     "0x4a178fe4": "Flag",
 
