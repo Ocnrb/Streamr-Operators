@@ -66,6 +66,23 @@
             pointer-events: none;
             cursor: not-allowed;
         }
+
+        /* NEW: Badge styles from the simple app */
+        .tx-badge {
+            padding: 2px 8px;
+            border-radius: 9999px;
+            font-size: 0.75rem; /* 12px */
+            font-weight: 600; /* semibold */
+            text-transform: uppercase;
+        }
+        .tx-badge-in {
+            background-color: rgba(16, 185, 129, 0.1); /* bg-green-500/10 */
+            color: #10B981; /* text-green-500 */
+        }
+        .tx-badge-out {
+            background-color: rgba(239, 68, 68, 0.1); /* bg-red-500/10 */
+            color: #EF4444; /* text-red-500 */
+        }
     </style>
 </head>
 <body class="text-gray-200">
@@ -196,7 +213,7 @@
                     <p class="text-green-400 font-bold">Transaction Successful!</p>
                     <a id="stake-modal-receipt-link" href="#" target="_blank" rel="noopener noreferrer" class="text-gray-300 hover:text-white text-sm break-all">View on Polygonscan</a>
                 </div>
-                <button id="stake-modal-close" class="mt-6 w-full bg-[#333333] hover:bg-[#444444] text-white font-bold py-2 px-4 rounded-lg transition-colors hidden">Close</button>
+                <button id="stake-modal-close" class="mt-6 w-full bg-[#33333This file is a configuration file, likely for a JavaScript application. It defines constants for interacting with smart contracts (like DATA token and Streamr operator contracts on Polygon) and various APIs (The Graph, Streamr). It includes ABI (Application Binary Interface) definitions, which are essential for web3 applications to understand how to call functions on a smart contract. It also defines application-level settings like pagination limits and search parameters. This centralized approach to managing constants is a good practice, making the application easier to maintain and update.44] hover:bg-[#444444] text-white font-bold py-2 px-4 rounded-lg transition-colors hidden">Close</button>
             </div>
         </div>
     </div>
@@ -209,6 +226,11 @@
                 <div>
                     <label for="thegraph-api-key-input" class="block text-sm font-medium text-gray-400 mb-2">The Graph API Key</label>
                     <input type="text" id="thegraph-api-key-input" placeholder="Enter your The Graph API key" class="w-full p-3 bg-[#121212] border border-[#333333] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#555555]">
+                </div>
+                <!-- NEW: Etherscan API Key Field -->
+                <div>
+                    <label for="etherscan-api-key-input" class="block text-sm font-medium text-gray-400 mb-2">Etherscan API Key</label>
+                    <input type="text" id="etherscan-api-key-input" placeholder="Enter your Etherscan API key" class="w-full p-3 bg-[#121212] border border-[#333333] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#555555]">
                 </div>
             </div>
             <div class="mt-6 flex gap-4">
@@ -296,3 +318,4 @@
 
 </body>
 </html>
+

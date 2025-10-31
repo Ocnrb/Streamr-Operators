@@ -212,41 +212,76 @@ export function updateDelegatorsSection(delegations, totalDelegatorCount) {
     }
 }
 
+/**
+ * Renders the unified sponsorship history list (The Graph + Polygonscan).
+ * @param {Array} history - The merged and sorted history array from main.js.
+ */
 export function renderSponsorshipsHistory(history) {
     const listEl = document.getElementById('sponsorships-history-list');
     if (!listEl) return;
 
-    const getIcon = () => {
-        return '<svg class="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path></svg>';
-    };
-
-    const getText = (event) => {
-        const sp = event.sponsorship;
-        if (!sp) return 'Unknown event';
-        const sponsorshipUrl = `https://streamr.network/hub/network/sponsorships/${sp.id}`;
-        const sponsorshipDisplayText = escapeHtml(sp.stream?.id || sp.id);
-        const link = `<a href="${sponsorshipUrl}" target="_blank" rel="noopener noreferrer" class="text-gray-300 hover:text-white transition-colors" title="${sponsorshipDisplayText}">${sponsorshipDisplayText}</a>`;
-        return `Staking action on ${link}`;
-    };
-
     if (history.length === 0) {
-        listEl.innerHTML = '<li class="text-gray-500 text-sm">No recent activity found.</li>';
+        listEl.innerHTML = '<li class="text-gray-500 text-sm p-4 text-center">No recent activity found from The Graph or Polygonscan.</li>';
         return;
     }
 
-    listEl.innerHTML = history.map(event => `
-        <li class="flex items-start gap-3 py-2 border-b border-[#333333]">
-            <div class="flex-shrink-0 pt-1">${getIcon()}</div>
-            <div class="flex-1 min-w-0">
-                <p class="text-xs text-gray-300 truncate">${getText(event)}</p>
-                <p class="text-xs text-gray-500 font-mono mt-1">${new Date(event.timestamp * 1000).toLocaleString()}</p>
-            </div>
-            <div class="text-right">
-                <p class="font-mono text-xs text-white" data-tooltip-value="${convertWeiToData(event.amount)}">${formatBigNumber(convertWeiToData(event.amount))} DATA</p>
-            </div>
-        </li>`
-    ).join('');
+    listEl.innerHTML = history.map(event => {
+        // Item timestamp
+        const date = new Date(event.timestamp * 1000).toLocaleString();
+
+        // --- RENDER LOGIC FOR 'graph' (The Graph Staking Event) ---
+        if (event.type === 'graph') {
+            const sp = event.relatedObject; // This is the sponsorship object
+            if (!sp) return ''; // Should not happen
+
+            const sponsorshipUrl = `https://streamr.network/hub/network/sponsorships/${sp.id}`;
+            const sponsorshipDisplayText = escapeHtml(sp.stream?.id || sp.id);
+            const link = `<a href="${sponsorshipUrl}" target="_blank" rel="noopener noreferrer" class="text-gray-300 hover:text-white transition-colors" title="${sponsorshipDisplayText}">${sponsorshipDisplayText}</a>`;
+            const text = `Staking action on ${link}`;
+            const icon = '<svg class="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path></svg>';
+
+            return `
+            <li class="flex items-start gap-3 py-3 border-b border-[#333333]">
+                <div class="flex-shrink-0 pt-1">${icon}</div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm text-gray-300 truncate">${text}</p>
+                    <p class="text-xs text-gray-500 font-mono mt-1">${date}</p>
+                </div>
+                <div class="text-right flex-shrink-0">
+                    <p class="font-mono text-sm text-white" data-tooltip-value="${event.amount}">${formatBigNumber(event.amount.toString())} ${event.token}</p>
+                </div>
+            </li>`;
+        }
+
+        // --- RENDER LOGIC FOR 'scan' (Polygonscan Transaction) ---
+        if (event.type === 'scan') {
+            const directionClass = event.relatedObject === "IN" ? "tx-badge-in" : "tx-badge-out";
+            const txUrl = `https://polygonscan.com/tx/${event.txHash}`;
+
+            return `
+            <li class="flex items-center gap-3 py-3 border-b border-[#333333]">
+                <div class="flex-shrink-0">
+                    <span class="tx-badge ${directionClass}">${event.relatedObject}</span>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium text-white truncate">${escapeHtml(event.methodId)}</p>
+                    <p class="text-xs text-gray-400 font-mono mt-1">
+                        ${date}
+                    </p>
+                </div>
+                <div class="text-right flex-shrink-0">
+                    <p class="font-mono text-sm text-white">${event.amount.toFixed(4)} ${escapeHtml(event.token)}</p>
+                    <a href="${txUrl}" target="_blank" rel="noopener noreferrer" class="text-xs text-blue-400 hover:text-blue-300 font-mono">
+                        ...${event.txHash.slice(-6)}
+                    </a>
+                </div>
+            </li>`;
+        }
+
+        return ''; // Fallback for unknown types
+    }).join('');
 }
+
 
 /**
  * Renders the daily stake history chart.

@@ -100,6 +100,51 @@ export const SUBGRAPH_ID = 'EGWFdhhiWypDuz22Uy7b3F69E9MEkyfU9iAQMttkH5Rj';
 export const DATA_PRICE_STREAM_ID = 'binance-streamr.eth/DATAUSDT/ticker';
 export const POLYGON_RPC_URL = 'https://polygon-rpc.com';
 
+// --- NEW: Polygonscan Constants ---
+export const POLYGONSCAN_API_URL = "https://api.etherscan.io/v2/api";
+export const POLYGONSCAN_NETWORK = {
+    apiUrl: "https://api.etherscan.io/v2/api", // Unified endpoint
+    nativeToken: "MATIC",
+    explorerUrl: "https://polygonscan.com/tx/",
+    chainId: 137 // ChainId for Polygon
+};
+
+// MethodID Dictionary (from our previous app)
+export const POLYGONSCAN_METHOD_IDS = {
+    // Standard ERC-20 IDs
+    "0xa9059cbb": "transfer",
+    "0x23b872dd": "transferFrom",
+    "0x095ea7b3": "approve",
+    "0xd0e30db0": "deposit (WETH/WMATIC)",
+    "0x2e1a7d4d": "withdraw (WETH/WMATIC)",
+
+    // 'DATA' contract IDs
+    "0x4000aea0": "Transfer And Call",
+    "0x918b5be1": "Update Metadata",
+    "0x25c33549": "Set Node Address",
+    "0xe8e658b4": "Withdraw Earnings",
+    "0xbed6ff09": "Vote On Flag",
+    "0x0fd6ff49": "Heartbeat",
+    "0x6c68c0e1": "Undelegate",
+    "0xadc9772e": "Stake",
+    "0xd1b68611": "Reduce Stake To",
+    "0x4a178fe4": "Flag",
+
+    // Other common IDs
+    "0x42842e0e": "safeTransferFrom (ERC721)",
+    "0x522f6445": "safeTransferFrom (ERC1155)",
+    "0x70a08231": "balanceOf"
+};
+
+// "Vote On Flag" logic 
+export const VOTE_ON_FLAG_RAW_AMOUNTS = new Set([
+    "50000000000000000",   // 0.05
+    "500000000000000000",  // 0.5
+    "150000000000000000",  // 0.15
+    "36000000000000000000", // 36
+    "2000000000000000000"  // 2
+]);
+
 // --- Application Constants ---
 export const DELEGATORS_PER_PAGE = 100;
 export const OPERATORS_PER_PAGE = 20; 

@@ -9,7 +9,12 @@ import {
     POLYGON_RPC_URL,
     DELEGATORS_PER_PAGE,
     OPERATORS_PER_PAGE,
-    MIN_SEARCH_LENGTH
+    MIN_SEARCH_LENGTH,
+    // Import Polygonscan constants
+    POLYGONSCAN_API_URL,
+    POLYGONSCAN_NETWORK,
+    POLYGONSCAN_METHOD_IDS,
+    VOTE_ON_FLAG_RAW_AMOUNTS
 } from './constants.js';
 import { showCustomAlert, setModalState, txModalAmount, txModalBalanceValue, txModalMinimumValue, stakeModalAmount, stakeModalCurrentStake, stakeModalFreeFunds, dataPriceValueEl, transactionModal, stakeModal } from './ui.js';
 import { getFriendlyErrorMessage, convertWeiToData } from './utils.js';
@@ -17,6 +22,9 @@ import { getFriendlyErrorMessage, convertWeiToData } from './utils.js';
 // Service state
 let graphApiKey = localStorage.getItem('the-graph-api-key') || 'bb77dd994c8e90edcbd73661a326f068';
 let API_URL = `https://gateway-arbitrum.network.thegraph.com/api/${graphApiKey}/subgraphs/id/${SUBGRAPH_ID}`;
+
+// NEW: Polygonscan API Key state
+let etherscanApiKey = localStorage.getItem('etherscan-api-key') || 'B8BXCXWR66RI1J2QYQRTT4SPHCC6VYYJHC'; // Use your default key as fallback
 
 // To be initialized by main.js
 let streamrClient = null;
@@ -28,8 +36,15 @@ export function updateGraphApiKey(newKey) {
     const keyToUse = newKey || 'bb77dd994c8e90edcbd73661a326f068';
     graphApiKey = keyToUse;
     API_URL = `https://gateway-arbitrum.network.thegraph.com/api/${graphApiKey}/subgraphs/id/${SUBGRAPH_ID}`;
-    console.log("API Key updated. New URL:", API_URL);
+    console.log("Graph API Key updated.");
 }
+
+//  Etherscan API Key Management
+export function updateEtherscanApiKey(newKey) {
+    etherscanApiKey = newKey || '4IYW9RG6W87Y9B9IGCSD6Z8PVJEIBW5S41'; // Use your default key as fallback
+    console.log("Etherscan API Key updated.");
+}
+
 
 // --- Wallet & Network ---
 export async function checkAndSwitchNetwork() {
@@ -117,6 +132,7 @@ export async function fetchOperators(skip = 0, filterQuery = '') {
             const data = await runQuery(query);
             return data.operators;
         } else {
+            // Client-side search for non-address queries
             const topResultsQuery = `
                 query GetTopOperatorsForClientSearch {
                     operators(first: 1000, orderBy: valueWithoutEarnings, orderDirection: desc) {
@@ -124,12 +140,15 @@ export async function fetchOperators(skip = 0, filterQuery = '') {
                     }
                 }`;
             const data = await runQuery(topResultsQuery);
+            // We must import this function or move it
+            const { parseOperatorMetadata } = await import('./utils.js');
             return data.operators.filter(op => {
                 const { name } = parseOperatorMetadata(op.metadataJsonString);
                 return name ? name.toLowerCase().includes(lowerCaseFilter) : false;
             });
         }
     } else {
+        // Default query (no filter)
         const query = `
             query GetOperatorsList {
                 operators(first: ${OPERATORS_PER_PAGE}, skip: ${skip}, orderBy: valueWithoutEarnings, orderDirection: desc) {
@@ -208,6 +227,130 @@ export async function fetchMoreDelegators(operatorId, skip) {
 }
 
 
+// --- API (Polygonscan) ---
+
+/**
+ * Fetches and processes the transaction history for a given wallet from Polygonscan.
+ * This function replicates the logic from the standalone explorer app.
+ * @param {string} walletAddress - The operator's wallet address.
+ * @returns {Promise<Array<object>>} A promise that resolves to an array of processed transaction objects.
+ */
+export async function fetchPolygonscanHistory(walletAddress) {
+    if (!etherscanApiKey) {
+        console.warn("Etherscan API Key not set. Skipping transaction history fetch.");
+        return [];
+    }
+
+    const { apiUrl, chainId, nativeToken } = POLYGONSCAN_NETWORK;
+
+    // --- FIX: Use pagination and sort descending to get the latest transactions ---
+    const page = 1;
+    const offset = 200; // Get the latest 200 of each type
+    const sort = "desc"; // Get latest first
+
+    // Build the V2 API URLs with pagination
+    const txlistUrl = `${apiUrl}?chainid=${chainId}&module=account&action=txlist&address=${walletAddress}&page=${page}&offset=${offset}&sort=${sort}&apikey=${etherscanApiKey}`;
+    const tokentxUrl = `${apiUrl}?chainid=${chainId}&module=account&action=tokentx&address=${walletAddress}&page=${page}&offset=${offset}&sort=${sort}&apikey=${etherscanApiKey}`;
+
+    try {
+        const [txlistRes, tokentxRes] = await Promise.all([
+            fetch(txlistUrl),
+            fetch(tokentxUrl)
+        ]);
+
+        if (!txlistRes.ok) throw new Error(`API request failed (txlist): HTTP ${txlistRes.status}`);
+        if (!tokentxRes.ok) throw new Error(`API request failed (tokentx): HTTP ${tokentxRes.status}`);
+
+        const txlistData = await txlistRes.json();
+        const tokentxData = await tokentxRes.json();
+
+        // Check for API-level errors
+        if (txlistData.status === "0") throw new Error(`API Error (txlist): ${txlistData.result}`);
+        if (tokentxData.status === "0") throw new Error(`API Error (tokentx): ${tokentxData.result}`);
+
+        const normalTxs = txlistData.result || [];
+        const tokenTxs = tokentxData.result || [];
+
+        // 1. Process Native Token Transactions (MATIC) and build MethodID map
+        const methodIdMap = new Map();
+        const processedNormalTxs = normalTxs.map(tx => {
+            const direction = tx.from.toLowerCase() === walletAddress.toLowerCase() ? "OUT" : "IN";
+            const methodIdHex = (tx.input === "0x" || !tx.input) ? "-" : tx.input.substring(0, 10);
+            const methodId = POLYGONSCAN_METHOD_IDS[methodIdHex] || methodIdHex;
+            
+            // Add to map if valid
+            if (methodId !== "-") {
+                methodIdMap.set(tx.hash, methodId);
+            }
+
+            const amount = parseFloat(tx.value) / 1e18;
+
+            return {
+                txHash: tx.hash,
+                timestamp: parseInt(tx.timeStamp),
+                token: nativeToken,
+                direction: direction,
+                methodId: methodId,
+                amount: amount,
+                // We keep the raw value for native txs as well, just in case
+                rawValue: tx.value 
+            };
+        });
+
+        // 2. Process Token Transactions (DATA, etc.) and apply logic
+        const processedTokenTxs = tokenTxs.map(tx => {
+            const direction = tx.from.toLowerCase() === walletAddress.toLowerCase() ? "OUT" : "IN";
+            const decimals = parseInt(tx.tokenDecimal) || 18;
+            const amount = parseFloat(tx.value) / Math.pow(10, decimals);
+            
+            // Start by checking for an inherited MethodID
+            let finalMethodId = methodIdMap.get(tx.hash) || "-"; // Inherit from map
+
+            // **FIXED LOGIC**: Only apply "Vote On Flag" if no other valid MethodID was found
+            if (
+                finalMethodId === "-" && // Check if it's still unknown
+                tx.tokenSymbol === "DATA" &&
+                VOTE_ON_FLAG_RAW_AMOUNTS.has(tx.value) // Check raw value
+            ) {
+                finalMethodId = "Vote On Flag"; // Set heuristic-based ID
+            }
+
+            // "Protocol Tax" logic
+            if (finalMethodId === "Withdraw Earnings" && direction === "OUT") {
+                finalMethodId = "Protocol Tax";
+            }
+
+            return {
+                txHash: tx.hash,
+                timestamp: parseInt(tx.timeStamp),
+                token: tx.tokenSymbol,
+                direction: direction,
+                methodId: finalMethodId,
+                amount: amount,
+                rawValue: tx.value // Keep the raw value for checks
+            };
+        });
+
+        // 3. Combine and Filter
+        const allTxs = [...processedNormalTxs, ...processedTokenTxs];
+
+        // Filter out the 0 MATIC transactions *after* processing
+        const filteredFinalTxs = allTxs.filter(tx => {
+            return !(tx.token === nativeToken && tx.amount === 0);
+        });
+
+        // Return the combined, processed, and filtered list
+        return filteredFinalTxs;
+
+    } catch (error) {
+        console.error("Error fetching Polygonscan history:", error);
+        // Show an alert to the user? For now, just log and return empty.
+        showCustomAlert("Etherscan API Error", `Failed to fetch transaction history: ${error.message}. Please check your API key in Settings.`);
+        return []; // Return empty on error
+    }
+}
+
+
 // --- Blockchain Interactions (Ethers.js) ---
 
 /**
@@ -245,7 +388,7 @@ export async function getMaticBalance(address) {
 export async function manageTransactionModal(show, mode = 'delegate', signer, myRealAddress, currentOperatorId) {
     if (!show) {
         transactionModal.classList.add('hidden');
-        return;
+        return '0'; // Return '0' for max amount
     }
     
     const titleEl = document.getElementById('tx-modal-title');
@@ -269,6 +412,15 @@ export async function manageTransactionModal(show, mode = 'delegate', signer, my
         if (mode === 'delegate') {
             const dataTokenContract = new ethers.Contract(DATA_TOKEN_ADDRESS_POLYGON, DATA_TOKEN_ABI, provider);
             balanceWei = await dataTokenContract.balanceOf(myRealAddress);
+            // Also fetch minimum delegation
+            try {
+                const configContract = new ethers.Contract(STREAMR_CONFIG_ADDRESS, STREAMR_CONFIG_ABI, provider);
+                const minWei = await configContract.minimumDelegationWei();
+                txModalMinimumValue.textContent = `${parseFloat(ethers.utils.formatEther(minWei)).toFixed(0)} DATA`;
+            } catch (e) {
+                console.error("Failed to get minimum delegation", e);
+                txModalMinimumValue.textContent = 'N/A';
+            }
         } else { // 'undelegate'
             const operatorContract = new ethers.Contract(currentOperatorId, OPERATOR_CONTRACT_ABI, provider);
             balanceWei = await operatorContract.balanceInData(myRealAddress);

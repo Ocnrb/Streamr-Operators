@@ -1,7 +1,3 @@
-// --- External Libraries ---
-// Ethers.js is imported via CDN in index.html
-// StreamrClient is imported via CDN in index.html
-
 // --- Module Imports ---
 import * as Constants from './constants.js';
 import * as Utils from './utils.js';
@@ -196,30 +192,53 @@ async function fetchAndRenderOperatorDetails(operatorId) {
  */
 async function refreshOperatorData(isFirstLoad = false) {
     try {
+        // --- MODIFICATION: Load The Graph data first ---
         const data = await Services.fetchOperatorDetails(state.currentOperatorId);
-        state.currentOperatorData = data.operator; // Keep current data fresh
+        
+        // Update state immediately with Graph data
+        state.currentOperatorData = data.operator;
         state.currentDelegations = data.operator?.delegations || [];
         state.totalDelegatorCount = data.operator?.delegatorCount || 0;
         state.operatorDailyBuckets = data.operatorDailyBuckets || [];
         
-        processSponsorshipHistory(data);
-
+        // Process history with ONLY The Graph data first
+        processSponsorshipHistory(data, []); // Pass empty array for scan txs
+        
         if (isFirstLoad) {
+            // Render the main page FAST with only The Graph data
             UI.renderOperatorDetails(data, state);
-            // After rendering, fetch balances and my stake
             const addresses = [...(data.operator.controllers || []), ...(data.operator.nodes || [])];
             UI.renderBalances(addresses);
             updateMyStakeUI();
             setupOperatorStream();
             filterAndRenderChart();
+            UI.renderSponsorshipsHistory(state.sponsorshipHistory); // Renders Graph data
         } else {
+            // Partial update with The Graph data
             UI.updateOperatorDetails(data, state);
-            // Also refresh balances and my stake on updates
             const addresses = [...(data.operator.controllers || []), ...(data.operator.nodes || [])];
             UI.renderBalances(addresses);
             updateMyStakeUI();
             filterAndRenderChart();
+            UI.renderSponsorshipsHistory(state.sponsorshipHistory); // Renders Graph data
         }
+
+        // --- END OF IMMEDIATE RENDER ---
+
+        // --- NEW: Asynchronously load Polygonscan data ---
+        Services.fetchPolygonscanHistory(state.currentOperatorId)
+            .then(polygonscanTxs => {
+                // Now we have the scan data, re-process and re-render the history
+                processSponsorshipHistory(data, polygonscanTxs);
+                // Re-render *only* the history list with the merged data
+                UI.renderSponsorshipsHistory(state.sponsorshipHistory);
+            })
+            .catch(error => {
+                console.error("Failed to load Polygonscan history in background:", error);
+                // Optionally show a non-blocking error to the user
+                // UI.showToast("Could not load Polygonscan history.");
+            });
+        // --- END OF ASYNC LOAD ---
 
     } catch (error) {
         console.error("Failed to refresh operator data:", error);
@@ -229,25 +248,38 @@ async function refreshOperatorData(isFirstLoad = false) {
     }
 }
 
+
 /**
  * Processes and unifies sponsorship-related events into a single chronological feed.
  * @param {object} gqlData - The raw data object from The Graph query.
+ * @param {Array<object>} polygonscanTxs - The processed transactions from Polygonscan.
  */
-function processSponsorshipHistory(gqlData) {
-    if (!gqlData) {
-        state.sponsorshipHistory = [];
-        return;
-    }
+function processSponsorshipHistory(gqlData, polygonscanTxs) {
+    
+    // 1. Map events from The Graph
+    const graphHistory = (gqlData.stakingEvents || []).map(e => ({
+        timestamp: e.date,
+        type: 'graph', // To identify the source
+        amount: parseFloat(Utils.convertWeiToData(e.amount)),
+        token: 'DATA',
+        methodId: 'Staking Event', // Generic label for Graph events
+        txHash: null, // Graph stakingEvents doesn't provide a txhash
+        relatedObject: e.sponsorship // Store the sponsorship object
+    }));
 
-    const stakeEvents = gqlData.stakingEvents?.map(e => ({
-        ...e,
-        timestamp: e.date, // Unify timestamp field
-        // We can't determine the type, so we leave it undefined
-    })) || [];
+    // 2. Map transactions from Polygonscan
+    const scanHistory = (polygonscanTxs || []).map(tx => ({
+        timestamp: tx.timestamp,
+        type: 'scan', // To identify the source
+        amount: tx.amount,
+        token: tx.token,
+        methodId: tx.methodId,
+        txHash: tx.txHash,
+        relatedObject: tx.direction // Store 'IN' or 'OUT'
+    }));
 
-    const unifiedHistory = [...stakeEvents];
-
-    // Sort by timestamp (date) descending
+    // 3. Combine and Sort
+    const unifiedHistory = [...graphHistory, ...scanHistory];
     unifiedHistory.sort((a, b) => b.timestamp - a.timestamp); 
     
     state.sponsorshipHistory = unifiedHistory;
@@ -286,6 +318,7 @@ async function updateMyStakeUI() {
     const myStakeWei = await Services.fetchMyStake(state.currentOperatorId, state.myRealAddress, state.signer);
     const myStakeData = Utils.convertWeiToData(myStakeWei);
     myStakeValueEl.textContent = `${Utils.formatBigNumber(myStakeData)} DATA`;
+    myStakeValueEl.setAttribute('data-tooltip-value', myStakeData);
 }
 
 
@@ -437,15 +470,20 @@ async function handleEditStakeClick(sponsorshipId, currentStakeWei) {
     UI.stakeModalAmount.value = parseFloat(currentStakeData);
     
     // Fetch free funds and calculate max
-    const tokenContract = new ethers.Contract(Constants.DATA_TOKEN_ADDRESS_POLYGON, Constants.DATA_TOKEN_ABI, state.signer.provider);
-    const freeFundsWei = await tokenContract.balanceOf(state.currentOperatorId);
-    UI.stakeModalFreeFunds.textContent = `${Utils.formatBigNumber(Utils.convertWeiToData(freeFundsWei))} DATA`;
-    const maxStakeAmountWei = ethers.BigNumber.from(currentStakeWei).add(freeFundsWei).toString();
+    try {
+        const tokenContract = new ethers.Contract(Constants.DATA_TOKEN_ADDRESS_POLYGON, Constants.DATA_TOKEN_ABI, state.signer.provider);
+        const freeFundsWei = await tokenContract.balanceOf(state.currentOperatorId);
+        UI.stakeModalFreeFunds.textContent = `${Utils.formatBigNumber(Utils.convertWeiToData(freeFundsWei))} DATA`;
+        const maxStakeAmountWei = ethers.BigNumber.from(currentStakeWei).add(freeFundsWei).toString();
+        
+        document.getElementById('stake-modal-max-btn').onclick = () => {
+            UI.stakeModalAmount.value = ethers.utils.formatEther(maxStakeAmountWei);
+        };
+    } catch(e) {
+        console.error("Failed to get free funds:", e);
+        UI.stakeModalFreeFunds.textContent = 'Error';
+    }
     
-    document.getElementById('stake-modal-max-btn').onclick = () => {
-        UI.stakeModalAmount.value = ethers.utils.formatEther(maxStakeAmountWei);
-    };
-
     const confirmBtn = document.getElementById('stake-modal-confirm');
     const newConfirmBtn = confirmBtn.cloneNode(true);
     confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
@@ -530,19 +568,33 @@ function setupEventListeners() {
     // Settings
     document.getElementById('settings-btn').addEventListener('click', () => {
         UI.theGraphApiKeyInput.value = localStorage.getItem('the-graph-api-key') || '';
+        document.getElementById('etherscan-api-key-input').value = localStorage.getItem('etherscan-api-key') || ''; // Load Etherscan key
         UI.settingsModal.classList.remove('hidden');
     });
     document.getElementById('settings-cancel-btn').addEventListener('click', () => UI.settingsModal.classList.add('hidden'));
     document.getElementById('settings-save-btn').addEventListener('click', () => {
-        const newKey = UI.theGraphApiKeyInput.value.trim();
-        if (newKey) {
-            localStorage.setItem('the-graph-api-key', newKey);
+        // Save The Graph Key
+        const newGraphKey = UI.theGraphApiKeyInput.value.trim();
+        if (newGraphKey) {
+            localStorage.setItem('the-graph-api-key', newGraphKey);
         } else {
             localStorage.removeItem('the-graph-api-key');
         }
-        Services.updateGraphApiKey(newKey);
+        Services.updateGraphApiKey(newGraphKey);
+        
+        // Save Etherscan Key
+        const newEtherscanKey = document.getElementById('etherscan-api-key-input').value.trim();
+        if (newEtherscanKey) {
+            localStorage.setItem('etherscan-api-key', newEtherscanKey);
+        } else {
+            localStorage.removeItem('etherscan-api-key');
+        }
+        Services.updateEtherscanApiKey(newEtherscanKey); // Update service
+        
         UI.settingsModal.classList.add('hidden');
-        UI.showCustomAlert('Settings Saved', 'Data will be refreshed with the new API key.');
+        UI.showCustomAlert('Settings Saved', 'Data will be refreshed with the new API keys.');
+        
+        // Refresh data
         state.loadedOperatorCount = 0;
         fetchAndRenderOperatorsList(false, 0, state.searchQuery);
     });
