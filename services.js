@@ -10,23 +10,19 @@ import {
     DELEGATORS_PER_PAGE,
     OPERATORS_PER_PAGE,
     MIN_SEARCH_LENGTH,
-    // Import Polygonscan constants
     POLYGONSCAN_API_URL,
     POLYGONSCAN_NETWORK,
     POLYGONSCAN_METHOD_IDS,
     VOTE_ON_FLAG_RAW_AMOUNTS
 } from './constants.js';
-import { showCustomAlert, setModalState, txModalAmount, txModalBalanceValue, txModalMinimumValue, stakeModalAmount, stakeModalCurrentStake, stakeModalFreeFunds, dataPriceValueEl, transactionModal, stakeModal } from './ui.js';
+import { showCustomAlert, setModalState, txModalAmount, txModalBalanceValue, txModalMinimumValue, stakeModalAmount, stakeModalCurrentStake, stakeModalFreeFunds, dataPriceValueEl, transactionModal, stakeModal, operatorSettingsModal } from './ui.js';
 import { getFriendlyErrorMessage, convertWeiToData } from './utils.js';
 
-// Service state
 let graphApiKey = localStorage.getItem('the-graph-api-key') || 'bb77dd994c8e90edcbd73661a326f068';
 let API_URL = `https://gateway-arbitrum.network.thegraph.com/api/${graphApiKey}/subgraphs/id/${SUBGRAPH_ID}`;
 
-// NEW: Polygonscan API Key state
-let etherscanApiKey = localStorage.getItem('etherscan-api-key') || 'B8BXCXWR66RI1J2QYQRTT4SPHCC6VYYJHC'; // Use your default key as fallback
+let etherscanApiKey = localStorage.getItem('etherscan-api-key') || 'B8BXCXWR66RI1J2QYQRTT4SPHCC6VYYJHC';
 
-// To be initialized by main.js
 let streamrClient = null;
 let priceSubscription = null;
 let coordinationSubscription = null;
@@ -39,9 +35,8 @@ export function updateGraphApiKey(newKey) {
     console.log("Graph API Key updated.");
 }
 
-// Etherscan API Key Management
 export function updateEtherscanApiKey(newKey) {
-    etherscanApiKey = newKey || '4IYW9RG6W87Y9B9IGCSD6Z8PVJEIBW5S41'; // Use your default key as fallback
+    etherscanApiKey = newKey || '4IYW9RG6W87Y9B9IGCSD6Z8PVJEIBW5S41';
     console.log("Etherscan API Key updated.");
 }
 
@@ -55,12 +50,12 @@ export async function checkAndSwitchNetwork() {
         }
         const provider = new ethers.providers.Web3Provider(window.ethereum);
         const network = await provider.getNetwork();
-        if (network.chainId !== 137) { // 137 is the chainId for Polygon Mainnet
+        if (network.chainId !== 137) {
             showCustomAlert('Incorrect Network', 'Please switch your wallet to the Polygon Mainnet to use this feature.');
             try {
                 await window.ethereum.request({
                     method: 'wallet_switchEthereumChain',
-                    params: [{ chainId: '0x89' }], // 0x89 is hex for 137
+                    params: [{ chainId: '0x89' }],
                 });
                 window.location.reload();
                 return true;
@@ -132,7 +127,6 @@ export async function fetchOperators(skip = 0, filterQuery = '') {
             const data = await runQuery(query);
             return data.operators;
         } else {
-            // Client-side search for non-address queries
             const topResultsQuery = `
                 query GetTopOperatorsForClientSearch {
                     operators(first: 1000, orderBy: valueWithoutEarnings, orderDirection: desc) {
@@ -140,7 +134,6 @@ export async function fetchOperators(skip = 0, filterQuery = '') {
                     }
                 }`;
             const data = await runQuery(topResultsQuery);
-            // We must import this function or move it
             const { parseOperatorMetadata } = await import('./utils.js');
             return data.operators.filter(op => {
                 const { name } = parseOperatorMetadata(op.metadataJsonString);
@@ -148,7 +141,6 @@ export async function fetchOperators(skip = 0, filterQuery = '') {
             });
         }
     } else {
-        // Default query (no filter)
         const query = `
             query GetOperatorsList {
                 operators(first: ${OPERATORS_PER_PAGE}, skip: ${skip}, orderBy: valueWithoutEarnings, orderDirection: desc) {
@@ -229,12 +221,6 @@ export async function fetchMoreDelegators(operatorId, skip) {
 
 // --- API (Polygonscan) ---
 
-/**
- * Fetches and processes the transaction history for a given wallet from Polygonscan.
- * This function replicates the logic from the standalone explorer app.
- * @param {string} walletAddress - The operator's wallet address.
- * @returns {Promise<Array<object>>} A promise that resolves to an array of processed transaction objects.
- */
 export async function fetchPolygonscanHistory(walletAddress) {
     if (!etherscanApiKey) {
         console.warn("Etherscan API Key not set. Skipping transaction history fetch.");
@@ -242,13 +228,10 @@ export async function fetchPolygonscanHistory(walletAddress) {
     }
 
     const { apiUrl, chainId, nativeToken } = POLYGONSCAN_NETWORK;
-
-    // --- FIX: Use pagination and sort descending to get the latest transactions ---
     const page = 1;
-    const offset = 200; // Get the latest 200 of each type
-    const sort = "desc"; // Get latest first
+    const offset = 200;
+    const sort = "desc";
 
-    // Build the V2 API URLs with pagination
     const txlistUrl = `${apiUrl}?chainid=${chainId}&module=account&action=txlist&address=${walletAddress}&page=${page}&offset=${offset}&sort=${sort}&apikey=${etherscanApiKey}`;
     const tokentxUrl = `${apiUrl}?chainid=${chainId}&module=account&action=tokentx&address=${walletAddress}&page=${page}&offset=${offset}&sort=${sort}&apikey=${etherscanApiKey}`;
 
@@ -264,21 +247,18 @@ export async function fetchPolygonscanHistory(walletAddress) {
         const txlistData = await txlistRes.json();
         const tokentxData = await tokentxRes.json();
 
-        // Check for API-level errors
         if (txlistData.status === "0") throw new Error(`API Error (txlist): ${txlistData.result}`);
         if (tokentxData.status === "0") throw new Error(`API Error (tokentx): ${tokentxData.result}`);
 
         const normalTxs = txlistData.result || [];
         const tokenTxs = tokentxData.result || [];
 
-        // 1. Process Native Token Transactions (MATIC) and build MethodID map
         const methodIdMap = new Map();
         const processedNormalTxs = normalTxs.map(tx => {
             const direction = tx.from.toLowerCase() === walletAddress.toLowerCase() ? "OUT" : "IN";
             const methodIdHex = (tx.input === "0x" || !tx.input) ? "-" : tx.input.substring(0, 10);
             const methodId = POLYGONSCAN_METHOD_IDS[methodIdHex] || methodIdHex;
             
-            // Add to map if valid
             if (methodId !== "-") {
                 methodIdMap.set(tx.hash, methodId);
             }
@@ -292,30 +272,25 @@ export async function fetchPolygonscanHistory(walletAddress) {
                 direction: direction,
                 methodId: methodId,
                 amount: amount,
-                // We keep the raw value for native txs as well, just in case
                 rawValue: tx.value 
             };
         });
 
-        // 2. Process Token Transactions (DATA, etc.) and apply logic
         const processedTokenTxs = tokenTxs.map(tx => {
             const direction = tx.from.toLowerCase() === walletAddress.toLowerCase() ? "OUT" : "IN";
             const decimals = parseInt(tx.tokenDecimal) || 18;
             const amount = parseFloat(tx.value) / Math.pow(10, decimals);
             
-            // Start by checking for an inherited MethodID
-            let finalMethodId = methodIdMap.get(tx.hash) || "-"; // Inherit from map
+            let finalMethodId = methodIdMap.get(tx.hash) || "-";
 
-            // **FIXED LOGIC**: Only apply "Vote On Flag" if no other valid MethodID was found
             if (
-                finalMethodId === "-" && // Check if it's still unknown
+                finalMethodId === "-" &&
                 tx.tokenSymbol === "DATA" &&
-                VOTE_ON_FLAG_RAW_AMOUNTS.has(tx.value) // Check raw value
+                VOTE_ON_FLAG_RAW_AMOUNTS.has(tx.value)
             ) {
-                finalMethodId = "Vote On Flag"; // Set heuristic-based ID
+                finalMethodId = "Vote On Flag";
             }
 
-            // "Protocol Tax" logic
             if (finalMethodId === "Withdraw Earnings" && direction === "OUT") {
                 finalMethodId = "Protocol Tax";
             }
@@ -327,55 +302,36 @@ export async function fetchPolygonscanHistory(walletAddress) {
                 direction: direction,
                 methodId: finalMethodId,
                 amount: amount,
-                rawValue: tx.value // Keep the raw value for checks
+                rawValue: tx.value
             };
         });
 
-        // 3. Combine and Filter
         const allTxs = [...processedNormalTxs, ...processedTokenTxs];
 
-        // Lógica de filtro anterior (solicitada):
-        // Manter uma transação se:
-        // 1. For 'DATA' (qualquer valor)
-        // 2. For 'MATIC' E tiver um valor > 0
         const filteredFinalTxs = allTxs.filter(tx => {
             const tokenSymbol = tx.token.toUpperCase();
             const nativeTokenSymbol = nativeToken.toUpperCase();
-
-            // 1. Manter todas as transações 'DATA'
             if (tokenSymbol === 'DATA') {
                 return true;
             }
-
-            // 2. Manter transações 'MATIC' APENAS se o valor > 0
             if (tokenSymbol === nativeTokenSymbol && tx.amount > 0) {
                 return true;
             }
-            
-            // 3. Filtrar tudo o resto
-            // (Isto inclui outros tokens E transações MATIC de valor 0)
             return false;
         });
 
-        // Return the combined, processed, and filtered list
         return filteredFinalTxs;
 
     } catch (error) {
         console.error("Error fetching Polygonscan history:", error);
-        // Show an alert to the user? For now, just log and return empty.
         showCustomAlert("Etherscan API Error", `Failed to fetch transaction history: ${error.message}. Please check your API key in Settings.`);
-        return []; // Return empty on error
+        return [];
     }
 }
 
 
 // --- Blockchain Interactions (Ethers.js) ---
 
-/**
- * Fetches the MATIC (POL) balance for a given address.
- * @param {string} address The address to check.
- * @returns {Promise<string>} The formatted balance or 'Error'.
- */
 export async function getMaticBalance(address) {
     try {
         const response = await fetch(POLYGON_RPC_URL, {
@@ -406,7 +362,7 @@ export async function getMaticBalance(address) {
 export async function manageTransactionModal(show, mode = 'delegate', signer, myRealAddress, currentOperatorId) {
     if (!show) {
         transactionModal.classList.add('hidden');
-        return '0'; // Return '0' for max amount
+        return '0';
     }
     
     const titleEl = document.getElementById('tx-modal-title');
@@ -430,7 +386,6 @@ export async function manageTransactionModal(show, mode = 'delegate', signer, my
         if (mode === 'delegate') {
             const dataTokenContract = new ethers.Contract(DATA_TOKEN_ADDRESS_POLYGON, DATA_TOKEN_ABI, provider);
             balanceWei = await dataTokenContract.balanceOf(myRealAddress);
-            // Also fetch minimum delegation
             try {
                 const configContract = new ethers.Contract(STREAMR_CONFIG_ADDRESS, STREAMR_CONFIG_ABI, provider);
                 const minWei = await configContract.minimumDelegationWei();
@@ -439,14 +394,13 @@ export async function manageTransactionModal(show, mode = 'delegate', signer, my
                 console.error("Failed to get minimum delegation", e);
                 txModalMinimumValue.textContent = 'N/A';
             }
-        } else { // 'undelegate'
+        } else {
             const operatorContract = new ethers.Contract(currentOperatorId, OPERATOR_CONTRACT_ABI, provider);
             balanceWei = await operatorContract.balanceInData(myRealAddress);
         }
         const balanceFormatted = ethers.utils.formatEther(balanceWei);
         txModalBalanceValue.textContent = `${parseFloat(balanceFormatted).toFixed(4)} DATA`;
         
-        // Return the max amount for the confirmation logic
         return balanceWei.toString();
     } catch (e) {
         console.error(`Failed to get balance for ${mode}:`, e);
@@ -486,19 +440,6 @@ export async function confirmDelegation(signer, myRealAddress, currentOperatorId
     }
 }
 
-/**
- * Confirms undelegation transaction with FIXED conversion logic.
- * * KEY CHANGES:
- * - Fetches current values directly from the contract (not from The Graph API)
- * - Uses user's balance proportions instead of pool totals
- * - Handles full withdrawal by using all user's tokens
- * - Includes detailed console logging for debugging
- * * @param {ethers.Signer} signer - The wallet signer
- * @param {string} myRealAddress - User's wallet address
- * @param {string} currentOperatorId - Operator contract address
- * @param {Object} currentOperatorData - Operator data (not used in calculation anymore)
- * @returns {Promise<string|null>} Transaction hash or null if failed
- */
 export async function confirmUndelegation(signer, myRealAddress, currentOperatorId, currentOperatorData) {
     const amountData = txModalAmount.value.replace(',', '.');
     if (!amountData || isNaN(amountData) || parseFloat(amountData) <= 0) {
@@ -512,76 +453,41 @@ export async function confirmUndelegation(signer, myRealAddress, currentOperator
         const operatorContract = new ethers.Contract(currentOperatorId, OPERATOR_CONTRACT_ABI, signer);
         const amountDataWei = ethers.utils.parseEther(amountData);
         
-        // Fetch CURRENT values from the contract (not from The Graph API)
-        // This ensures we have the most up-to-date data including recent earnings
         const [userBalanceDataWei, userBalanceTokensWei] = await Promise.all([
-            operatorContract.balanceInData(myRealAddress),      // How much DATA the user has
-            operatorContract.balanceOf(myRealAddress)           // How many Operator Tokens the user has
+            operatorContract.balanceInData(myRealAddress),
+            operatorContract.balanceOf(myRealAddress)
         ]);
 
-        console.log("=== UNDELEGATION DEBUG INFO ===");
-        console.log("User wants to withdraw:", ethers.utils.formatEther(amountDataWei), "DATA");
-        console.log("User balance in DATA:", ethers.utils.formatEther(userBalanceDataWei), "DATA");
-        console.log("User balance in Operator Tokens:", ethers.utils.formatEther(userBalanceTokensWei), "tokens");
-        console.log("Conversion rate:", parseFloat(ethers.utils.formatEther(userBalanceDataWei)) / parseFloat(ethers.utils.formatEther(userBalanceTokensWei)), "DATA per token");
-
-        // Check if user has sufficient stake
         if (amountDataWei.gt(userBalanceDataWei)) {
             showCustomAlert('Insufficient Stake', 'You do not have enough staked DATA to undelegate that amount.');
             setModalState('tx-modal', 'input');
             return null;
         }
 
-        // FIXED CONVERSION LOGIC
-        // The correct formula is: tokens_to_burn = (amount_to_withdraw / user_total_data) * user_total_tokens
-        // This uses the user's own balances, not the pool's totals
         let amountOperatorTokensWei;
-        
-        // Check if this is a full withdrawal (or very close to it)
-        // We use 99.99% threshold to handle rounding issues
         const fullWithdrawalThreshold = userBalanceDataWei.mul(9999).div(10000);
         
         if (amountDataWei.gte(fullWithdrawalThreshold)) {
-            // For full withdrawal, use ALL user's tokens to avoid rounding issues
-            console.log("Full withdrawal detected - using all user's tokens");
             amountOperatorTokensWei = userBalanceTokensWei;
         } else {
-            // For partial withdrawal, calculate proportionally
-            // Formula: tokens = (data_amount * user_tokens) / user_data
             if (userBalanceDataWei.isZero()) {
                 throw new Error("User has no DATA balance, cannot calculate conversion");
             }
-            
             amountOperatorTokensWei = amountDataWei
                 .mul(userBalanceTokensWei)
                 .div(userBalanceDataWei);
-            
-            console.log("Calculated tokens to burn:", ethers.utils.formatEther(amountOperatorTokensWei));
-            
-            // Safety check: ensure we don't try to burn more tokens than user has
             if (amountOperatorTokensWei.gt(userBalanceTokensWei)) {
-                console.warn("Calculated tokens exceed user balance, capping to user balance");
                 amountOperatorTokensWei = userBalanceTokensWei;
             }
         }
 
-        console.log("Final tokens to burn:", ethers.utils.formatEther(amountOperatorTokensWei), "tokens");
-        console.log("Expected DATA to receive:", ethers.utils.formatEther(amountDataWei), "DATA");
-        console.log("===============================");
-
-        // Execute the undelegation transaction
         setModalState('tx-modal', 'loading');
         const tx = await operatorContract.undelegate(amountOperatorTokensWei);
-        
         setModalState('tx-modal', 'loading', { 
             text: 'Processing Transaction...', 
             subtext: 'Waiting for confirmation.' 
         });
-        
         const receipt = await tx.wait();
-        
-        console.log("Undelegation successful! Transaction hash:", receipt.transactionHash);
-        
         setModalState('tx-modal', 'success', { txHash: receipt.transactionHash });
         return receipt.transactionHash;
         
@@ -599,7 +505,7 @@ export async function handleProcessQueue(signer, operatorId) {
     setModalState('tx-modal', 'loading', { text: "Preparing transaction...", subtext: "This will pay out queued undelegations." });
     try {
         const operatorContract = new ethers.Contract(operatorId, OPERATOR_CONTRACT_ABI, signer);
-        const tx = await operatorContract.payOutQueue(0); // 0 means iterate as many times as gas limit allows
+        const tx = await operatorContract.payOutQueue(0);
         setModalState('tx-modal', 'loading', { text: 'Processing Transaction...', subtext: 'Waiting for confirmation.' });
         const receipt = await tx.wait();
         setModalState('tx-modal', 'success', { txHash: receipt.transactionHash });
@@ -688,6 +594,40 @@ export async function fetchMyStake(operatorId, myRealAddress, signer) {
     }
 }
 
+export async function updateOperatorMetadata(signer, operatorId, newMetadataJson) {
+    try {
+        const operatorContract = new ethers.Contract(operatorId, OPERATOR_CONTRACT_ABI, signer);
+        const tx = await operatorContract.updateMetadata(newMetadataJson);
+        const receipt = await tx.wait();
+        return receipt.transactionHash;
+    } catch (e) {
+        console.error("Metadata update failed:", e);
+        setModalState('operator-settings-modal', 'error', { message: getFriendlyErrorMessage(e) });
+        return null;
+    }
+}
+
+export async function updateOperatorCut(signer, operatorId, newCutPercent) {
+    try {
+        const percent = parseFloat(newCutPercent);
+        if (isNaN(percent) || percent < 0 || percent > 100) {
+            throw new Error("Invalid percentage value. Must be between 0 and 100.");
+        }
+        
+        const cutWei = ethers.utils.parseEther((percent / 100).toString());
+        
+        const operatorContract = new ethers.Contract(operatorId, OPERATOR_CONTRACT_ABI, signer);
+        const tx = await operatorContract.updateOperatorsCutFraction(cutWei);
+        const receipt = await tx.wait();
+        return receipt.transactionHash;
+    } catch (e) {
+        console.error("Operator cut update failed:", e);
+        setModalState('operator-settings-modal', 'error', { message: getFriendlyErrorMessage(e) });
+        return null;
+    }
+}
+
+
 // --- Streamr SDK ---
 export function setStreamrClient(client) {
     streamrClient = client;
@@ -755,5 +695,3 @@ export async function cleanupClient() {
         streamrClient = null;
     }
 }
-
-

@@ -25,7 +25,6 @@ export const DATA_TOKEN_ABI = [
 ];
 
 export const OPERATOR_CONTRACT_ABI = [
-    // Minimal ABI for undelegating and checking stake
     {
         "inputs": [],
         "name": "totalSupply",
@@ -49,14 +48,14 @@ export const OPERATOR_CONTRACT_ABI = [
     },
     {
         "inputs": [ { "internalType": "address", "name": "account", "type": "address" } ],
-        "name": "balanceOf", // Returns the amount of Operator Tokens (shares) a delegator has
+        "name": "balanceOf",
         "outputs": [ { "internalType": "uint256", "name": "", "type": "uint256" } ],
         "stateMutability": "view",
         "type": "function"
     },
     {
         "inputs": [ { "internalType": "address", "name": "delegator", "type": "address" } ],
-        "name": "balanceInData", // Returns a delegator's stake value in DATA tokens
+        "name": "balanceInData",
         "outputs": [ { "internalType": "uint256", "name": "amountDataWei", "type": "uint256" } ],
         "stateMutability": "view",
         "type": "function"
@@ -68,7 +67,6 @@ export const OPERATOR_CONTRACT_ABI = [
         "stateMutability": "nonpayable",
         "type": "function"
     },
-    // New functions for stake management
     {
         "inputs": [ { "internalType": "address", "name": "sponsorship", "type": "address" }, { "internalType": "uint256", "name": "amountWei", "type": "uint256" } ],
         "name": "stake",
@@ -89,6 +87,32 @@ export const OPERATOR_CONTRACT_ABI = [
         "outputs": [ { "internalType": "uint256", "name": "", "type": "uint256" } ],
         "stateMutability": "nonpayable",
         "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "string",
+                "name": "metadataJsonString",
+                "type": "string"
+            }
+        ],
+        "name": "updateMetadata",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "uint256",
+                "name": "operatorsCutFractionWei",
+                "type": "uint256"
+            }
+        ],
+        "name": "updateOperatorsCutFraction",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
     }
 ];
 
@@ -100,25 +124,21 @@ export const SUBGRAPH_ID = 'EGWFdhhiWypDuz22Uy7b3F69E9MEkyfU9iAQMttkH5Rj';
 export const DATA_PRICE_STREAM_ID = 'binance-streamr.eth/DATAUSDT/ticker';
 export const POLYGON_RPC_URL = 'https://polygon-rpc.com';
 
-// --- NEW: Polygonscan Constants ---
+// --- Polygonscan Constants ---
 export const POLYGONSCAN_API_URL = "https://api.etherscan.io/v2/api";
 export const POLYGONSCAN_NETWORK = {
-    apiUrl: "https://api.etherscan.io/v2/api", // Unified endpoint
+    apiUrl: "https://api.etherscan.io/v2/api",
     nativeToken: "MATIC",
     explorerUrl: "https://polygonscan.com/tx/",
-    chainId: 137 // ChainId for Polygon
+    chainId: 137
 };
 
-// MethodID Dictionary (from our previous app)
 export const POLYGONSCAN_METHOD_IDS = {
-    // Standard ERC-20 IDs
     "0xa9059cbb": "transfer",
     "0x23b872dd": "transferFrom",
     "0x095ea7b3": "approve",
     "0xd0e30db0": "deposit (WETH/WMATIC)",
     "0x2e1a7d4d": "withdraw (WETH/WMATIC)",
-
-    // 'DATA' contract IDs
     "0x4000aea0": "Transfer And Call",
     "0x918b5be1": "Update Metadata",
     "0x25c33549": "Set Node Address",
@@ -130,20 +150,15 @@ export const POLYGONSCAN_METHOD_IDS = {
     "0xa93a019f": "Force Unstake",
     "0xd1b68611": "Reduce Stake To",
     "0x4a178fe4": "Flag",
-
-    // Other common IDs
-    "0x42842e0e": "safeTransferFrom (ERC721)",
-    "0x522f6445": "safeTransferFrom (ERC1155)",
     "0x70a08231": "balanceOf"
 };
 
-// "Vote On Flag" logic 
 export const VOTE_ON_FLAG_RAW_AMOUNTS = new Set([
-    "50000000000000000",   // 0.05
-    "500000000000000000",  // 0.5
-    "150000000000000000",  // 0.15
-    "36000000000000000000", // 36
-    "2000000000000000000"  // 2
+    "50000000000000000",
+    "500000000000000000",
+    "150000000000000000",
+    "36000000000000000000",
+    "2000000000000000000"
 ]);
 
 // --- Application Constants ---

@@ -1,4 +1,3 @@
-// --- Module Imports ---
 import * as Constants from './constants.js';
 import * as Utils from './utils.js';
 import * as UI from './ui.js';
@@ -13,7 +12,7 @@ let state = {
     currentDelegations: [],
     sponsorshipHistory: [],
     operatorDailyBuckets: [],
-    chartTimeFrame: 90, // Default to 90 days
+    chartTimeFrame: 90,
     totalDelegatorCount: 0,
     dataPriceUSD: null,
     loadedOperatorCount: 0,
@@ -21,7 +20,6 @@ let state = {
     searchTimeout: null,
     detailsRefreshInterval: null,
     activeSponsorshipMenu: null,
-    // UI State
     uiState: {
         isStatsPanelExpanded: false,
         isDelegatorViewActive: true,
@@ -29,16 +27,12 @@ let state = {
         walletViewIndex: 0,
         isSponsorshipsListViewActive: true,
     },
-    // Streamr State
     activeNodes: new Set(),
     unreachableNodes: new Set(),
 };
 
 // --- Initialization ---
 
-/**
- * Initializes the main application logic after login.
- */
 async function initializeApp() {
     await Services.cleanupClient();
     try {
@@ -62,9 +56,6 @@ async function initializeApp() {
     }
 }
 
-/**
- * Sets up listeners for wallet events like account or chain changes.
- */
 function setupWalletListeners() {
     if (window.ethereum) {
         window.ethereum.on('accountsChanged', () => {
@@ -78,9 +69,6 @@ function setupWalletListeners() {
     }
 }
 
-/**
- * Connects the application using a web3 wallet (e.g., MetaMask).
- */
 async function connectWithWallet() {
     const injectedProvider = window.ethereum || window.top?.ethereum;
     if (!injectedProvider) {
@@ -118,9 +106,6 @@ async function connectWithWallet() {
     }
 }
 
-/**
- * Initializes the application in guest mode (read-only).
- */
 async function connectAsGuest() {
     UI.setLoginModalState('loading', 'guest');
     state.myRealAddress = '';
@@ -132,12 +117,6 @@ async function connectAsGuest() {
 
 // --- Data Fetching and Rendering Orchestration ---
 
-/**
- * Fetches and renders the list of operators.
- * @param {boolean} [isLoadMore=false] - True if appending to the list.
- * @param {number} [skip=0] - The number of items to skip for pagination.
- * @param {string} [filterQuery=''] - The search query.
- */
 async function fetchAndRenderOperatorsList(isLoadMore = false, skip = 0, filterQuery = '') {
     UI.showLoader(!isLoadMore);
     try {
@@ -163,10 +142,6 @@ async function fetchAndRenderOperatorsList(isLoadMore = false, skip = 0, filterQ
     }
 }
 
-/**
- * Fetches and renders the details for a specific operator.
- * @param {string} operatorId - The ID of the operator.
- */
 async function fetchAndRenderOperatorDetails(operatorId) {
     UI.showLoader(true);
     if (state.detailsRefreshInterval) clearInterval(state.detailsRefreshInterval);
@@ -174,7 +149,7 @@ async function fetchAndRenderOperatorDetails(operatorId) {
     state.currentOperatorId = operatorId.toLowerCase();
     state.activeNodes.clear();
     state.unreachableNodes.clear();
-    state.chartTimeFrame = 90; // Reset timeframe on new operator view
+    state.chartTimeFrame = 90;
 
     try {
         await refreshOperatorData(true); // isFirstLoad = true
@@ -186,59 +161,42 @@ async function fetchAndRenderOperatorDetails(operatorId) {
     }
 }
 
-/**
- * Refreshes the operator detail data, either fully or partially.
- * @param {boolean} [isFirstLoad=false] - True for a full re-render.
- */
 async function refreshOperatorData(isFirstLoad = false) {
     try {
-        // --- MODIFICATION: Load The Graph data first ---
         const data = await Services.fetchOperatorDetails(state.currentOperatorId);
         
-        // Update state immediately with Graph data
         state.currentOperatorData = data.operator;
         state.currentDelegations = data.operator?.delegations || [];
         state.totalDelegatorCount = data.operator?.delegatorCount || 0;
         state.operatorDailyBuckets = data.operatorDailyBuckets || [];
         
-        // Process history with ONLY The Graph data first
-        processSponsorshipHistory(data, []); // Pass empty array for scan txs
+        processSponsorshipHistory(data, []);
         
         if (isFirstLoad) {
-            // Render the main page FAST with only The Graph data
             UI.renderOperatorDetails(data, state);
             const addresses = [...(data.operator.controllers || []), ...(data.operator.nodes || [])];
             UI.renderBalances(addresses);
             updateMyStakeUI();
             setupOperatorStream();
             filterAndRenderChart();
-            UI.renderSponsorshipsHistory(state.sponsorshipHistory); // Renders Graph data
+            UI.renderSponsorshipsHistory(state.sponsorshipHistory);
         } else {
-            // Partial update with The Graph data
             UI.updateOperatorDetails(data, state);
             const addresses = [...(data.operator.controllers || []), ...(data.operator.nodes || [])];
             UI.renderBalances(addresses);
             updateMyStakeUI();
             filterAndRenderChart();
-            UI.renderSponsorshipsHistory(state.sponsorshipHistory); // Renders Graph data
+            UI.renderSponsorshipsHistory(state.sponsorshipHistory);
         }
 
-        // --- END OF IMMEDIATE RENDER ---
-
-        // --- NEW: Asynchronously load Polygonscan data ---
         Services.fetchPolygonscanHistory(state.currentOperatorId)
             .then(polygonscanTxs => {
-                // Now we have the scan data, re-process and re-render the history
                 processSponsorshipHistory(data, polygonscanTxs);
-                // Re-render *only* the history list with the merged data
                 UI.renderSponsorshipsHistory(state.sponsorshipHistory);
             })
             .catch(error => {
                 console.error("Failed to load Polygonscan history in background:", error);
-                // Optionally show a non-blocking error to the user
-                // UI.showToast("Could not load Polygonscan history.");
             });
-        // --- END OF ASYNC LOAD ---
 
     } catch (error) {
         console.error("Failed to refresh operator data:", error);
@@ -248,46 +206,47 @@ async function refreshOperatorData(isFirstLoad = false) {
     }
 }
 
-
-/**
- * Processes and unifies sponsorship-related events into a single chronological feed.
- * @param {object} gqlData - The raw data object from The Graph query.
- * @param {Array<object>} polygonscanTxs - The processed transactions from Polygonscan.
- */
 function processSponsorshipHistory(gqlData, polygonscanTxs) {
-    
-    // 1. Map events from The Graph
-    const graphHistory = (gqlData.stakingEvents || []).map(e => ({
-        timestamp: e.date,
-        type: 'graph', // To identify the source
-        amount: parseFloat(Utils.convertWeiToData(e.amount)),
-        token: 'DATA',
-        methodId: 'Staking Event', // Generic label for Graph events
-        txHash: null, // Graph stakingEvents doesn't provide a txhash
-        relatedObject: e.sponsorship // Store the sponsorship object
-    }));
+    const combinedEvents = new Map();
 
-    // 2. Map transactions from Polygonscan
-    const scanHistory = (polygonscanTxs || []).map(tx => ({
-        timestamp: tx.timestamp,
-        type: 'scan', // To identify the source
-        amount: tx.amount,
-        token: tx.token,
-        methodId: tx.methodId,
-        txHash: tx.txHash,
-        relatedObject: tx.direction // Store 'IN' or 'OUT'
-    }));
+    (gqlData.stakingEvents || []).forEach(e => {
+        const timestamp = Number(e.date); 
+        if (!combinedEvents.has(timestamp)) {
+            combinedEvents.set(timestamp, { timestamp, events: [] });
+        }
+        combinedEvents.get(timestamp).events.push({
+            timestamp: timestamp,
+            type: 'graph',
+            amount: parseFloat(Utils.convertWeiToData(e.amount)),
+            token: 'DATA',
+            methodId: 'Staking Event',
+            txHash: null,
+            relatedObject: e.sponsorship
+        });
+    });
 
-    // 3. Combine and Sort
-    const unifiedHistory = [...graphHistory, ...scanHistory];
+    (polygonscanTxs || []).forEach(tx => {
+        const timestamp = Number(tx.timestamp); 
+        if (!combinedEvents.has(timestamp)) {
+            combinedEvents.set(timestamp, { timestamp, events: [] });
+        }
+        combinedEvents.get(timestamp).events.push({
+            timestamp: timestamp,
+            type: 'scan',
+            amount: tx.amount,
+            token: tx.token,
+            methodId: tx.methodId,
+            txHash: tx.txHash,
+            relatedObject: tx.direction
+        });
+    });
+
+    const unifiedHistory = Array.from(combinedEvents.values());
     unifiedHistory.sort((a, b) => b.timestamp - a.timestamp); 
     
     state.sponsorshipHistory = unifiedHistory;
 }
 
-/**
- * Filters the daily bucket data based on the current timeframe and renders the chart.
- */
 function filterAndRenderChart() {
     const now = new Date();
     const filteredBuckets = state.operatorDailyBuckets.filter(bucket => {
@@ -302,10 +261,6 @@ function filterAndRenderChart() {
     UI.updateChartTimeframeButtons(state.chartTimeFrame);
 }
 
-
-/**
- * Fetches and updates the "My Stake" section in the UI.
- */
 async function updateMyStakeUI() {
     if (!state.myRealAddress) return;
     const myStakeSection = document.getElementById('my-stake-section');
@@ -326,7 +281,6 @@ async function updateMyStakeUI() {
 
 function handleShowOperatorDetails(operatorId) {
     UI.displayView('detail');
-    // Reset view-specific UI states
     state.uiState.reputationViewIndex = 0;
     state.uiState.walletViewIndex = 0;
     state.uiState.isSponsorshipsListViewActive = true;
@@ -384,7 +338,6 @@ async function handleDelegateClick() {
 
     let maxAmountWei = await Services.manageTransactionModal(true, 'delegate', state.signer, state.myRealAddress, state.currentOperatorId);
 
-    // Use a clone to ensure the event listener is fresh
     const confirmBtn = document.getElementById('tx-modal-confirm');
     const newConfirmBtn = confirmBtn.cloneNode(true);
     confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
@@ -451,7 +404,7 @@ async function handleProcessQueueClick(button) {
     button.innerHTML = `<div class="w-4 h-4 border-2 border-white rounded-full border-t-transparent btn-spinner"></div> Processing...`;
     
     await Services.handleProcessQueue(state.signer, state.currentOperatorId);
-    await refreshOperatorData(true); // Full refresh after queue processing
+    await refreshOperatorData(true);
 
     button.disabled = false;
     button.innerHTML = 'Process Queue';
@@ -469,7 +422,6 @@ async function handleEditStakeClick(sponsorshipId, currentStakeWei) {
     UI.stakeModalCurrentStake.textContent = `${Utils.formatBigNumber(currentStakeData)} DATA`;
     UI.stakeModalAmount.value = parseFloat(currentStakeData);
     
-    // Fetch free funds and calculate max
     try {
         const tokenContract = new ethers.Contract(Constants.DATA_TOKEN_ADDRESS_POLYGON, Constants.DATA_TOKEN_ABI, state.signer.provider);
         const freeFundsWei = await tokenContract.balanceOf(state.currentOperatorId);
@@ -494,7 +446,7 @@ async function handleEditStakeClick(sponsorshipId, currentStakeWei) {
 
         const result = await Services.confirmStakeEdit(state.signer, state.currentOperatorId, sponsorshipId, currentStakeWei);
         if (result && result !== 'nochange') {
-            await refreshOperatorData(false); // Partial refresh
+            await refreshOperatorData(false);
         }
         
         newConfirmBtn.disabled = false;
@@ -533,6 +485,109 @@ async function handleCollectAllEarningsClick(button) {
     button.textContent = 'Collect All';
 }
 
+async function handleEditOperatorSettingsClick() {
+    if (!state.signer) {
+        UI.showCustomAlert('Action Required', 'Please connect your wallet.');
+        return;
+    }
+    if (!await Services.checkAndSwitchNetwork()) return;
+
+    UI.populateOperatorSettingsModal(state.currentOperatorData);
+    UI.setModalState('operator-settings-modal', 'input');
+
+    const originalConfirmBtn = document.getElementById('operator-settings-modal-confirm');
+    const confirmBtn = originalConfirmBtn.cloneNode(true);
+    originalConfirmBtn.parentNode.replaceChild(confirmBtn, originalConfirmBtn);
+
+    const enableConfirm = () => { confirmBtn.disabled = false; };
+    UI.operatorSettingsModalNameInput.addEventListener('input', enableConfirm, { once: true });
+    UI.operatorSettingsModalDescriptionInput.addEventListener('input', enableConfirm, { once: true });
+    UI.operatorSettingsModalCutInput.addEventListener('input', enableConfirm, { once: true });
+    UI.operatorSettingsModalRedundancyInput.addEventListener('input', enableConfirm, { once: true });
+
+    confirmBtn.addEventListener('click', async () => {
+        confirmBtn.disabled = true;
+        confirmBtn.innerHTML = `<div class="w-4 h-4 border-2 border-white rounded-full border-t-transparent btn-spinner"></div> Processing...`;
+        UI.setModalState('operator-settings-modal', 'loading', { text: "Checking for changes...", subtext: "Please wait." });
+
+        const oldMetadata = Utils.parseOperatorMetadata(state.currentOperatorData.metadataJsonString);
+        let oldRedundancy = '1';
+        try {
+            if (state.currentOperatorData.metadataJsonString) {
+                 const meta = JSON.parse(state.currentOperatorData.metadataJsonString);
+                 if (meta && meta.redundancyFactor !== undefined) oldRedundancy = String(meta.redundancyFactor);
+            }
+        } catch(e) {}
+        const oldCut = (BigInt(state.currentOperatorData.operatorsCutFraction) * 100n) / BigInt('1000000000000000000');
+
+        const newName = UI.operatorSettingsModalNameInput.value;
+        const newDescription = UI.operatorSettingsModalDescriptionInput.value;
+        const newRedundancy = UI.operatorSettingsModalRedundancyInput.value;
+        const newCut = UI.operatorSettingsModalCutInput.value;
+
+        const metadataChanged = newName !== (oldMetadata.name || '') ||
+                                newDescription !== (oldMetadata.description || '') ||
+                                newRedundancy !== oldRedundancy;
+        
+        const cutChanged = newCut !== oldCut.toString();
+
+        if (!metadataChanged && !cutChanged) {
+            UI.setModalState('operator-settings-modal', 'input');
+            UI.showCustomAlert('No Changes', 'You have not made any changes.');
+            confirmBtn.disabled = false;
+            confirmBtn.textContent = 'Confirm Changes';
+            return;
+        }
+
+        let txHash1 = null;
+        let txHash2 = null;
+
+        try {
+            if (metadataChanged) {
+                UI.setModalState('operator-settings-modal', 'loading', { text: "Updating Metadata...", subtext: "Please confirm in your wallet." });
+                const newMetadata = {
+                    name: newName,
+                    description: newDescription,
+                    imageIpfsCid: oldMetadata.imageUrl ? oldMetadata.imageUrl.split('/').pop() : null,
+                    redundancyFactor: parseInt(newRedundancy, 10)
+                };
+                txHash1 = await Services.updateOperatorMetadata(state.signer, state.currentOperatorId, JSON.stringify(newMetadata));
+                if (!txHash1) {
+                    confirmBtn.disabled = false;
+                    confirmBtn.textContent = 'Confirm Changes';
+                    return;
+                }
+            }
+
+            if (cutChanged) {
+                UI.setModalState('operator-settings-modal', 'loading', { text: "Updating Owner's Cut...", subtext: "Please confirm in your wallet." });
+                txHash2 = await Services.updateOperatorCut(state.signer, state.currentOperatorId, newCut);
+                if (!txHash2) {
+                     confirmBtn.disabled = false;
+                     confirmBtn.textContent = 'Confirm Changes';
+                     return;
+                }
+            }
+
+            UI.setModalState('operator-settings-modal', 'success', {
+                txHash: txHash1,
+                tx1Text: txHash1 ? "Metadata Update Successful!" : "",
+                txHash2: txHash2,
+                tx2Text: txHash2 ? "Owner's Cut Update Successful!" : ""
+            });
+            
+            await refreshOperatorData(true);
+
+        } catch (e) {
+            UI.setModalState('operator-settings-modal', 'error', { message: Utils.getFriendlyErrorMessage(e) });
+        } finally {
+            confirmBtn.disabled = false;
+            confirmBtn.textContent = 'Confirm Changes';
+        }
+    });
+}
+
+
 // --- Streamr Coordination Stream ---
 function setupOperatorStream() {
     Services.setupStreamrSubscription(state.currentOperatorId, (message) => {
@@ -543,16 +598,13 @@ function setupOperatorStream() {
 // --- Event Listener Setup ---
 
 function setupEventListeners() {
-    // Login
     document.getElementById('connectWalletBtn').addEventListener('click', connectWithWallet);
     document.getElementById('guestBtn').addEventListener('click', connectAsGuest);
     document.getElementById('closeAlertBtn').addEventListener('click', () => UI.customAlertModal.classList.add('hidden'));
 
-    // Main List
     UI.searchInput.addEventListener('input', (e) => handleSearch(e.target.value));
     document.getElementById('load-more-operators-btn').addEventListener('click', (e) => handleLoadMoreOperators(e.target));
     
-    // Detail View Navigation
     document.getElementById('back-to-list-btn').addEventListener('click', () => {
         if (state.detailsRefreshInterval) clearInterval(state.detailsRefreshInterval);
         Services.unsubscribeFromCoordinationStream();
@@ -564,16 +616,17 @@ function setupEventListeners() {
     document.getElementById('tx-modal-close').addEventListener('click', () => UI.transactionModal.classList.add('hidden'));
     document.getElementById('stake-modal-cancel').addEventListener('click', () => UI.stakeModal.classList.add('hidden'));
     document.getElementById('stake-modal-close').addEventListener('click', () => UI.stakeModal.classList.add('hidden'));
+    document.getElementById('operator-settings-modal-cancel').addEventListener('click', () => UI.operatorSettingsModal.classList.add('hidden'));
+    document.getElementById('operator-settings-modal-close').addEventListener('click', () => UI.operatorSettingsModal.classList.add('hidden'));
     
     // Settings
     document.getElementById('settings-btn').addEventListener('click', () => {
         UI.theGraphApiKeyInput.value = localStorage.getItem('the-graph-api-key') || '';
-        document.getElementById('etherscan-api-key-input').value = localStorage.getItem('etherscan-api-key') || ''; // Load Etherscan key
+        document.getElementById('etherscan-api-key-input').value = localStorage.getItem('etherscan-api-key') || '';
         UI.settingsModal.classList.remove('hidden');
     });
     document.getElementById('settings-cancel-btn').addEventListener('click', () => UI.settingsModal.classList.add('hidden'));
     document.getElementById('settings-save-btn').addEventListener('click', () => {
-        // Save The Graph Key
         const newGraphKey = UI.theGraphApiKeyInput.value.trim();
         if (newGraphKey) {
             localStorage.setItem('the-graph-api-key', newGraphKey);
@@ -582,28 +635,24 @@ function setupEventListeners() {
         }
         Services.updateGraphApiKey(newGraphKey);
         
-        // Save Etherscan Key
         const newEtherscanKey = document.getElementById('etherscan-api-key-input').value.trim();
         if (newEtherscanKey) {
             localStorage.setItem('etherscan-api-key', newEtherscanKey);
         } else {
             localStorage.removeItem('etherscan-api-key');
         }
-        Services.updateEtherscanApiKey(newEtherscanKey); // Update service
+        Services.updateEtherscanApiKey(newEtherscanKey);
         
         UI.settingsModal.classList.add('hidden');
         UI.showCustomAlert('Settings Saved', 'Data will be refreshed with the new API keys.');
         
-        // Refresh data
         state.loadedOperatorCount = 0;
         fetchAndRenderOperatorsList(false, 0, state.searchQuery);
     });
     
-    // Event Delegation for dynamic content
     document.body.addEventListener('click', (e) => {
         const target = e.target;
 
-        // Operator cards and links
         const operatorCard = target.closest('.card, .operator-link');
         if (operatorCard && operatorCard.dataset.operatorId) {
             e.preventDefault();
@@ -611,14 +660,13 @@ function setupEventListeners() {
             return;
         }
 
-        // Detail view buttons
         if (target.id === 'delegate-btn') handleDelegateClick();
         if (target.id === 'undelegate-btn') handleUndelegateClick();
         if (target.id === 'process-queue-btn') handleProcessQueueClick(target);
         if (target.id === 'collect-all-earnings-btn') handleCollectAllEarningsClick(target);
         if (target.id === 'load-more-delegators-btn') handleLoadMoreDelegators(target);
+        if (target.id === 'edit-operator-settings-btn') handleEditOperatorSettingsClick();
         
-        // Detail view toggles
         if (target.closest('#toggle-stats-btn')) UI.toggleStatsPanel(false, state.uiState);
         if (target.id === 'toggle-delegator-view-btn') {
             UI.toggleDelegatorQueueView(state.currentOperatorData, state.uiState);
@@ -630,14 +678,12 @@ function setupEventListeners() {
         if (target.id === 'toggle-wallets-view-btn') UI.toggleWalletsView(false, state.uiState);
         if (target.id === 'toggle-sponsorship-view-btn') {
             UI.toggleSponsorshipsView(state.uiState, state.currentOperatorData);
-            // Render history only when switching to that view, if not already rendered
             if (!state.uiState.isSponsorshipsListViewActive) {
                  UI.renderSponsorshipsHistory(state.sponsorshipHistory);
             }
         }
         if (target.closest('.toggle-vote-list-btn')) UI.toggleVoteList(target.closest('.toggle-vote-list-btn').dataset.flagId);
 
-        // Chart timeframe buttons
         const timeframeButton = target.closest('#chart-timeframe-buttons button');
         if (timeframeButton && timeframeButton.dataset.days) {
             const days = timeframeButton.dataset.days === 'all' ? 'all' : parseInt(timeframeButton.dataset.days, 10);
@@ -646,7 +692,6 @@ function setupEventListeners() {
             return;
         }
 
-        // Sponsorship menu
         const menuBtn = target.closest('.toggle-sponsorship-menu-btn');
         if (menuBtn) {
             e.stopPropagation();
@@ -664,7 +709,6 @@ function setupEventListeners() {
             }
         }
         
-        // Sponsorship actions
         const editStakeLink = target.closest('.edit-stake-link');
         if(editStakeLink) {
             e.preventDefault();
@@ -679,7 +723,6 @@ function setupEventListeners() {
         }
     });
 
-    // Tooltip listeners
     UI.mainContainer.addEventListener('mouseover', (e) => {
         const target = e.target.closest('[data-tooltip-value], [data-tooltip-content]');
         if (!target) return;

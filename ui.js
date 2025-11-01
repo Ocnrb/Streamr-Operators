@@ -27,6 +27,13 @@ export const txModalMinimumValue = document.getElementById('tx-modal-minimum-val
 export const stakeModalAmount = document.getElementById('stake-modal-amount');
 export const stakeModalCurrentStake = document.getElementById('stake-modal-current-stake');
 export const stakeModalFreeFunds = document.getElementById('stake-modal-free-funds');
+// Operator Settings Modal Elements
+export const operatorSettingsModal = document.getElementById('operatorSettingsModal');
+export const operatorSettingsModalNameInput = document.getElementById('operator-settings-modal-name');
+export const operatorSettingsModalDescriptionInput = document.getElementById('operator-settings-modal-description-input');
+export const operatorSettingsModalCutInput = document.getElementById('operator-settings-modal-cut');
+export const operatorSettingsModalRedundancyInput = document.getElementById('operator-settings-modal-redundancy');
+
 
 // --- Module State ---
 let stakeHistoryChart = null;
@@ -83,12 +90,6 @@ export function displayView(view) {
     }
 }
 
-/**
- * A generic function to control the state of modals (tx-modal, stake-modal, etc.).
- * @param {string} baseId - The base ID of the modal elements (e.g., 'tx-modal').
- * @param {string} state - The target state: 'input', 'loading', 'success', 'error'.
- * @param {object} options - Optional parameters for the state.
- */
 export function setModalState(baseId, state, options = {}) {
     const inputSection = document.getElementById(`${baseId}-input-section`);
     const statusSection = document.getElementById(`${baseId}-status-section`);
@@ -99,19 +100,36 @@ export function setModalState(baseId, state, options = {}) {
     const statusSubtext = document.getElementById(`${baseId}-status-subtext`);
     const amountInput = document.getElementById(`${baseId}-amount`);
     const receiptLink = document.getElementById(`${baseId}-receipt-link`);
+    const receiptLink2 = document.getElementById(`${baseId}-receipt-link-2`);
+    const receiptText = document.getElementById(`${baseId}-receipt-text`);
+    const receiptText2 = document.getElementById(`${baseId}-receipt-text-2`);
 
-    // Hide all dynamic sections first
     if (inputSection) inputSection.classList.add('hidden');
     if (statusSection) statusSection.classList.add('hidden');
     if (receiptSection) receiptSection.classList.add('hidden');
     if (closeButton) closeButton.classList.add('hidden');
     if (loader) loader.classList.remove('hidden');
     if (statusText) statusText.classList.remove('text-red-400');
+    if (receiptLink) receiptLink.href = '#';
+    if (receiptLink2) receiptLink2.href = '#';
+    if (receiptText) receiptText.textContent = 'Transaction Successful!';
+    if (receiptText2) receiptText2.textContent = '';
+    if (receiptLink2) receiptLink2.textContent = '';
+
 
     if (state === 'input') {
         if (inputSection) inputSection.classList.remove('hidden');
         if (statusText) statusText.textContent = '';
         if (amountInput) amountInput.value = '';
+        
+        if (baseId === 'operator-settings-modal') {
+             const confirmBtn = document.getElementById('operator-settings-modal-confirm');
+             if (confirmBtn) {
+                confirmBtn.disabled = true;
+                confirmBtn.textContent = 'Confirm Changes';
+             }
+        }
+
     } else if (state === 'loading') {
         if (statusSection) statusSection.classList.remove('hidden');
         if (statusText) statusText.textContent = options.text || 'Awaiting confirmation...';
@@ -121,9 +139,23 @@ export function setModalState(baseId, state, options = {}) {
         if (receiptSection) receiptSection.classList.remove('hidden');
         if (closeButton) closeButton.classList.remove('hidden');
         if (loader) loader.classList.add('hidden');
-        if (statusText) statusText.textContent = 'Transaction Successful!';
+        if (statusText) statusText.textContent = 'Update Successful!';
         if (statusSubtext) statusSubtext.textContent = '';
-        if (receiptLink) receiptLink.href = `https://polygonscan.com/tx/${options.txHash}`;
+        if (receiptLink && options.txHash) {
+             receiptLink.href = `https://polygonscan.com/tx/${options.txHash}`;
+             receiptLink.textContent = 'View on Polygonscan';
+        }
+        if (receiptText && options.txHash) {
+             receiptText.textContent = options.tx1Text || 'Transaction 1 Successful!';
+        }
+        if (receiptLink2 && options.txHash2) {
+            receiptLink2.href = `https://polygonscan.com/tx/${options.txHash2}`;
+            receiptLink2.textContent = 'View on Polygonscan';
+        }
+         if (receiptText2 && options.txHash2) {
+             receiptText2.textContent = options.tx2Text || 'Transaction 2 Successful!';
+        }
+
     } else if (state === 'error') {
         if (statusSection) statusSection.classList.remove('hidden');
         if (closeButton) closeButton.classList.remove('hidden');
@@ -146,7 +178,6 @@ function createOperatorCardHtml(op) {
     const totalStakedData = convertWeiToData(op.valueWithoutEarnings);
     const safeOperatorName = escapeHtml(name || op.id);
 
-    // Adiciona lógica para a cor da APY
     const roundedApy = Math.round(weightedApy * 100);
     const apyColorClass = roundedApy === 0 ? 'text-red-400' : 'text-green-400';
 
@@ -183,10 +214,6 @@ export function appendOperatorsList(operators) {
 
 // --- Detail View Rendering ---
 
-/**
- * Fetches and renders the POL balances for a list of addresses.
- * @param {string[]} addresses - An array of addresses.
- */
 export async function renderBalances(addresses) {
     const uniqueAddresses = [...new Set(addresses)];
     for (const address of uniqueAddresses) {
@@ -216,28 +243,21 @@ export function updateDelegatorsSection(delegations, totalDelegatorCount) {
     }
 }
 
-/**
- * Renders the unified sponsorship history list (The Graph + Polygonscan).
- * @param {Array} history - The merged and sorted history array from main.js.
- */
-export function renderSponsorshipsHistory(history) {
+export function renderSponsorshipsHistory(historyGroups) {
     const listEl = document.getElementById('sponsorships-history-list');
     if (!listEl) return;
 
-    if (history.length === 0) {
+    if (historyGroups.length === 0) {
         listEl.innerHTML = '<li class="text-gray-500 text-sm p-4 text-center">No recent activity found from The Graph or Polygonscan.</li>';
         return;
     }
 
-    listEl.innerHTML = history.map(event => {
-        // Item timestamp
-        const date = new Date(event.timestamp * 1000).toLocaleString();
+    listEl.innerHTML = historyGroups.map(group => {
+        const date = new Date(group.timestamp * 1000).toLocaleString();
 
-        // --- RENDER LOGIC FOR 'graph' (The Graph Staking Event) ---
-        if (event.type === 'graph') {
-            const sp = event.relatedObject; // This is the sponsorship object
-            if (!sp) return ''; // Should not happen
-
+        const graphEventsHtml = group.events.filter(e => e.type === 'graph').map(event => {
+            const sp = event.relatedObject;
+            if (!sp) return '';
             const sponsorshipUrl = `https://streamr.network/hub/network/sponsorships/${sp.id}`;
             const sponsorshipDisplayText = escapeHtml(sp.stream?.id || sp.id);
             const link = `<a href="${sponsorshipUrl}" target="_blank" rel="noopener noreferrer" class="text-gray-300 hover:text-white transition-colors" title="${sponsorshipDisplayText}">${sponsorshipDisplayText}</a>`;
@@ -245,25 +265,23 @@ export function renderSponsorshipsHistory(history) {
             const icon = '<svg class="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path></svg>';
 
             return `
-            <li class="flex items-start gap-3 py-3 border-b border-[#333333]">
+            <div class="flex items-start gap-3 py-2">
                 <div class="flex-shrink-0 pt-1">${icon}</div>
                 <div class="flex-1 min-w-0">
                     <p class="text-sm text-gray-300 truncate">${text}</p>
-                    <p class="text-xs text-gray-500 font-mono mt-1">${date}</p>
                 </div>
                 <div class="text-right flex-shrink-0">
                     <p class="font-mono text-sm text-white" ${event.token.toUpperCase() === 'DATA' ? `data-tooltip-value="${Math.round(event.amount)}"` : ''}>${formatBigNumber(Math.round(event.amount).toString())} ${escapeHtml(event.token)}</p>
                 </div>
-            </li>`;
-        }
+            </div>`;
+        }).join('');
 
-        // --- RENDER LOGIC FOR 'scan' (Polygonscan Transaction) ---
-        if (event.type === 'scan') {
+        const scanEventsHtml = group.events.filter(e => e.type === 'scan').map(event => {
             const directionClass = event.relatedObject === "IN" ? "tx-badge-in" : "tx-badge-out";
             const txUrl = `https://polygonscan.com/tx/${event.txHash}`;
 
             return `
-            <li class="flex items-center gap-3 py-3 border-b border-[#333333]">
+            <div class="flex items-center gap-3 py-2">
                 <div class="flex-shrink-0">
                     <span class="tx-badge ${directionClass}">${event.relatedObject}</span>
                 </div>
@@ -271,30 +289,41 @@ export function renderSponsorshipsHistory(history) {
                     <a href="${txUrl}" target="_blank" rel="noopener noreferrer" class="text-sm font-medium text-gray-300 hover:text-white truncate transition-colors block">
                         ${escapeHtml(event.methodId)}
                     </a>
-                    <p class="text-xs text-gray-400 font-mono mt-1">
-                        ${date}
-                    </p>
                 </div>
                 <div class="text-right flex-shrink-0">
                     <p class="font-mono text-sm text-white" ${event.token.toUpperCase() === 'DATA' ? `data-tooltip-value="${Math.round(event.amount)}"` : ''}>${formatBigNumber(Math.round(event.amount).toString())} ${escapeHtml(event.token)}</p>
                 </div>
-            </li>`;
-        }
+            </div>`;
+        }).join('');
 
-        return ''; // Fallback for unknown types
+        const hasGraphEvents = graphEventsHtml.length > 0;
+        const hasScanEvents = scanEventsHtml.length > 0;
+
+        return `
+        <li class="py-3 border-b border-[#333333]">
+            <p class="text-xs text-gray-400 font-mono mb-2">${date}</p>
+            <div>
+                ${hasGraphEvents ? `
+                    <div>
+                        <h4 class="text-sm font-semibold text-white mb-1">Sponsorship Actions</h4>
+                        <div class="pl-4 border-l-2 border-gray-700">${graphEventsHtml}</div>
+                    </div>
+                ` : ''}
+                
+                ${hasScanEvents ? `
+                    <div class="${hasGraphEvents ? 'mt-2' : ''}">
+                         <div class="pl-4">${scanEventsHtml}</div>
+                    </div>
+                ` : ''}
+            </div>
+        </li>`;
     }).join('');
 }
 
-
-/**
- * Renders the daily stake history chart.
- * @param {Array} buckets - The filtered operatorDailyBuckets data.
- */
 export function renderStakeChart(buckets) {
     const container = document.getElementById('stake-chart-container');
     if (!container) return;
 
-    // Clear previous state and recreate canvas
     container.innerHTML = '<canvas id="stake-history-chart"></canvas>';
     const canvas = document.getElementById('stake-history-chart');
     const ctx = canvas.getContext('2d');
@@ -380,6 +409,29 @@ export function renderStakeChart(buckets) {
     });
 }
 
+export function populateOperatorSettingsModal(operatorData) {
+    const { name, description } = parseOperatorMetadata(operatorData.metadataJsonString);
+    let redundancyFactor = '1';
+    try {
+        if (operatorData.metadataJsonString) {
+            const meta = JSON.parse(operatorData.metadataJsonString);
+            if (meta && meta.redundancyFactor !== undefined) {
+                redundancyFactor = meta.redundancyFactor;
+            }
+        }
+    } catch (e) { /* ignore */ }
+
+    const ownersCutPercent = (BigInt(operatorData.operatorsCutFraction) * 100n) / BigInt('1000000000000000000');
+
+    operatorSettingsModalNameInput.value = name || '';
+    operatorSettingsModalDescriptionInput.value = description || '';
+    operatorSettingsModalCutInput.value = ownersCutPercent.toString();
+    operatorSettingsModalRedundancyInput.value = redundancyFactor;
+    
+    document.getElementById('operator-settings-modal-confirm').disabled = false;
+    operatorSettingsModal.classList.remove('hidden');
+}
+
 
 export function renderOperatorDetails(data, globalState) {
     const { operator: op, selfDelegation: selfDelegationData, flagsAgainst, flagsAsFlagger, slashingEvents } = data;
@@ -405,6 +457,19 @@ export function renderOperatorDetails(data, globalState) {
 
     const apy = calculateWeightedApy(op.stakes);
     const ownersCutPercent = (BigInt(op.operatorsCutFraction) * 100n) / BigInt('1000000000000000000');
+    
+    const isOwner = globalState.myRealAddress && op.owner && globalState.myRealAddress.toLowerCase() === op.owner.toLowerCase();
+    const editSettingsButtonHtml = isOwner ? `
+        <div class="mb-4">
+            <button id="edit-operator-settings-btn" class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg transition-colors flex items-center text-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                </svg>
+                Edit Settings
+            </button>
+        </div>
+    ` : '';
 
     const headerStatsHtml = `
         <div class="detail-section px-6 pt-6 pb-2">
@@ -643,9 +708,8 @@ export function renderOperatorDetails(data, globalState) {
         </div>`;
 
 
-    detailContent.innerHTML = headerStatsHtml + listsHtml + streamHtml;
+    detailContent.innerHTML = editSettingsButtonHtml + headerStatsHtml + listsHtml + streamHtml;
 
-    // call update and restore states
     updateOperatorDetails(data, globalState);
     updateDelegatorsSection(globalState.currentDelegations, globalState.totalDelegatorCount);
 
@@ -665,24 +729,15 @@ export function updateOperatorDetails(data, globalState) {
 
     const selfDelegation = selfDelegationData?.[0];
 
-    // --- CALCULATION LOGIC ---
-
-    // 1. Get direct values from The Graph
     const totalStakeWei = BigInt(op.valueWithoutEarnings);
     const totalEarningsWei = BigInt(op.cumulativeEarningsWei);
     const ownerCutWei = BigInt(op.cumulativeOperatorsCutWei);
     const operatorsOwnStakeWei = selfDelegation ? BigInt(selfDelegation._valueDataWei) : 0n;
-
-    // 2. Calculate "Total Distributed" the correct and simple way
-    // Total Distributed = Total Earnings - Owner's Earnings from Cut
     const distributedToDelegatorsWei = totalEarningsWei - ownerCutWei;
-
-    // 3. Other calculations (remain the same)
     const ownersCutPercent = (BigInt(op.operatorsCutFraction) * 100n) / BigInt('1000000000000000000');
     const ownersStakePercent = totalStakeWei > 0n ? Number((operatorsOwnStakeWei * 10000n) / totalStakeWei) / 100 : 0;
     const deployedStakeWei = op.stakes?.reduce((sum, stake) => sum + BigInt(stake.amountWei), 0n) || 0n;
 
-    // Convert to DATA for display
     const totalStakeData = convertWeiToData(op.valueWithoutEarnings);
     const totalEarningsData = convertWeiToData(op.cumulativeEarningsWei);
     const ownerCutData = convertWeiToData(op.cumulativeOperatorsCutWei);
@@ -690,10 +745,6 @@ export function updateOperatorDetails(data, globalState) {
     const deployedData = convertWeiToData(deployedStakeWei.toString());
     const ownerStakeData = convertWeiToData(operatorsOwnStakeWei.toString());
 
-
-    // --- UPDATE UI WITH VALUES ---
-
-    // Update Header Stats
     const headerStakeEl = document.getElementById('header-stat-stake');
     if (headerStakeEl) {
         headerStakeEl.textContent = formatBigNumber(totalStakeData);
@@ -711,10 +762,8 @@ export function updateOperatorDetails(data, globalState) {
         headerCutEl.textContent = `${ownersCutPercent}%`;
     }
 
-    // Update Extended Stats
     const distributedEl = document.getElementById('extended-stat-distributed');
     if (distributedEl) {
-        // Display calculated value
         distributedEl.textContent = formatBigNumber(distributedData);
         distributedEl.setAttribute('data-tooltip-value', distributedData);
     }
@@ -883,12 +932,8 @@ export function addStreamMessageToUI(message, activeNodes, unreachableNodes) {
         <pre class="whitespace-pre-wrap break-all text-xs text-gray-400"><code>${escapeHtml(JSON.stringify(message, null, 2))}</code></pre>`;
 
     messagesContainerEl.prepend(messageWrapper);
-    while (messagesContainerEl.children.length > 20) { // MAX_STREAM_MESSAGES
+    while (messagesContainerEl.children.length > 20) {
         messagesContainerEl.removeChild(messagesContainerEl.lastChild);
     }
 }
-
-
-
-
 
