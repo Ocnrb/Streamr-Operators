@@ -291,7 +291,7 @@ export async function fetchPolygonscanHistory(walletAddress) {
                 finalMethodId = "Vote On Flag";
             }
 
-            if (finalMethodId === "Withdraw Earnings" && direction === "OUT") {
+            if (finalMethodId === "Collect Earnings" && direction === "OUT") {
                 finalMethodId = "Protocol Tax";
             }
 

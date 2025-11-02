@@ -1,5 +1,6 @@
 import { escapeHtml, formatBigNumber, convertWeiToData, createAddressLink, createEntityLink, parseOperatorMetadata, calculateWeightedApy } from './utils.js';
 import { getMaticBalance } from './services.js';
+import { regionToLocationMap } from './locationData.js';
 
 // --- Element Cache ---
 export const loginModal = document.getElementById('loginModal');
@@ -37,6 +38,15 @@ export const operatorSettingsModalRedundancyInput = document.getElementById('ope
 
 // --- Module State ---
 let stakeHistoryChart = null;
+
+// --- Leaflet Map State ---
+let leafletMap = null;
+// Use a Map to group nodes by location. Key: "lat,long", Value: { marker, nodes (Map<nodeId, host>), location }
+let locationNodeMap = new Map();
+let mapLayers = {
+    markers: null,
+    lines: null
+};
 
 
 // --- UI Update Functions ---
@@ -261,7 +271,7 @@ export function renderSponsorshipsHistory(historyGroups) {
             const sponsorshipUrl = `https://streamr.network/hub/network/sponsorships/${sp.id}`;
             const sponsorshipDisplayText = escapeHtml(sp.stream?.id || sp.id);
             const link = `<a href="${sponsorshipUrl}" target="_blank" rel="noopener noreferrer" class="text-gray-300 hover:text-white transition-colors" title="${sponsorshipDisplayText}">${sponsorshipDisplayText}</a>`;
-            const text = `Staking action on ${link}`;
+            const text = `Action on ${link}`;
             const icon = '<svg class="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path></svg>';
 
             return `
@@ -644,7 +654,11 @@ export function renderOperatorDetails(data, globalState) {
             <div class="detail-section p-6">
                 <div class="flex justify-between items-center mb-4">
                     <h3 id="delegator-queue-title" class="text-xl font-semibold text-white">Delegators</h3>
-                    <button id="toggle-delegator-view-btn" title="Switch View" class="text-gray-400 hover:text-white p-1"><svg class="h-5 w-5 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg></button>
+                    <button id="toggle-delegator-view-btn" title="Switch View" class="text-gray-400 hover:text-white p-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M5 7h14" />
+                        </svg>
+                    </button>
                 </div>
                 <div id="delegators-content"><ul id="delegators-list" class="max-h-96 overflow-y-auto pr-2"></ul><div id="delegators-footer" class="mt-4"></div></div>
                 <div id="queue-content" class="hidden">
@@ -656,7 +670,11 @@ export function renderOperatorDetails(data, globalState) {
                 <div class="flex justify-between items-center mb-4">
                     <h3 id="sponsorships-title" class="text-xl font-semibold text-white">Sponsorships (${op.stakes?.length || 0})</h3>
                     <div class="flex items-center gap-2">
-                        <button id="toggle-sponsorship-view-btn" title="Switch View" class="text-gray-400 hover:text-white p-1"><svg class="h-5 w-5 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg></button>
+                        <button id="toggle-sponsorship-view-btn" title="Switch View" class="text-gray-400 hover:text-white p-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                              <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M5 7h14" />
+                            </svg>
+                        </button>
                     </div>
                 </div>
                 <div id="sponsorships-list-content">
@@ -672,7 +690,11 @@ export function renderOperatorDetails(data, globalState) {
             <div class="detail-section p-6 lg:col-span-2">
                 <div class="flex justify-between items-center mb-4">
                     <h3 id="reputation-title" class="text-xl font-semibold text-white">Slashing Events</h3>
-                    <button id="toggle-reputation-view-btn" title="Switch View" class="text-gray-400 hover:text-white p-1"><svg class="h-5 w-5 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg></button>
+                    <button id="toggle-reputation-view-btn" title="Switch View" class="text-gray-400 hover:text-white p-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M5 7h14" />
+                        </svg>
+                    </button>
                 </div>
                 <div id="reputation-content-wrapper" 
                     data-slashes-count="${slashingEvents.length}" 
@@ -686,7 +708,11 @@ export function renderOperatorDetails(data, globalState) {
             <div class="detail-section p-6 lg:col-span-2">
                 <div class="flex justify-between items-center mb-4">
                     <h3 id="wallets-title" class="text-xl font-semibold text-white">Agents</h3>
-                    <button id="toggle-wallets-view-btn" title="Switch View" class="text-gray-400 hover:text-white p-1"><svg class="h-5 w-5 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg></button>
+                    <button id="toggle-wallets-view-btn" title="Switch View" class="text-gray-400 hover:text-white p-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M5 7h14" />
+                        </svg>
+                    </button>
                 </div>
                 <div id="agents-content" data-agents-count="${op.controllers?.length || 0}"><ul class="max-h-96 overflow-y-auto pr-2">${agentsHtml}</ul></div>
                 <div id="nodes-content" class="hidden" data-nodes-count="${op.nodes?.length || 0}"><ul class="max-h-96 overflow-y-auto pr-2">${nodesHtml}</ul></div>
@@ -705,7 +731,15 @@ export function renderOperatorDetails(data, globalState) {
                 </div>
             </div>
             <div id="stream-messages-container" class="max-h-96 overflow-y-auto pr-2 bg-black/50 p-2"><div class="text-gray-500 text-sm text-center py-4">Live messages will appear here.</div></div>
-        </div>`;
+        </div>
+        
+        <!-- Node Map -->
+        <div class="detail-section p-6 mt-8">
+            <div id="node-map-container" class="h-96 w-full rounded-lg bg-black/50" style="z-index: 0;">
+                <div class="text-gray-500 text-sm text-center py-4">Initializing map...</div>
+            </div>
+        </div>
+        `;
 
 
     detailContent.innerHTML = editSettingsButtonHtml + headerStatsHtml + listsHtml + streamHtml;
@@ -720,6 +754,9 @@ export function renderOperatorDetails(data, globalState) {
     toggleReputationView(true, globalState.uiState);
     toggleWalletsView(true, globalState.uiState);
     toggleSponsorshipsView(globalState.uiState, op, true);
+
+    // Initialize the Leaflet map
+    initLeafletMap('node-map-container');
 }
 
 
@@ -907,10 +944,24 @@ export function addStreamMessageToUI(message, activeNodes, unreachableNodes) {
 
     if (message?.msgType === 'heartbeat' && message?.peerDescriptor?.nodeId) {
         const nodeId = message.peerDescriptor.nodeId;
+        const region = message.peerDescriptor.region; // Get the region
+        const host = message.peerDescriptor.websocket?.host || nodeId; // Get the host, fallback to nodeId
+
         if (!activeNodes.has(nodeId)) {
             activeNodes.add(nodeId);
             document.getElementById('active-nodes-count-value').textContent = activeNodes.size;
             document.getElementById('active-nodes-stats-value').textContent = activeNodes.size;
+
+            // --- NEW MAP LOGIC ---
+            if (region && leafletMap) {
+                const location = regionToLocationMap[region];
+                if (location) {
+                    addNodeToMap(location, host, nodeId); // Pass location, host, AND nodeId
+                } else {
+                    console.warn(`Region code ${region} not found in location map.`);
+                }
+            }
+            // --- END NEW MAP LOGIC ---
         }
         if (message.peerDescriptor?.websocket?.tls === false && !unreachableNodes.has(nodeId)) {
             unreachableNodes.add(nodeId);
@@ -934,6 +985,149 @@ export function addStreamMessageToUI(message, activeNodes, unreachableNodes) {
     messagesContainerEl.prepend(messageWrapper);
     while (messagesContainerEl.children.length > 20) {
         messagesContainerEl.removeChild(messagesContainerEl.lastChild);
+    }
+}
+
+
+// --- Leaflet Map Functions ---
+
+/**
+ * Cleans up the existing Leaflet map instance and resets state.
+ */
+function cleanupLeafletMap() {
+    if (leafletMap) {
+        leafletMap.remove();
+        leafletMap = null;
+    }
+    locationNodeMap.clear(); // Clear the location/node tracker
+    mapLayers = { markers: null, lines: null };
+}
+
+/**
+ * Initializes a new Leaflet map instance.
+ * @param {string} containerId - The ID of the div element to contain the map.
+ */
+export function initLeafletMap(containerId) {
+    cleanupLeafletMap(); // Clean up old instance first
+
+    try {
+        const mapContainer = document.getElementById(containerId);
+        if (!mapContainer) {
+            console.error("Map container not found:", containerId);
+            return;
+        }
+        // Clear placeholder
+        mapContainer.innerHTML = '';
+
+        leafletMap = L.map(containerId, {
+            zoomControl: true, // Show zoom control
+            attributionControl: false // Hide "Leaflet" attribution
+        }).setView([20, 0], 2); // Center map [lat, long], zoom
+
+        // Add CartoDB dark_matter tile layer
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+            subdomains: 'abcd',
+            maxZoom: 19,
+            minZoom: 2
+        }).addTo(leafletMap);
+
+        // --- FIX: Force map to re-check its size after container is rendered ---
+        // This solves the "half-loaded map" bug
+        setTimeout(() => {
+            if (leafletMap) {
+                leafletMap.invalidateSize();
+            }
+        }, 0); // 0ms timeout pushes this to the end of the execution stack
+        // --- END FIX ---
+
+        // Initialize layer groups to manage markers and lines
+        mapLayers.lines = L.layerGroup().addTo(leafletMap);
+        mapLayers.markers = L.layerGroup().addTo(leafletMap);
+
+    } catch (e) {
+        console.error("Failed to initialize Leaflet map:", e);
+        const mapContainer = document.getElementById(containerId);
+        if (mapContainer) {
+            mapContainer.innerHTML = '<p class="text-red-400">Error loading map.</p>';
+        }
+    }
+}
+
+/**
+ * Formats the tooltip content for a map marker.
+ * @param {Map<string, string>} nodesMap - A Map of nodeId -> host
+ * @returns {string} HTML content for the tooltip.
+ */
+function formatNodeTooltip(nodesMap) {
+    const lines = [];
+    for (const [nodeId, host] of nodesMap.entries()) {
+        const safeHost = escapeHtml(host);
+        const safeNodeId = escapeHtml(nodeId);
+        lines.push(
+            `- host: ${safeHost}\n  node: ${safeNodeId}`
+        );
+    }
+    // Wrap in <pre> to respect the newlines and indentation
+    return `<pre style="margin: 0; font-family: monospace; font-size: 10px;">${lines.join('\n\n')}</pre>`;
+}
+
+/**
+ * Adds a new node marker and connection lines to the map.
+ * Groups nodes by location and updates tooltips.
+ * @param {object} location - The location object { lat, long, code }.
+ * @param {string} host - The node's host ID.
+ * @param {string} nodeId - The node's ID.
+ */
+function addNodeToMap(location, host, nodeId) {
+    if (!leafletMap || !mapLayers.markers || !mapLayers.lines) return;
+
+    const latLng = [location.lat, location.long];
+    const locationKey = `${location.lat},${location.long}`; // Use lat/long as a unique key
+
+    if (!locationNodeMap.has(locationKey)) {
+        // This is the FIRST node at this location
+        const marker = L.circleMarker(latLng, {
+            radius: 5,
+            fillColor: "#3b82f6", // Tailwind Blue-500
+            color: "#FFFFFF",
+            weight: 1,
+            opacity: 1,
+            fillOpacity: 0.8
+        }).addTo(mapLayers.markers);
+
+        const nodes = new Map();
+        nodes.set(nodeId, host);
+
+        // Bind tooltip
+        marker.bindTooltip(formatNodeTooltip(nodes));
+
+        // Store marker and nodes
+        locationNodeMap.set(locationKey, { marker, nodes, location });
+
+        // Add lines to all *other* existing locations
+        for (const [key, existingEntry] of locationNodeMap.entries()) {
+            if (key !== locationKey) { // Don't draw line to self
+                const latlngs = [
+                    [existingEntry.location.lat, existingEntry.location.long],
+                    latLng
+                ];
+                L.polyline(latlngs, {
+                    color: "rgba(255, 255, 255, 0.4)", // White, semi-transparent
+                    weight: 1
+                }).addTo(mapLayers.lines);
+            }
+        }
+    } else {
+        // This is an ADDITIONAL node at an existing location
+        const entry = locationNodeMap.get(locationKey);
+        
+        // Add the new node (Map handles duplicates by nodeId)
+        entry.nodes.set(nodeId, host);
+
+        // Update the tooltip content
+        const tooltipContent = formatNodeTooltip(entry.nodes);
+        entry.marker.setTooltipContent(tooltipContent);
     }
 }
 

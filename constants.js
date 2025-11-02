@@ -1,4 +1,3 @@
-// --- Smart Contract & Network Constants ---
 export const DATA_TOKEN_ADDRESS_POLYGON = '0x3a9A81d576d83FF21f26f325066054540720fC34';
 export const STREAMR_CONFIG_ADDRESS = '0x344587b3d00394821557352354331D7048754d24';
 
@@ -89,26 +88,14 @@ export const OPERATOR_CONTRACT_ABI = [
         "type": "function"
     },
     {
-        "inputs": [
-            {
-                "internalType": "string",
-                "name": "metadataJsonString",
-                "type": "string"
-            }
-        ],
+        "inputs": [ { "internalType": "string", "name": "metadataJsonString", "type": "string" } ],
         "name": "updateMetadata",
         "outputs": [],
         "stateMutability": "nonpayable",
         "type": "function"
     },
     {
-        "inputs": [
-            {
-                "internalType": "uint256",
-                "name": "operatorsCutFractionWei",
-                "type": "uint256"
-            }
-        ],
+        "inputs": [ { "internalType": "uint256", "name": "operatorsCutFractionWei", "type": "uint256" } ],
         "name": "updateOperatorsCutFraction",
         "outputs": [],
         "stateMutability": "nonpayable",
@@ -118,13 +105,10 @@ export const OPERATOR_CONTRACT_ABI = [
 
 export const STREAMR_CONFIG_ABI = [{ "inputs": [], "name": "minimumDelegationWei", "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }], "stateMutability": "view", "type": "function" }];
 
-
-// --- API & SDK Constants ---
 export const SUBGRAPH_ID = 'EGWFdhhiWypDuz22Uy7b3F69E9MEkyfU9iAQMttkH5Rj';
 export const DATA_PRICE_STREAM_ID = 'binance-streamr.eth/DATAUSDT/ticker';
 export const POLYGON_RPC_URL = 'https://polygon-rpc.com';
 
-// --- Polygonscan Constants ---
 export const POLYGONSCAN_API_URL = "https://api.etherscan.io/v2/api";
 export const POLYGONSCAN_NETWORK = {
     apiUrl: "https://api.etherscan.io/v2/api",
@@ -135,22 +119,17 @@ export const POLYGONSCAN_NETWORK = {
 
 export const POLYGONSCAN_METHOD_IDS = {
     "0xa9059cbb": "transfer",
-    "0x23b872dd": "transferFrom",
-    "0x095ea7b3": "approve",
-    "0xd0e30db0": "deposit (WETH/WMATIC)",
-    "0x2e1a7d4d": "withdraw (WETH/WMATIC)",
     "0x4000aea0": "Transfer And Call",
     "0x918b5be1": "Update Metadata",
     "0x25c33549": "Set Node Address",
-    "0xe8e658b4": "Withdraw Earnings",
+    "0xe8e658b4": "Collect Earnings",
     "0xbed6ff09": "Vote On Flag",
     "0x0fd6ff49": "Heartbeat",
     "0x6c68c0e1": "Undelegate",
     "0xadc9772e": "Stake",
     "0xa93a019f": "Force Unstake",
-    "0xd1b68611": "Reduce Stake To",
+    "0xd1b68611": "Unstake",
     "0x4a178fe4": "Flag",
-    "0x70a08231": "balanceOf"
 };
 
 export const VOTE_ON_FLAG_RAW_AMOUNTS = new Set([
@@ -161,8 +140,9 @@ export const VOTE_ON_FLAG_RAW_AMOUNTS = new Set([
     "2000000000000000000"
 ]);
 
-// --- Application Constants ---
 export const DELEGATORS_PER_PAGE = 100;
-export const OPERATORS_PER_PAGE = 20; 
+export const OPERATORS_PER_PAGE = 20;
+export const SPONSORSHIPS_PER_PAGE = 20;
 export const MIN_SEARCH_LENGTH = 3;
 export const MAX_STREAM_MESSAGES = 20;
+
