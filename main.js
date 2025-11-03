@@ -170,33 +170,42 @@ async function refreshOperatorData(isFirstLoad = false) {
         state.totalDelegatorCount = data.operator?.delegatorCount || 0;
         state.operatorDailyBuckets = data.operatorDailyBuckets || [];
         
-        processSponsorshipHistory(data, []);
-        
         if (isFirstLoad) {
+            // Process GQL-only events first for a fast initial render
+            processSponsorshipHistory(data, []);
+            
             UI.renderOperatorDetails(data, state);
             const addresses = [...(data.operator.controllers || []), ...(data.operator.nodes || [])];
             UI.renderBalances(addresses);
             updateMyStakeUI();
             setupOperatorStream();
             filterAndRenderChart();
+            // Render GQL-only history
             UI.renderSponsorshipsHistory(state.sponsorshipHistory);
         } else {
+            // On refresh, just update stats and chart
             UI.updateOperatorDetails(data, state);
             const addresses = [...(data.operator.controllers || []), ...(data.operator.nodes || [])];
             UI.renderBalances(addresses);
             updateMyStakeUI();
             filterAndRenderChart();
-            UI.renderSponsorshipsHistory(state.sponsorshipHistory);
+            // DO NOT render history on background refresh
         }
 
-        Services.fetchPolygonscanHistory(state.currentOperatorId)
-            .then(polygonscanTxs => {
-                processSponsorshipHistory(data, polygonscanTxs);
-                UI.renderSponsorshipsHistory(state.sponsorshipHistory);
-            })
-            .catch(error => {
-                console.error("Failed to load Polygonscan history in background:", error);
-            });
+        // --- MODIFICATION ---
+        // Only fetch (heavy) Polygonscan history and re-render history list ONCE on first load
+        if (isFirstLoad) {
+            Services.fetchPolygonscanHistory(state.currentOperatorId)
+                .then(polygonscanTxs => {
+                    // Re-process with combined GQL and Scan data
+                    processSponsorshipHistory(data, polygonscanTxs);
+                    // Re-render history with combined data
+                    UI.renderSponsorshipsHistory(state.sponsorshipHistory);
+                })
+                .catch(error => {
+                    console.error("Failed to load Polygonscan history in background:", error);
+                });
+        }
 
     } catch (error) {
         console.error("Failed to refresh operator data:", error);
@@ -751,4 +760,3 @@ document.addEventListener('DOMContentLoaded', () => {
     setupEventListeners();
     UI.loginModal.classList.remove('hidden');
 });
-

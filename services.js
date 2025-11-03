@@ -1,6 +1,7 @@
 import {
     DATA_TOKEN_ADDRESS_POLYGON,
     STREAMR_CONFIG_ADDRESS,
+    STREAMR_TREASURY_ADDRESS, // Imported the treasury address
     DATA_TOKEN_ABI,
     OPERATOR_CONTRACT_ABI,
     STREAMR_CONFIG_ABI,
@@ -291,10 +292,45 @@ export async function fetchPolygonscanHistory(walletAddress) {
                 finalMethodId = "Vote On Flag";
             }
 
-            if (finalMethodId === "Collect Earnings" && direction === "OUT") {
-                finalMethodId = "Protocol Tax";
+            // 1. Handle known delegation/transfer methods that are "IN"
+            if (
+                (finalMethodId === "Delegate" || finalMethodId === "Transfer") &&
+                direction === "IN"
+            ) {
+                finalMethodId = "Delegate";
+            }
+            // 2. Catch failed lookups ("-") that are "IN" and are DATA tokens
+            // (This block must be AFTER the "Vote On Flag" check)
+            else if (
+                finalMethodId === "-" &&
+                direction === "IN" &&
+                tx.tokenSymbol === "DATA"
+            ) {
+                finalMethodId = "Delegate";
             }
 
+            // 3. Handle "OUT" transactions from "Collect Earnings"
+            if (finalMethodId === "Collect Earnings" && direction === "OUT") {
+                if (tx.to.toLowerCase() === STREAMR_TREASURY_ADDRESS.toLowerCase()) {
+                    finalMethodId = "Protocol Tax";
+                } else {
+                    finalMethodId = "Undelegate";
+                }
+            }
+
+            // 4. Handle "OUT" transactions from "Unstake"
+            if (
+                (finalMethodId === "Unstake" || finalMethodId === "Force Unstake") &&
+                direction === "OUT"
+            ) {
+                // THIS IS THE NEW LOGIC / FIX
+                if (tx.to.toLowerCase() === STREAMR_TREASURY_ADDRESS.toLowerCase()) {
+                    finalMethodId = "Protocol Tax";
+                } else {
+                    finalMethodId = "Undelegate";
+                }
+            }
+            
             return {
                 txHash: tx.hash,
                 timestamp: parseInt(tx.timeStamp),
@@ -695,3 +731,4 @@ export async function cleanupClient() {
         streamrClient = null;
     }
 }
+

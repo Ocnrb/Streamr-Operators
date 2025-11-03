@@ -287,7 +287,23 @@ export function renderSponsorshipsHistory(historyGroups) {
         }).join('');
 
         const scanEventsHtml = group.events.filter(e => e.type === 'scan').map(event => {
-            const directionClass = event.relatedObject === "IN" ? "tx-badge-in" : "tx-badge-out";
+            
+            let directionClass;
+            const method = event.methodId;
+            // Estes métodos são LARANJA (operações de stake 'IN')
+            const stakeInMethods = ["Stake", "Unstake", "Force Unstake"]; // "Delegate" REMOVIDO
+            // Estes métodos são VERMELHOS (operações de stake 'OUT')
+            const stakeOutMethods = ["Undelegate"];
+
+            if (stakeInMethods.includes(method)) {
+                directionClass = "tx-badge-stake"; // Laranja
+            } else if (stakeOutMethods.includes(method)) {
+                directionClass = "tx-badge-out"; // Vermelho
+            } else {
+                // Lógica antiga para tudo o resto (Delegate cairá aqui)
+                directionClass = event.relatedObject === "IN" ? "tx-badge-in" : "tx-badge-out";
+            }
+            
             const txUrl = `https://polygonscan.com/tx/${event.txHash}`;
 
             return `
@@ -334,21 +350,35 @@ export function renderStakeChart(buckets) {
     const container = document.getElementById('stake-chart-container');
     if (!container) return;
 
-    container.innerHTML = '<canvas id="stake-history-chart"></canvas>';
-    const canvas = document.getElementById('stake-history-chart');
-    const ctx = canvas.getContext('2d');
+    const labels = buckets.map(bucket => new Date(bucket.date * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }));
+    const data = buckets.map(bucket => parseFloat(convertWeiToData(bucket.valueWithoutEarnings)));
 
+    // Se o gráfico já existir, atualize-o suavemente
     if (stakeHistoryChart) {
-        stakeHistoryChart.destroy();
+        if (!buckets || buckets.length === 0) {
+            // Lida com o caso em que os dados desaparecem
+            container.innerHTML = '<div class="flex items-center justify-center h-full"><p class="text-gray-500">No daily data available for this timeframe.</p></div>';
+            stakeHistoryChart.destroy();
+            stakeHistoryChart = null;
+            return;
+        }
+        
+        stakeHistoryChart.data.labels = labels;
+        stakeHistoryChart.data.datasets[0].data = data;
+        stakeHistoryChart.update(); // <-- Atualização suave
+        return;
     }
 
+    // Se o gráfico não existir, crie-o
     if (!buckets || buckets.length === 0) {
         container.innerHTML = '<div class="flex items-center justify-center h-full"><p class="text-gray-500">No daily data available for this timeframe.</p></div>';
         return;
     }
 
-    const labels = buckets.map(bucket => new Date(bucket.date * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }));
-    const data = buckets.map(bucket => parseFloat(convertWeiToData(bucket.valueWithoutEarnings)));
+    container.innerHTML = '<canvas id="stake-history-chart"></canvas>';
+    const canvas = document.getElementById('stake-history-chart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
 
     stakeHistoryChart = new Chart(ctx, {
         type: 'line',

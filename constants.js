@@ -1,5 +1,6 @@
 export const DATA_TOKEN_ADDRESS_POLYGON = '0x3a9A81d576d83FF21f26f325066054540720fC34';
 export const STREAMR_CONFIG_ADDRESS = '0x344587b3d00394821557352354331D7048754d24';
+export const STREAMR_TREASURY_ADDRESS = '0x63f74A64fd334122aB5D29760C6E72Fb4b752208';
 
 export const DATA_TOKEN_ABI = [
      {
@@ -118,8 +119,8 @@ export const POLYGONSCAN_NETWORK = {
 };
 
 export const POLYGONSCAN_METHOD_IDS = {
-    "0xa9059cbb": "transfer",
-    "0x4000aea0": "Transfer And Call",
+    "0xa9059cbb": "Transfer",
+    "0x4000aea0": "Delegate",
     "0x918b5be1": "Update Metadata",
     "0x25c33549": "Set Node Address",
     "0xe8e658b4": "Collect Earnings",
