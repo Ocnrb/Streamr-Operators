@@ -290,18 +290,15 @@ export function renderSponsorshipsHistory(historyGroups) {
             
             let directionClass;
             const method = event.methodId;
-            // Estes métodos são LARANJA (operações de stake 'IN')
-            const stakeInMethods = ["Stake", "Unstake", "Force Unstake"]; // "Delegate" REMOVIDO
-            // Estes métodos são VERMELHOS (operações de stake 'OUT')
-            const stakeOutMethods = ["Undelegate"];
+            // Stake/Unstake are orange, regardless of direction
+            const stakeInMethods = ["Stake", "Unstake", "Force Unstake"];
 
             if (stakeInMethods.includes(method)) {
-                directionClass = "tx-badge-stake"; // Laranja
-            } else if (stakeOutMethods.includes(method)) {
-                directionClass = "tx-badge-out"; // Vermelho
+                directionClass = "tx-badge-stake";
+            } else if (event.relatedObject === "OUT") {
+                directionClass = "tx-badge-out";
             } else {
-                // Lógica antiga para tudo o resto (Delegate cairá aqui)
-                directionClass = event.relatedObject === "IN" ? "tx-badge-in" : "tx-badge-out";
+                directionClass = "tx-badge-in";
             }
             
             const txUrl = `https://polygonscan.com/tx/${event.txHash}`;
@@ -353,32 +350,26 @@ export function renderStakeChart(buckets) {
     const labels = buckets.map(bucket => new Date(bucket.date * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }));
     const data = buckets.map(bucket => parseFloat(convertWeiToData(bucket.valueWithoutEarnings)));
 
-    // Se o gráfico já existir, atualize-o suavemente
+    // Smooth update logic
     if (stakeHistoryChart) {
-        if (!buckets || buckets.length === 0) {
-            // Lida com o caso em que os dados desaparecem
-            container.innerHTML = '<div class="flex items-center justify-center h-full"><p class="text-gray-500">No daily data available for this timeframe.</p></div>';
-            stakeHistoryChart.destroy();
-            stakeHistoryChart = null;
-            return;
-        }
-        
         stakeHistoryChart.data.labels = labels;
         stakeHistoryChart.data.datasets[0].data = data;
-        stakeHistoryChart.update(); // <-- Atualização suave
-        return;
+        stakeHistoryChart.update();
+        return; // Don't recreate the chart
     }
 
-    // Se o gráfico não existir, crie-o
+    // If chart doesn't exist, create it:
+    container.innerHTML = '<canvas id="stake-history-chart"></canvas>';
+    const canvas = document.getElementById('stake-history-chart');
+    if (!canvas) return; // Exit if canvas wasn't found
+    
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return; // Exit if context couldn't be created
+
     if (!buckets || buckets.length === 0) {
         container.innerHTML = '<div class="flex items-center justify-center h-full"><p class="text-gray-500">No daily data available for this timeframe.</p></div>';
         return;
     }
-
-    container.innerHTML = '<canvas id="stake-history-chart"></canvas>';
-    const canvas = document.getElementById('stake-history-chart');
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
 
     stakeHistoryChart = new Chart(ctx, {
         type: 'line',
@@ -474,6 +465,14 @@ export function populateOperatorSettingsModal(operatorData) {
 
 
 export function renderOperatorDetails(data, globalState) {
+    // --- THIS IS THE FIX ---
+    // Destroy the old chart instance if it exists, before wiping the HTML
+    if (stakeHistoryChart) {
+        stakeHistoryChart.destroy();
+        stakeHistoryChart = null;
+    }
+    // --- END OF FIX ---
+
     const { operator: op, selfDelegation: selfDelegationData, flagsAgainst, flagsAsFlagger, slashingEvents } = data;
     if (!op) {
         detailContent.innerHTML = '<p class="text-gray-500">Operator not found.</p>';
@@ -1106,6 +1105,7 @@ function formatNodeTooltip(nodesMap) {
  * Adds a new node marker and connection lines to the map.
  * Groups nodes by location and updates tooltips.
  * @param {object} location - The location object { lat, long, code }.
+ *HttpS
  * @param {string} host - The node's host ID.
  * @param {string} nodeId - The node's ID.
  */
