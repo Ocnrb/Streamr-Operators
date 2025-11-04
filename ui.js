@@ -70,7 +70,7 @@ export function setLoginModalState(state, mode = 'wallet') {
     if (state === 'loading') {
         walletLoginView.classList.add('hidden');
         loadingContent.classList.remove('hidden');
-        loadingMainText.textContent = mode === 'guest' ? 'Loading...' : 'Connecting...';
+        loadingMainText.textContent = mode === 'guest' ? 'Loading...' : 'Fetching operator data, please wait.';
         loadingSubText.textContent = mode === 'guest' ? 'Fetching operator data, please wait.' : 'Please follow the instructions in your wallet.';
     } else { // 'buttons'
         loadingContent.classList.add('hidden');
@@ -343,17 +343,46 @@ export function renderSponsorshipsHistory(historyGroups) {
     }).join('');
 }
 
-export function renderStakeChart(buckets) {
+export function renderStakeChart(chartData, isUsdView) {
     const container = document.getElementById('stake-chart-container');
     if (!container) return;
 
-    const labels = buckets.map(bucket => new Date(bucket.date * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }));
-    const data = buckets.map(bucket => parseFloat(convertWeiToData(bucket.valueWithoutEarnings)));
+    if (!chartData || chartData.length === 0) {
+        if (stakeHistoryChart) {
+            stakeHistoryChart.destroy();
+            stakeHistoryChart = null;
+        }
+        container.innerHTML = '<div class="flex items-center justify-center h-full"><p class="text-gray-500">No daily data available for this timeframe.</p></div>';
+        return;
+    }
+
+    const labels = chartData.map(d => d.label);
+    const data = chartData.map(d => d.value);
+
+    const chartLabel = isUsdView ? 'Total Stake (USD)' : 'Total Stake (DATA)';
+    const yAxisPrefix = isUsdView ? '$' : '';
+    const yAxisSuffix = isUsdView ? '' : ' DATA';
 
     // Smooth update logic
     if (stakeHistoryChart) {
         stakeHistoryChart.data.labels = labels;
         stakeHistoryChart.data.datasets[0].data = data;
+        stakeHistoryChart.data.datasets[0].label = chartLabel;
+        stakeHistoryChart.options.scales.y.ticks.callback = function (value) {
+            if (value >= 1000000) return yAxisPrefix + (value / 1000000) + 'M';
+            if (value >= 1000) return yAxisPrefix + (value / 1000) + 'K';
+            return yAxisPrefix + Math.round(value);
+        };
+        stakeHistoryChart.options.plugins.tooltip.callbacks.label = function (context) {
+            let label = context.dataset.label || '';
+            if (label) {
+                label += ': ';
+            }
+            if (context.parsed.y !== null) {
+                label += yAxisPrefix + formatBigNumber(Math.round(context.parsed.y).toString()) + yAxisSuffix;
+            }
+            return label;
+        };
         stakeHistoryChart.update();
         return; // Don't recreate the chart
     }
@@ -366,17 +395,12 @@ export function renderStakeChart(buckets) {
     const ctx = canvas.getContext('2d');
     if (!ctx) return; // Exit if context couldn't be created
 
-    if (!buckets || buckets.length === 0) {
-        container.innerHTML = '<div class="flex items-center justify-center h-full"><p class="text-gray-500">No daily data available for this timeframe.</p></div>';
-        return;
-    }
-
     stakeHistoryChart = new Chart(ctx, {
         type: 'line',
         data: {
             labels: labels,
             datasets: [{
-                label: 'Total Stake (DATA)',
+                label: chartLabel,
                 data: data,
                 backgroundColor: 'rgba(59, 130, 246, 0.2)',
                 borderColor: 'rgba(59, 130, 246, 1)',
@@ -404,7 +428,7 @@ export function renderStakeChart(buckets) {
                                 label += ': ';
                             }
                             if (context.parsed.y !== null) {
-                                label += formatBigNumber(Math.round(context.parsed.y).toString()) + ' DATA';
+                                label += yAxisPrefix + formatBigNumber(Math.round(context.parsed.y).toString()) + yAxisSuffix;
                             }
                             return label;
                         }
@@ -426,9 +450,9 @@ export function renderStakeChart(buckets) {
                     ticks: {
                         color: 'rgba(255, 255, 255, 0.7)',
                         callback: function (value) {
-                            if (value >= 1000000) return (value / 1000000) + 'M';
-                            if (value >= 1000) return (value / 1000) + 'K';
-                            return value;
+                            if (value >= 1000000) return yAxisPrefix + (value / 1000000) + 'M';
+                            if (value >= 1000) return yAxisPrefix + (value / 1000) + 'K';
+                            return yAxisPrefix + Math.round(value);
                         }
                     },
                     grid: {
@@ -543,7 +567,13 @@ export function renderOperatorDetails(data, globalState) {
         
         <div class="detail-section p-6 mt-8">
             <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
-                <h3 class="text-xl font-semibold text-white">Stake</h3>
+                <div class="flex items-center gap-4">
+                     <h3 class="text-xl font-semibold text-white">Stake</h3>
+                     <div id="chart-view-buttons" class="flex items-center gap-1 bg-[#2C2C2C] p-1 rounded-lg">
+                        <button data-view="data" class="px-3 py-1 text-xs font-bold rounded-md hover:bg-[#444444] transition">DATA</button>
+                        <button data-view="usd" class="px-3 py-1 text-xs font-bold rounded-md hover:bg-[#444444] transition">USD</button>
+                    </div>
+                </div>
                 <div id="chart-timeframe-buttons" class="flex items-center gap-1 bg-[#2C2C2C] p-1 rounded-lg">
                     <button data-days="30" class="px-3 py-1 text-xs font-bold rounded-md hover:bg-[#444444] transition">30D</button>
                     <button data-days="90" class="px-3 py-1 text-xs font-bold rounded-md hover:bg-[#444444] transition">90D</button>
@@ -953,10 +983,24 @@ export function toggleSponsorshipsView(uiState, operatorData, isRefresh = false)
         : 'History';
 }
 
-export function updateChartTimeframeButtons(days) {
+export function updateChartTimeframeButtons(days, isUsdView) {
+    // Timeframe buttons
     const buttons = document.querySelectorAll('#chart-timeframe-buttons button');
     buttons.forEach(button => {
         if (button.dataset.days === String(days)) {
+            button.classList.add('bg-blue-800', 'text-white');
+            button.classList.remove('hover:bg-[#444444]');
+        } else {
+            button.classList.remove('bg-blue-800', 'text-white');
+            button.classList.add('hover:bg-[#444444]');
+        }
+    });
+
+    // View buttons (DATA/USD)
+    const viewButtons = document.querySelectorAll('#chart-view-buttons button');
+    viewButtons.forEach(button => {
+        const isActive = (button.dataset.view === 'usd' && isUsdView) || (button.dataset.view === 'data' && !isUsdView);
+        if (isActive) {
             button.classList.add('bg-blue-800', 'text-white');
             button.classList.remove('hover:bg-[#444444]');
         } else {
@@ -1160,4 +1204,3 @@ function addNodeToMap(location, host, nodeId) {
         entry.marker.setTooltipContent(tooltipContent);
     }
 }
-

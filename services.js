@@ -17,7 +17,7 @@ import {
     VOTE_ON_FLAG_RAW_AMOUNTS
 } from './constants.js';
 import { showCustomAlert, setModalState, txModalAmount, txModalBalanceValue, txModalMinimumValue, stakeModalAmount, stakeModalCurrentStake, stakeModalFreeFunds, dataPriceValueEl, transactionModal, stakeModal, operatorSettingsModal } from './ui.js';
-import { getFriendlyErrorMessage, convertWeiToData } from './utils.js';
+import { getFriendlyErrorMessage, convertWeiToData, parseDateFromCsv } from './utils.js';
 
 let graphApiKey = localStorage.getItem('the-graph-api-key') || 'bb77dd994c8e90edcbd73661a326f068';
 let API_URL = `https://gateway-arbitrum.network.thegraph.com/api/${graphApiKey}/subgraphs/id/${SUBGRAPH_ID}`;
@@ -27,6 +27,7 @@ let etherscanApiKey = localStorage.getItem('etherscan-api-key') || 'B8BXCXWR66RI
 let streamrClient = null;
 let priceSubscription = null;
 let coordinationSubscription = null;
+let historicalDataPriceMap = null; // Cache for historical prices
 
 // --- API Key Management ---
 export function updateGraphApiKey(newKey) {
@@ -90,6 +91,68 @@ export async function checkAndSwitchNetwork() {
     } catch (e) {
         console.error("Could not check network:", e);
         return false;
+    }
+}
+
+// --- API (CSV Price Data) ---
+
+/**
+ * Fetches and processes the historical DATA price from a local CSV file.
+ * Returns a Map where key is a UTC day timestamp (seconds) and value is the price.
+ * @returns {Promise<Map<number, number>>}
+ */
+export async function fetchHistoricalDataPrice() {
+    if (historicalDataPriceMap) {
+        return historicalDataPriceMap;
+    }
+
+    try {
+        const response = await fetch('./DATAHistoricalPrice.csv');
+        if (!response.ok) {
+            throw new Error(`Failed to fetch DATAHistoricalPrice.csv: ${response.statusText}`);
+        }
+        const csvText = await response.text();
+        const lines = csvText.split('\n').slice(1); // Skip header row
+
+        const priceMap = new Map();
+
+        for (const line of lines) {
+            const parts = line.split(',');
+            if (parts.length < 2) continue;
+
+            const dateStr = parts[0].trim();
+            const priceStr = parts[1].trim();
+
+            if (dateStr && priceStr) {
+                const date = parseDateFromCsv(dateStr);
+                const price = parseFloat(priceStr);
+
+                if (date && !isNaN(price)) {
+                    // Normalize the date to the start of the day (UTC)
+                    const dayStart = new Date(date);
+                    dayStart.setUTCHours(0, 0, 0, 0);
+                    
+                    const dayTimestampSeconds = Math.floor(dayStart.getTime() / 1000);
+
+                    // --- MODIFIED LOGIC ---
+                    // Check if this price is higher than the one already stored for this day
+                    const existingPrice = priceMap.get(dayTimestampSeconds) || 0;
+                    if (price > existingPrice) {
+                        priceMap.set(dayTimestampSeconds, price);
+                    }
+                    // --- END MODIFIED LOGIC ---
+                }
+            }
+        }
+        
+        console.log(`Processed ${priceMap.size} historical price points.`);
+        historicalDataPriceMap = priceMap;
+        return historicalDataPriceMap;
+
+    } catch (error) {
+        console.error("Error fetching or processing historical price data:", error);
+        showCustomAlert("Price Data Error", `Failed to load historical price data: ${error.message}`);
+        return new Map(); // Return an empty map on failure
     }
 }
 

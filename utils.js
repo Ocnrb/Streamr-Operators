@@ -115,10 +115,6 @@ export function parseOperatorMetadata(metadataJsonString) {
 }
 
 /**
- * Escapes HTML special characters in a string.
- * @param {string} unsafe The unsafe string.
-
-/**
  * Provides a user-friendly error message from a transaction error object.
  * @param {Error} error - The error object from ethers.js or wallet.
  * @returns {string} A user-friendly error message.
@@ -169,6 +165,41 @@ export function calculateWeightedApy(stakes) {
 }
 
 /**
+ * Parses a non-standard date string from the CSV.
+ * Format: "d/MM/yy HH:mm" (e.g., "4/11/25 16:14")
+ * @param {string} dateString The date string from the CSV.
+ * @returns {Date|null} The parsed Date object or null if invalid.
+ */
+export function parseDateFromCsv(dateString) {
+    if (!dateString) return null;
+
+    try {
+        const parts = dateString.split(' '); // [ "4/11/25", "16:14" ]
+        if (parts.length !== 2) return null;
+
+        const dateParts = parts[0].split('/'); // [ "4", "11", "25" ]
+        const timeParts = parts[1].split(':'); // [ "16", "14" ]
+
+        if (dateParts.length !== 3 || timeParts.length !== 2) return null;
+
+        const day = parseInt(dateParts[0], 10);
+        const month = parseInt(dateParts[1], 10) - 1; // JS months are 0-indexed
+        const year = 2000 + parseInt(dateParts[2], 10); // "25" -> 2025
+        const hour = parseInt(timeParts[0], 10);
+        const minute = parseInt(timeParts[1], 10);
+
+        if (isNaN(day) || isNaN(month) || isNaN(year) || isNaN(hour) || isNaN(minute)) {
+            return null;
+        }
+
+        return new Date(year, month, day, hour, minute);
+    } catch (e) {
+        console.error("Failed to parse CSV date:", dateString, e);
+        return null;
+    }
+}
+
+/**
  * Fetches the MATIC balance for a given address using a public RPC.
  * @param {string} address - The address to check the balance of.
  * @returns {Promise<string>} The formatted MATIC balance or 'Error'.
@@ -199,5 +230,3 @@ export async function getMaticBalance(address) {
         return 'Error';
     }
 }
-
-

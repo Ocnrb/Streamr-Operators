@@ -12,6 +12,7 @@ let state = {
     currentDelegations: [],
     sponsorshipHistory: [],
     operatorDailyBuckets: [],
+    historicalDataPriceMap: null, // To store prices from CSV
     chartTimeFrame: 90,
     totalDelegatorCount: 0,
     dataPriceUSD: null,
@@ -26,6 +27,7 @@ let state = {
         reputationViewIndex: 0,
         walletViewIndex: 0,
         isSponsorshipsListViewActive: true,
+        isChartUsdView: false, // false = DATA, true = USD
     },
     activeNodes: new Set(),
     unreachableNodes: new Set(),
@@ -39,6 +41,9 @@ async function initializeApp() {
         const streamrClient = new StreamrClient();
         Services.setStreamrClient(streamrClient);
         console.log("Streamr client initialized.");
+
+        // Load CSV price data on startup
+        state.historicalDataPriceMap = await Services.fetchHistoricalDataPrice();
 
         await Services.setupDataPriceStream((price) => {
             state.dataPriceUSD = price;
@@ -150,6 +155,7 @@ async function fetchAndRenderOperatorDetails(operatorId) {
     state.activeNodes.clear();
     state.unreachableNodes.clear();
     state.chartTimeFrame = 90;
+    state.uiState.isChartUsdView = false; // Reset to DATA view
 
     try {
         await refreshOperatorData(true); // isFirstLoad = true
@@ -258,16 +264,55 @@ function processSponsorshipHistory(gqlData, polygonscanTxs) {
 
 function filterAndRenderChart() {
     const now = new Date();
-    const filteredBuckets = state.operatorDailyBuckets.filter(bucket => {
-        if (state.chartTimeFrame === 'all') {
-            return true;
+    let latestKnownPrice = state.dataPriceUSD || 0;
+
+    const chartData = state.operatorDailyBuckets.map(bucket => {
+        const bucketDate = bucket.date; // This is already a timestamp in seconds
+        
+        // Filter by time window
+        if (state.chartTimeFrame !== 'all') {
+            const bucketDateObj = new Date(bucketDate * 1000);
+            const daysAgo = (now - bucketDateObj) / (1000 * 60 * 60 * 24);
+            if (daysAgo > state.chartTimeFrame) {
+                return null; // Will be filtered out
+            }
         }
-        const bucketDate = new Date(bucket.date * 1000);
-        const daysAgo = (now - bucketDate) / (1000 * 60 * 60 * 24);
-        return daysAgo <= state.chartTimeFrame;
-    });
-    UI.renderStakeChart(filteredBuckets);
-    UI.updateChartTimeframeButtons(state.chartTimeFrame);
+        
+        const dataAmount = parseFloat(Utils.convertWeiToData(bucket.valueWithoutEarnings));
+
+        let value;
+        if (state.uiState.isChartUsdView) {
+            // Find the price for this day
+            let price = state.historicalDataPriceMap.get(bucketDate);
+            
+            if (!price) {
+                // If no price for this exact day, try to find the most recent one
+                // (Iterating backwards from this date)
+                for (let i = 1; i <= 7; i++) { // Check up to 7 days prior
+                    const priorDate = bucketDate - (i * 86400); // 86400 seconds in a day
+                    price = state.historicalDataPriceMap.get(priorDate);
+                    if (price) break;
+                }
+            }
+
+            // Use the found historical price, or fallback to the *latest known live price*
+            const priceToUse = price || latestKnownPrice;
+            if (priceToUse > 0) latestKnownPrice = priceToUse; // Update latest known price
+            
+            value = dataAmount * priceToUse;
+        } else {
+            value = dataAmount;
+        }
+
+        return {
+            label: new Date(bucketDate * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+            value: value
+        };
+
+    }).filter(Boolean); // Remove null entries filtered by time window
+
+    UI.renderStakeChart(chartData, state.uiState.isChartUsdView);
+    UI.updateChartTimeframeButtons(state.chartTimeFrame, state.uiState.isChartUsdView);
 }
 
 async function updateMyStakeUI() {
@@ -485,7 +530,7 @@ async function handleCollectAllEarningsClick(button) {
         return;
     }
     button.disabled = true;
-    button.innerHTML = `<div class="w-4 h-4 border-2 border-white rounded-full border-t-transparent btn-spinner"></div>`;
+    button.innerHTML = `<div class_ = "w-4 h-4 border-2 border-white rounded-full border-t-transparent btn-spinner"></div>`;
 
     await Services.handleCollectAllEarnings(state.signer, state.currentOperatorId, state.currentOperatorData);
     await refreshOperatorData(false);
@@ -693,10 +738,19 @@ function setupEventListeners() {
         }
         if (target.closest('.toggle-vote-list-btn')) UI.toggleVoteList(target.closest('.toggle-vote-list-btn').dataset.flagId);
 
+        // Chart Timeframe
         const timeframeButton = target.closest('#chart-timeframe-buttons button');
         if (timeframeButton && timeframeButton.dataset.days) {
             const days = timeframeButton.dataset.days === 'all' ? 'all' : parseInt(timeframeButton.dataset.days, 10);
             state.chartTimeFrame = days;
+            filterAndRenderChart();
+            return;
+        }
+
+        // Chart View (DATA/USD)
+        const chartViewButton = target.closest('#chart-view-buttons button');
+        if (chartViewButton && chartViewButton.dataset.view) {
+            state.uiState.isChartUsdView = (chartViewButton.dataset.view === 'usd');
             filterAndRenderChart();
             return;
         }
