@@ -12,7 +12,7 @@ let state = {
     currentDelegations: [],
     sponsorshipHistory: [],
     operatorDailyBuckets: [],
-    historicalDataPriceMap: null, // To store prices from CSV
+    historicalDataPriceMap: null, 
     chartTimeFrame: 90,
     totalDelegatorCount: 0,
     dataPriceUSD: null,

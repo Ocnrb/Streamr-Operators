@@ -489,13 +489,10 @@ export function populateOperatorSettingsModal(operatorData) {
 
 
 export function renderOperatorDetails(data, globalState) {
-    // --- THIS IS THE FIX ---
-    // Destroy the old chart instance if it exists, before wiping the HTML
     if (stakeHistoryChart) {
         stakeHistoryChart.destroy();
         stakeHistoryChart = null;
     }
-    // --- END OF FIX ---
 
     const { operator: op, selfDelegation: selfDelegationData, flagsAgainst, flagsAsFlagger, slashingEvents } = data;
     if (!op) {
@@ -1025,7 +1022,6 @@ export function addStreamMessageToUI(message, activeNodes, unreachableNodes) {
             document.getElementById('active-nodes-count-value').textContent = activeNodes.size;
             document.getElementById('active-nodes-stats-value').textContent = activeNodes.size;
 
-            // --- NEW MAP LOGIC ---
             if (region && leafletMap) {
                 const location = regionToLocationMap[region];
                 if (location) {
@@ -1034,7 +1030,6 @@ export function addStreamMessageToUI(message, activeNodes, unreachableNodes) {
                     console.warn(`Region code ${region} not found in location map.`);
                 }
             }
-            // --- END NEW MAP LOGIC ---
         }
         if (message.peerDescriptor?.websocket?.tls === false && !unreachableNodes.has(nodeId)) {
             unreachableNodes.add(nodeId);
@@ -1105,14 +1100,11 @@ export function initLeafletMap(containerId) {
             minZoom: 2
         }).addTo(leafletMap);
 
-        // --- FIX: Force map to re-check its size after container is rendered ---
-        // This solves the "half-loaded map" bug
         setTimeout(() => {
             if (leafletMap) {
                 leafletMap.invalidateSize();
             }
         }, 0); // 0ms timeout pushes this to the end of the execution stack
-        // --- END FIX ---
 
         // Initialize layer groups to manage markers and lines
         mapLayers.lines = L.layerGroup().addTo(leafletMap);
