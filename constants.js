@@ -146,4 +146,6 @@ export const OPERATORS_PER_PAGE = 20;
 export const SPONSORSHIPS_PER_PAGE = 20;
 export const MIN_SEARCH_LENGTH = 3;
 export const MAX_STREAM_MESSAGES = 20;
+export const MIN_ADDRESS_SEARCH_LENGTH = 8;
+export const FULL_ADDRESS_LENGTH = 42;
 

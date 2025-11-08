@@ -182,7 +182,7 @@ export function parseDateFromCsv(dateString) {
 
         if (dateParts.length !== 3 || timeParts.length !== 2) return null;
 
-        const day = parseInt(dateParts[0], 10);
+        const day = parseInt(dateParts[0], 10) -1;
         const month = parseInt(dateParts[1], 10) - 1; // JS months are 0-indexed
         const year = 2000 + parseInt(dateParts[2], 10); // "25" -> 2025
         const hour = parseInt(timeParts[0], 10);

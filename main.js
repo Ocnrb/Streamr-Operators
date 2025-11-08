@@ -115,7 +115,7 @@ async function connectAsGuest() {
     UI.setLoginModalState('loading', 'guest');
     state.myRealAddress = '';
     state.signer = null;
-    UI.walletInfoEl.classList.add('hidden');
+    UI.updateWalletUI(null); 
     sessionStorage.removeItem('authMethod');
     await initializeApp();
 }
@@ -169,6 +169,7 @@ async function fetchAndRenderOperatorDetails(operatorId) {
 
 async function refreshOperatorData(isFirstLoad = false) {
     try {
+        // 1. Obter dados do The Graph (rápidos)
         const data = await Services.fetchOperatorDetails(state.currentOperatorId);
         
         state.currentOperatorData = data.operator;
@@ -176,41 +177,39 @@ async function refreshOperatorData(isFirstLoad = false) {
         state.totalDelegatorCount = data.operator?.delegatorCount || 0;
         state.operatorDailyBuckets = data.operatorDailyBuckets || [];
         
+        // 2. Verificar se é um refresh completo (isFirstLoad = true)
         if (isFirstLoad) {
-            // Process GQL-only events first for a fast initial render
-            processSponsorshipHistory(data, []);
+            // 3. Obter dados do Polygonscan (lentos) e ESPERAR por eles
+            let polygonscanTxs = [];
+            try {
+                // Adicionámos 'await' aqui
+                polygonscanTxs = await Services.fetchPolygonscanHistory(state.currentOperatorId);
+            } catch (error) {
+                console.error("Failed to load Polygonscan history:", error);
+                // Continuar mesmo se o Polygonscan falhar, mostrando apenas dados do GQL
+            }
             
+            // 4. Processar o histórico COMBINADO (só depois de ter ambos os dados)
+            processSponsorshipHistory(data, polygonscanTxs);
+            
+            // 5. Renderizar a UI completa (agora com o histórico correto)
             UI.renderOperatorDetails(data, state);
             const addresses = [...(data.operator.controllers || []), ...(data.operator.nodes || [])];
             UI.renderBalances(addresses);
             updateMyStakeUI();
             setupOperatorStream();
             filterAndRenderChart();
-            // Render GQL-only history
+            // 6. Renderizar o histórico COMPLETO
             UI.renderSponsorshipsHistory(state.sponsorshipHistory);
         } else {
-            // On refresh, just update stats and chart
+            // Este é o refresh de fundo (a cada 30s)
+            // Não recarrega o histórico, apenas atualiza estatísticas e gráfico
             UI.updateOperatorDetails(data, state);
             const addresses = [...(data.operator.controllers || []), ...(data.operator.nodes || [])];
             UI.renderBalances(addresses);
             updateMyStakeUI();
             filterAndRenderChart();
-            // DO NOT render history on background refresh
-        }
-
-        // --- MODIFICATION ---
-        // Only fetch (heavy) Polygonscan history and re-render history list ONCE on first load
-        if (isFirstLoad) {
-            Services.fetchPolygonscanHistory(state.currentOperatorId)
-                .then(polygonscanTxs => {
-                    // Re-process with combined GQL and Scan data
-                    processSponsorshipHistory(data, polygonscanTxs);
-                    // Re-render history with combined data
-                    UI.renderSponsorshipsHistory(state.sponsorshipHistory);
-                })
-                .catch(error => {
-                    console.error("Failed to load Polygonscan history in background:", error);
-                });
+            // NÃO renderizar o histórico no refresh de fundo
         }
 
     } catch (error) {
@@ -408,7 +407,7 @@ async function handleDelegateClick() {
         
         const txHash = await Services.confirmDelegation(state.signer, state.myRealAddress, state.currentOperatorId);
         if (txHash) {
-            await updateMyStakeUI();
+            await refreshOperatorData(true);
         }
 
         newConfirmBtn.disabled = false;
@@ -441,7 +440,7 @@ async function handleUndelegateClick() {
 
         const txHash = await Services.confirmUndelegation(state.signer, state.myRealAddress, state.currentOperatorId, state.currentOperatorData);
         if (txHash) {
-            await updateMyStakeUI();
+           await refreshOperatorData(true);;
         }
 
         newConfirmBtn.disabled = false;
@@ -500,7 +499,7 @@ async function handleEditStakeClick(sponsorshipId, currentStakeWei) {
 
         const result = await Services.confirmStakeEdit(state.signer, state.currentOperatorId, sponsorshipId, currentStakeWei);
         if (result && result !== 'nochange') {
-            await refreshOperatorData(false);
+            await refreshOperatorData(true);
         }
         
         newConfirmBtn.disabled = false;
@@ -518,7 +517,7 @@ async function handleCollectEarningsClick(button, sponsorshipId) {
     button.textContent = 'Processing...';
 
     await Services.handleCollectEarnings(state.signer, state.currentOperatorId, sponsorshipId);
-    await refreshOperatorData(false);
+    await refreshOperatorData(true);
 
     button.classList.remove('processing');
     button.textContent = originalText;
@@ -533,7 +532,7 @@ async function handleCollectAllEarningsClick(button) {
     button.innerHTML = `<div class_ = "w-4 h-4 border-2 border-white rounded-full border-t-transparent btn-spinner"></div>`;
 
     await Services.handleCollectAllEarnings(state.signer, state.currentOperatorId, state.currentOperatorData);
-    await refreshOperatorData(false);
+    await refreshOperatorData(true);
 
     button.disabled = false;
     button.textContent = 'Collect All';
@@ -656,6 +655,13 @@ function setupEventListeners() {
     document.getElementById('guestBtn').addEventListener('click', connectAsGuest);
     document.getElementById('closeAlertBtn').addEventListener('click', () => UI.customAlertModal.classList.add('hidden'));
 
+    UI.walletInfoEl.addEventListener('click', () => {
+        // Apenas aciona se não estivermos conectados (ou seja, se for um botão)
+        if (!state.myRealAddress) {
+            connectWithWallet();
+        }
+    });
+
     UI.searchInput.addEventListener('input', (e) => handleSearch(e.target.value));
     document.getElementById('load-more-operators-btn').addEventListener('click', (e) => handleLoadMoreOperators(e.target));
     
@@ -663,6 +669,8 @@ function setupEventListeners() {
         if (state.detailsRefreshInterval) clearInterval(state.detailsRefreshInterval);
         Services.unsubscribeFromCoordinationStream();
         UI.displayView('list');
+		state.loadedOperatorCount = 0;
+        fetchAndRenderOperatorsList(false, 0, state.searchQuery);
     });
 
     // Modals

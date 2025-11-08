@@ -11,6 +11,8 @@ import {
     DELEGATORS_PER_PAGE,
     OPERATORS_PER_PAGE,
     MIN_SEARCH_LENGTH,
+    MIN_ADDRESS_SEARCH_LENGTH,
+    FULL_ADDRESS_LENGTH,
     POLYGONSCAN_API_URL,
     POLYGONSCAN_NETWORK,
     POLYGONSCAN_METHOD_IDS,
@@ -134,13 +136,10 @@ export async function fetchHistoricalDataPrice() {
                     
                     const dayTimestampSeconds = Math.floor(dayStart.getTime() / 1000);
 
-                    // --- MODIFIED LOGIC ---
-                    // Check if this price is higher than the one already stored for this day
                     const existingPrice = priceMap.get(dayTimestampSeconds) || 0;
                     if (price > existingPrice) {
                         priceMap.set(dayTimestampSeconds, price);
                     }
-                    // --- END MODIFIED LOGIC ---
                 }
             }
         }
@@ -174,6 +173,7 @@ const isAddressFilter = (query) => {
     return normalizedQuery.startsWith('0x') && /^[0-9a-f]+$/.test(normalizedQuery.substring(2));
 };
 
+
 export async function fetchOperators(skip = 0, filterQuery = '') {
     if (filterQuery && filterQuery.length > 0 && filterQuery.length < MIN_SEARCH_LENGTH) {
         return [];
@@ -182,14 +182,23 @@ export async function fetchOperators(skip = 0, filterQuery = '') {
     if (filterQuery) {
         const lowerCaseFilter = filterQuery.toLowerCase();
         if (isAddressFilter(lowerCaseFilter)) {
-            const query = `
+            
+            if (lowerCaseFilter.length === FULL_ADDRESS_LENGTH) {
+                const whereClause = `where: {id: "${lowerCaseFilter}"}`;
+                
+                const query = `
                 query GetOperatorsList {
-                    operators(first: ${OPERATORS_PER_PAGE}, skip: ${skip}, orderBy: valueWithoutEarnings, orderDirection: desc, where: {id_contains: "${lowerCaseFilter}"}) {
+                    operators(first: ${OPERATORS_PER_PAGE}, skip: ${skip}, orderBy: valueWithoutEarnings, orderDirection: desc, ${whereClause}) {
                         id valueWithoutEarnings delegatorCount metadataJsonString stakes(first: 50) { amountWei sponsorship { spotAPY } }
                     }
                 }`;
-            const data = await runQuery(query);
-            return data.operators;
+                const data = await runQuery(query);
+                return data.operators;
+
+            } else {
+                return [];
+            }
+
         } else {
             const topResultsQuery = `
                 query GetTopOperatorsForClientSearch {
@@ -293,7 +302,7 @@ export async function fetchPolygonscanHistory(walletAddress) {
 
     const { apiUrl, chainId, nativeToken } = POLYGONSCAN_NETWORK;
     const page = 1;
-    const offset = 1000;
+    const offset = 800;
     const sort = "desc";
 
     const txlistUrl = `${apiUrl}?chainid=${chainId}&module=account&action=txlist&address=${walletAddress}&page=${page}&offset=${offset}&sort=${sort}&apikey=${etherscanApiKey}`;
@@ -301,8 +310,8 @@ export async function fetchPolygonscanHistory(walletAddress) {
 
     try {
         const [txlistRes, tokentxRes] = await Promise.all([
-            fetch(txlistUrl),
-            fetch(tokentxUrl)
+            fetch(txlistUrl, { cache: 'no-cache' }), 
+            fetch(tokentxUrl, { cache: 'no-cache' })
         ]);
 
         if (!txlistRes.ok) throw new Error(`API request failed (txlist): HTTP ${txlistRes.status}`);
@@ -340,69 +349,93 @@ export async function fetchPolygonscanHistory(walletAddress) {
             };
         });
 
-        const processedTokenTxs = tokenTxs.map(tx => {
-            const direction = tx.from.toLowerCase() === walletAddress.toLowerCase() ? "OUT" : "IN";
-            const decimals = parseInt(tx.tokenDecimal) || 18;
-            const amount = parseFloat(tx.value) / Math.pow(10, decimals);
+        const tokenTxsByHash = new Map();
+        for (const tx of tokenTxs) {
+            if (!tokenTxsByHash.has(tx.hash)) {
+                tokenTxsByHash.set(tx.hash, []);
+            }
+            tokenTxsByHash.get(tx.hash).push(tx);
+        }
+
+const processedTokenTxs = [];
+        for (const [txHash, txGroup] of tokenTxsByHash.entries()) {
             
-            let finalMethodId = methodIdMap.get(tx.hash) || "-";
+            const baseMethodId = methodIdMap.get(txHash) || "-";
+            let groupMethodId = baseMethodId; 
 
-            if (
-                finalMethodId === "-" &&
-                tx.tokenSymbol === "DATA" &&
-                VOTE_ON_FLAG_RAW_AMOUNTS.has(tx.value)
-            ) {
-                finalMethodId = "Vote On Flag";
-            }
+            if (groupMethodId === "-" && txGroup.length > 1) {
+                const allDirections = txGroup.map(t => t.from.toLowerCase() === walletAddress.toLowerCase() ? "OUT" : "IN");
+                const areAllIn = allDirections.every(d => d === "IN");
 
-            // 1. Handle known delegation/transfer methods that are "IN"
-            if (
-                (finalMethodId === "Delegate" || finalMethodId === "Transfer") &&
-                direction === "IN"
-            ) {
-                finalMethodId = "Delegate";
-            }
-            // 2. Catch failed lookups ("-") that are "IN" and are DATA tokens
-            // (This block must be AFTER the "Vote On Flag" check)
-            else if (
-                finalMethodId === "-" &&
-                direction === "IN" &&
-                tx.tokenSymbol === "DATA"
-            ) {
-                finalMethodId = "Delegate";
-            }
-
-            // 3. Handle "OUT" transactions from "Collect Earnings"
-            if (finalMethodId === "Collect Earnings" && direction === "OUT") {
-                if (tx.to.toLowerCase() === STREAMR_TREASURY_ADDRESS.toLowerCase()) {
-                    finalMethodId = "Protocol Tax";
-                } else {
-                    finalMethodId = "Undelegate";
+                if (areAllIn) {
+                    groupMethodId = "Force Unstake";
                 }
             }
 
-            // 4. Handle "OUT" transactions from "Unstake"
-            if (
-                (finalMethodId === "Unstake" || finalMethodId === "Force Unstake") &&
-                direction === "OUT"
-            ) {
-                if (tx.to.toLowerCase() === STREAMR_TREASURY_ADDRESS.toLowerCase()) {
+            for (const tx of txGroup) {
+                const direction = tx.from.toLowerCase() === walletAddress.toLowerCase() ? "OUT" : "IN";
+                const decimals = parseInt(tx.tokenDecimal) || 18;
+                const amount = parseFloat(tx.value) / Math.pow(10, decimals);
+                
+                let finalMethodId = groupMethodId;
+
+                if (
+                    direction === "OUT" &&
+                    tx.tokenSymbol === "DATA" &&
+                    tx.to.toLowerCase() === STREAMR_TREASURY_ADDRESS.toLowerCase()
+                ) {
                     finalMethodId = "Protocol Tax";
-                } else {
-                    finalMethodId = "Undelegate";
                 }
-            }
+                else if (
+                    finalMethodId === "-" && 
+                    tx.tokenSymbol === "DATA" &&
+                    VOTE_ON_FLAG_RAW_AMOUNTS.has(tx.value)
+                ) {
+                    finalMethodId = "Vote On Flag";
+                }
+                else if (
+                    (baseMethodId === "Delegate" || baseMethodId === "Transfer") && 
+                    direction === "IN"
+                ) {
+                    finalMethodId = "Delegate";
+                }
+                else if (
+                    finalMethodId === "-" && 
+                    direction === "IN" &&
+                    tx.tokenSymbol === "DATA" &&
+                    txGroup.length === 1 
+                ) {
+                    finalMethodId = "Delegate";
+                }
+                else if (baseMethodId === "Collect Earnings" && direction === "OUT") { 
+                    if (tx.to.toLowerCase() === STREAMR_TREASURY_ADDRESS.toLowerCase()) {
+                        finalMethodId = "Protocol Tax";
+                    } else {
+                        finalMethodId = "Undelegate"; 
+                    }
+                }
+                else if (
+                    (baseMethodId === "Unstake" || baseMethodId === "Force Unstake") && 
+                    direction === "OUT"
+                ) {
+                    if (tx.to.toLowerCase() === STREAMR_TREASURY_ADDRESS.toLowerCase()) {
+                        finalMethodId = "Protocol Tax";
+                    } else {
+                        finalMethodId = "Undelegate"; 
+                    }
+                }
             
-            return {
-                txHash: tx.hash,
-                timestamp: parseInt(tx.timeStamp),
-                token: tx.tokenSymbol,
-                direction: direction,
-                methodId: finalMethodId,
-                amount: amount,
-                rawValue: tx.value
-            };
-        });
+                processedTokenTxs.push({
+                    txHash: tx.hash,
+                    timestamp: parseInt(tx.timeStamp),
+                    token: tx.tokenSymbol,
+                    direction: direction,
+                    methodId: finalMethodId,
+                    amount: amount,
+                    rawValue: tx.value
+                });
+            }
+        }
 
         const allTxs = [...processedNormalTxs, ...processedTokenTxs];
 
