@@ -302,7 +302,7 @@ export async function fetchPolygonscanHistory(walletAddress) {
 
     const { apiUrl, chainId, nativeToken } = POLYGONSCAN_NETWORK;
     const page = 1;
-    const offset = 800;
+    const offset = 1000;
     const sort = "desc";
 
     const txlistUrl = `${apiUrl}?chainid=${chainId}&module=account&action=txlist&address=${walletAddress}&page=${page}&offset=${offset}&sort=${sort}&apikey=${etherscanApiKey}`;

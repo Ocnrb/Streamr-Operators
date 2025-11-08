@@ -444,6 +444,7 @@ export function renderStakeChart(chartData, isUsdView) {
                 x: {
                     ticks: {
                         color: 'rgba(255, 255, 255, 0.7)',
+						maxTicksLimit: 12,
                         maxRotation: 45,
                         minRotation: 45,
                     },

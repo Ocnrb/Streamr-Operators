@@ -302,9 +302,14 @@ function filterAndRenderChart() {
         } else {
             value = dataAmount;
         }
+		
+        const date = new Date(bucketDate * 1000);
+        const month = date.toLocaleDateString(undefined, { month: 'short' });
+        const day = date.getDate(); // Usar getDate() para obter "7" em vez de "07"
+        const year = date.getFullYear().toString().substring(2); // 2025 -> "25"
 
         return {
-            label: new Date(bucketDate * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+            label: `${month} ${day} '${year}`, // Formato: "Nov 7 '25"
             value: value
         };
 
