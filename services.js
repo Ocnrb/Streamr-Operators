@@ -235,7 +235,7 @@ export async function fetchOperatorDetails(operatorId) {
             queueEntries(orderBy: date, orderDirection: asc) { id amount delegator { id } date }
           }
           selfDelegation: delegations(where: {operator: "${operatorId}", isSelfDelegation: true}, first: 1) { _valueDataWei }
-          stakingEvents(orderBy: date, orderDirection: desc, first: 1000, where: {operator: "${operatorId}"}) {
+          stakingEvents(orderBy: date, orderDirection: desc, first: 800, where: {operator: "${operatorId}"}) {
             id
             amount
             date
@@ -302,7 +302,7 @@ export async function fetchPolygonscanHistory(walletAddress) {
 
     const { apiUrl, chainId, nativeToken } = POLYGONSCAN_NETWORK;
     const page = 1;
-    const offset = 1000;
+    const offset = 500;
     const sort = "desc";
 
     const txlistUrl = `${apiUrl}?chainid=${chainId}&module=account&action=txlist&address=${walletAddress}&page=${page}&offset=${offset}&sort=${sort}&apikey=${etherscanApiKey}`;

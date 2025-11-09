@@ -522,6 +522,8 @@ export function renderOperatorDetails(data, globalState) {
 
 
     const apy = calculateWeightedApy(op.stakes);
+    const roundedApy = Math.round(apy * 100);
+    const apyColorClass = roundedApy === 0 ? 'text-red-400' : 'text-green-400';
     const ownersCutPercent = (BigInt(op.operatorsCutFraction) * 100n) / BigInt('1000000000000000000');
     
     const isOwner = globalState.myRealAddress && op.owner && globalState.myRealAddress.toLowerCase() === op.owner.toLowerCase();
