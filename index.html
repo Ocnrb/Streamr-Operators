@@ -91,7 +91,65 @@
             background-color: rgba(249, 115, 22, 0.1); /* orange-500 com 10% opacidade */
             color: #F97316; /* orange-500 */
         }
-        /* Leaflet Dark Mode CSS filter was here, now removed. */
+        
+        /* --- RACE STYLES --- */
+        .chart-container {
+            position: relative;
+            height: 680px; 
+            overflow: hidden;
+        }
+        .bar-row {
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: 18px;
+            display: flex;
+            align-items: center;
+            gap: 8px; 
+            transition: top 0.5s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.3s ease;
+            width: 100%;
+        }
+        .bar-fill {
+            height: 100%;
+            border-top-right-radius: 0.2rem;
+            border-bottom-right-radius: 0.2rem;
+            transition: width 0.2s linear;
+            position: relative;
+            overflow: hidden; 
+        }
+        .bar-hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+        .scale-marker-line {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 1px;
+            background-color: rgba(255, 255, 255, 0.15);
+            pointer-events: none;
+        }
+        /* Custom Slider for Race */
+        input[type=range].race-slider {
+            -webkit-appearance: none; 
+            background: transparent; 
+        }
+        input[type=range].race-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #1d4ed8; 
+            cursor: pointer;
+            margin-top: -6px; 
+            border: 2px solid #1E1E1E; 
+        }
+        input[type=range].race-slider::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 6px;
+            background: #333333; 
+            border-radius: 3px;
+        }
     </style>
 </head>
 <body class="text-gray-200">
@@ -244,7 +302,7 @@
         </div>
     </div>
 
-    <!-- NEW: Operator Settings Modal -->
+    <!-- Operator Settings Modal -->
     <div id="operatorSettingsModal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50 hidden">
         <div class="bg-[#1E1E1E] rounded-lg p-8 max-w-md w-full text-gray-300 border border-[#333333] shadow-2xl">
             <h2 id="operator-settings-modal-title" class="text-2xl font-bold mb-4 text-white">Operator Settings</h2>
@@ -308,6 +366,7 @@
             </div>
             <div id="wallet-info" class="bg-[#1E1E1E] border border-[#333333] text-white p-3 rounded-lg shadow-lg text-sm hidden items-center gap-2">
             </div>
+            
             <button id="settings-btn" class="text-gray-400 hover:text-white transition-colors p-3 bg-[#1E1E1E] border border-[#333333] rounded-lg shadow-lg">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
             </button>
@@ -318,16 +377,21 @@
     <div id="main-container" class="container mx-auto p-4 md:p-8 hidden">
         <!-- Operator List View -->
         <main id="operator-list-view">
-            <div class="mb-6 relative">
-                <input 
-                    type="text" 
-                    id="search-input" 
-                    placeholder="Search" 
-                    class="w-full p-4 pl-12 bg-[#1E1E1E] border border-[#333333] rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-[#555555] transition-colors"
-                >
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
+            <div class="mb-6 flex gap-2">
+                <div class="relative flex-grow">
+                    <input 
+                        type="text" 
+                        id="search-input" 
+                        placeholder="Search" 
+                        class="w-full p-4 pl-12 bg-[#1E1E1E] border border-[#333333] rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-[#555555] transition-colors"
+                    >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                </div>
+                <button id="race-view-btn" class="bg-[#1E1E1E] hover:bg-[#333333] border border-[#333333] text-white font-bold p-4 rounded-xl transition-colors flex items-center justify-center" title="Stake Race">
+                    <svg class="w-6 h-6 text-yellow-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path><path d="M4 22h16"></path><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"></path><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"></path><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"></path></svg>
+                </button>
             </div>
             
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6" id="operators-grid">
@@ -350,6 +414,101 @@
             <div id="detail-content">
             </div>
         </div>
+
+        <!-- Race View -->
+        <div id="race-view" class="hidden space-y-8">
+            <div>
+                <button id="race-back-to-list-btn" class="bg-[#333333] hover:bg-[#444444] text-white font-bold py-2 px-4 rounded-lg transition-colors flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>
+                    Back to List
+                </button>
+            </div>
+            
+            <!-- Main Race Card -->
+            <div class="max-w-7xl mx-auto bg-[#1E1E1E] rounded-xl border border-[#333333] shadow-2xl overflow-hidden flex flex-col h-full">
+                
+                <!-- HEADER -->
+                <div class="p-4 border-b border-[#333333] flex flex-col lg:flex-row lg:items-center justify-between gap-4 sticky top-0 bg-[#1E1E1E] z-30 min-h-[88px]">
+                    <!-- Title (Always Visible) -->
+                    <div class="flex-shrink-0">
+                        <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                            <svg class="w-5 h-5 text-yellow-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path><path d="M4 22h16"></path><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"></path><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"></path><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"></path></svg>
+                            Stake Race (Top 30)
+                        </h2>
+                        <p class="text-xs text-gray-400 mt-1">
+                            Tracking operators since Mar 18, 2024
+                        </p>
+                    </div>
+
+                    <!-- Controls (Hidden by default, toggled by JS) -->
+                    <div id="race-controls-area" class="hidden flex-1 w-full lg:w-auto flex flex-col sm:flex-row items-center gap-4 px-2 order-last lg:order-none mt-2 lg:mt-0">
+                        
+                        <!-- Play Button -->
+                        <button id="race-btn-play" class="w-10 h-10 flex items-center justify-center rounded-full bg-blue-800 hover:bg-blue-900 text-white transition shadow-md shrink-0 border border-blue-900">
+                            <svg class="w-4 h-4 fill-current ml-1" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                        </button>
+
+                        <!-- Slider Section -->
+                        <div class="flex-1 w-full flex flex-col gap-1">
+                            <div class="flex justify-between text-[10px] text-gray-500 uppercase font-semibold tracking-wider">
+                                <span id="race-lbl-start-date">Start</span>
+                                <span id="race-lbl-current-date" class="text-blue-400 text-xs">--</span>
+                                <span>Today</span>
+                            </div>
+                            <input type="range" id="race-timeline-slider" min="0" value="0" step="1" class="w-full h-1 race-slider">
+                        </div>
+
+                        <!-- Speed Button -->
+                        <button id="race-btn-speed" class="p-2 rounded-lg border border-[#333333] bg-[#2C2C2C] text-gray-400 hover:text-white hover:bg-[#3A3A3A] transition-all" title="Playback Speed">
+                            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 19 22 12 13 5 13 19"></polygon><polygon points="2 19 11 12 2 5 2 19"></polygon></svg>
+                        </button>
+                    </div>
+
+                    <!-- Reload Button (Always Visible) -->
+                    <div class="flex-shrink-0 self-end lg:self-center">
+                        <button id="race-btn-reload" class="p-2 hover:bg-[#333333] rounded-full transition-colors text-gray-400 hover:text-white" title="Reload Data">
+                            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path><path d="M21 3v5h-5"></path><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path><path d="M8 16H3v5"></path></svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- MAIN CONTENT -->
+                <div class="relative min-h-[680px]">
+                    
+                    <!-- LOADING STATE -->
+                    <div id="race-loading-state" class="absolute inset-0 flex flex-col items-center justify-center bg-[#1E1E1E] z-20 h-full">
+                        <div class="w-10 h-10 border-4 border-[#555555] border-t-transparent rounded-full animate-spin mb-4"></div>
+                        <p id="race-loading-text" class="text-gray-300 font-medium text-sm">Initializing...</p>
+                        <div class="w-48 mt-4 bg-[#333333] rounded-full h-2 overflow-hidden">
+                            <div id="race-loading-bar" class="bg-blue-800 h-full w-0 transition-all duration-300"></div>
+                        </div>
+                    </div>
+
+                    <!-- ERROR STATE -->
+                    <div id="race-error-state" class="hidden absolute inset-0 flex flex-col items-center justify-center bg-[#1E1E1E] z-20 text-red-400 p-6 text-center h-full">
+                        <svg class="w-8 h-8 mb-2 mx-auto" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                        <p id="race-error-msg" class="font-semibold text-sm">Unknown error</p>
+                    </div>
+
+                    <!-- CHART AREA -->
+                    <div id="race-chart-area" class="hidden px-6 py-4 bg-[#1E1E1E] relative">
+                        
+                        <!-- Background Year/Date -->
+                        <div class="fixed bottom-24 right-8 md:right-1/4 text-right pointer-events-none z-0 opacity-80">
+                            <div id="race-bg-year" class="text-6xl font-black text-[#252525] tracking-tighter transition-colors">2024</div>
+                            <div id="race-bg-date" class="text-2xl font-bold text-[#3a3a3a]">--/--</div>
+                        </div>
+
+                        <!-- Bars Container -->
+                        <div id="race-bars-container" class="chart-container z-10">
+                            <!-- Bars injected via JS -->
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
     </div>
 
     <div id="custom-tooltip" class="hidden absolute z-30 px-3 py-2 text-sm font-medium text-white bg-black rounded-lg shadow-sm border border-[#333333] max-w-xs break-words">
@@ -359,10 +518,9 @@
     <!-- LeafletJS JavaScript -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     
-    <script type="module" src="main.js"><script>
+    <script type="module" src="main.js"></script>
 
-
-<!-- Service Worker Registration -->
+    <!-- Service Worker Registration -->
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
@@ -377,5 +535,3 @@
 
 </body>
 </html>
-
-

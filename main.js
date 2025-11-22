@@ -2,6 +2,7 @@ import * as Constants from './constants.js';
 import * as Utils from './utils.js';
 import * as UI from './ui.js';
 import * as Services from './services.js';
+import { RaceLogic } from './race.js';
 
 // --- Global State ---
 let state = {
@@ -345,6 +346,16 @@ function handleShowOperatorDetails(operatorId) {
     fetchAndRenderOperatorDetails(operatorId);
 }
 
+function handleShowRace() {
+    UI.displayView('race');
+    RaceLogic.init();
+}
+
+function handleBackToFromRace() {
+    RaceLogic.stop(); 
+    UI.displayView('list');
+}
+
 async function handleLoadMoreOperators(button) {
     button.disabled = true;
     button.innerHTML = `<div class="w-4 h-4 border-2 border-white rounded-full border-t-transparent btn-spinner"></div> Loading...`;
@@ -677,6 +688,17 @@ function setupEventListeners() {
 		state.loadedOperatorCount = 0;
         fetchAndRenderOperatorsList(false, 0, state.searchQuery);
     });
+
+    // --- RACE LISTENERS ---
+    const raceBtn = document.getElementById('race-view-btn');
+    if (raceBtn) {
+        raceBtn.addEventListener('click', handleShowRace);
+    }
+
+    const raceBackBtn = document.getElementById('race-back-to-list-btn');
+    if (raceBackBtn) {
+        raceBackBtn.addEventListener('click', handleBackToFromRace);
+    }
 
     // Modals
     document.getElementById('tx-modal-cancel').addEventListener('click', () => UI.transactionModal.classList.add('hidden'));

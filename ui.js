@@ -11,6 +11,7 @@ export const loadMoreOperatorsBtn = document.getElementById('load-more-operators
 export const detailContent = document.getElementById('detail-content');
 export const operatorDetailView = document.getElementById('operator-detail-view');
 export const operatorListView = document.getElementById('operator-list-view');
+export const raceView = document.getElementById('race-view'); // Added Race View
 export const customTooltip = document.getElementById('custom-tooltip');
 export const loaderOverlay = document.getElementById('loader-overlay');
 export const customAlertModal = document.getElementById('customAlertModal');
@@ -95,11 +96,16 @@ export function updateWalletUI(address) {
 }
 
 export function displayView(view) {
+    // Hide all views first
+    operatorListView.style.display = 'none';
+    operatorDetailView.style.display = 'none';
+    if (raceView) raceView.style.display = 'none';
+
     if (view === 'list') {
-        operatorDetailView.style.display = 'none';
         operatorListView.style.display = 'block';
+    } else if (view === 'race') {
+        if (raceView) raceView.style.display = 'block';
     } else { // 'detail'
-        operatorListView.style.display = 'none';
         operatorDetailView.style.display = 'block';
         window.scrollTo(0, 0);
     }
@@ -368,106 +374,137 @@ export function renderStakeChart(chartData, isUsdView) {
     const yAxisPrefix = isUsdView ? '$' : '';
     const yAxisSuffix = isUsdView ? '' : ' DATA';
 
-    // Smooth update logic
-    if (stakeHistoryChart) {
-        stakeHistoryChart.data.labels = labels;
-        stakeHistoryChart.data.datasets[0].data = data;
-        stakeHistoryChart.data.datasets[0].label = chartLabel;
-        stakeHistoryChart.options.scales.y.ticks.callback = function (value) {
-            if (value >= 1000000) return yAxisPrefix + (value / 1000000) + 'M';
-            if (value >= 1000) return yAxisPrefix + (value / 1000) + 'K';
-            return yAxisPrefix + Math.round(value);
-        };
-        stakeHistoryChart.options.plugins.tooltip.callbacks.label = function (context) {
-            let label = context.dataset.label || '';
-            if (label) {
-                label += ': ';
-            }
-            if (context.parsed.y !== null) {
-                label += yAxisPrefix + formatBigNumber(Math.round(context.parsed.y).toString()) + yAxisSuffix;
-            }
-            return label;
-        };
-        stakeHistoryChart.update();
-        return; // Don't recreate the chart
-    }
+    // Função auxiliar para criar o gradiente
+    const createGradient = (ctx) => {
+        const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+        gradient.addColorStop(0, 'rgba(59, 130, 246, 0.5)'); // Top color
+        gradient.addColorStop(1, 'rgba(59, 130, 246, 0.0)'); // Bottom transparency
+        return gradient;
+    };
 
-    // If chart doesn't exist, create it:
-    container.innerHTML = '<canvas id="stake-history-chart"></canvas>';
-    const canvas = document.getElementById('stake-history-chart');
-    if (!canvas) return; // Exit if canvas wasn't found
-    
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return; // Exit if context couldn't be created
-
-    stakeHistoryChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: chartLabel,
-                data: data,
-                backgroundColor: 'rgba(59, 130, 246, 0.2)',
-                borderColor: 'rgba(59, 130, 246, 1)',
-                borderWidth: 2,
-                pointBackgroundColor: 'rgba(59, 130, 246, 1)',
-                tension: 0.1,
-                fill: true
-            }]
+    // Configurações de estilo (Options)
+    const chartOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: {
+            mode: 'index',
+            intersect: false,
         },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    display: false
+        plugins: {
+            legend: {
+                display: false
+            },
+            tooltip: {
+                backgroundColor: 'rgba(30, 30, 30, 0.9)', // Fundo escuro minimalista
+                titleColor: '#ffffff',
+                bodyColor: '#9ca3af', // Gray-400
+                borderColor: '#333333',
+                borderWidth: 1,
+                padding: 10,
+                cornerRadius: 8,
+                displayColors: false, // Remove caixa de cor
+                titleFont: {
+                    family: "'Inter', sans-serif",
+                    size: 13,
+                    weight: '600'
                 },
-                tooltip: {
-                    backgroundColor: '#1E1E1E',
-                    titleColor: '#E5E7EB',
-                    bodyColor: '#D1D5DB',
-                    callbacks: {
-                        label: function (context) {
-                            let label = context.dataset.label || '';
-                            if (label) {
-                                label += ': ';
-                            }
-                            if (context.parsed.y !== null) {
-                                label += yAxisPrefix + formatBigNumber(Math.round(context.parsed.y).toString()) + yAxisSuffix;
-                            }
-                            return label;
+                bodyFont: {
+                    family: "'Inter', sans-serif",
+                    size: 12
+                },
+                callbacks: {
+                    label: function (context) {
+                        let label = '';
+                        if (context.parsed.y !== null) {
+                            label += yAxisPrefix + formatBigNumber(Math.round(context.parsed.y).toString()) + yAxisSuffix;
                         }
+                        return label;
                     }
                 }
-            },
-            scales: {
-                x: {
-                    ticks: {
-                        color: 'rgba(255, 255, 255, 0.7)',
-						maxTicksLimit: 12,
-                        maxRotation: 45,
-                        minRotation: 45,
-                    },
-                    grid: {
-                        color: 'rgba(255, 255, 255, 0.1)'
+            }
+        },
+        scales: {
+            x: {
+                ticks: {
+                    color: '#6b7280', // Gray-500
+                    maxTicksLimit: 8,
+                    maxRotation: 0,
+                    autoSkip: true,
+                    font: {
+                        family: "'Inter', sans-serif",
+                        size: 11
                     }
                 },
-                y: {
-                    ticks: {
-                        color: 'rgba(255, 255, 255, 0.7)',
-                        callback: function (value) {
-                            if (value >= 1000000) return yAxisPrefix + (value / 1000000) + 'M';
-                            if (value >= 1000) return yAxisPrefix + (value / 1000) + 'K';
-                            return yAxisPrefix + Math.round(value);
-                        }
+                grid: {
+                    display: false // Remove grelha vertical
+                }
+            },
+            y: {
+                position: 'left',
+                ticks: {
+                    color: '#6b7280', // Gray-500
+                    callback: function (value) {
+                        if (value >= 1000000) return yAxisPrefix + (value / 1000000).toFixed(1) + 'M';
+                        if (value >= 1000) return yAxisPrefix + (value / 1000).toFixed(0) + 'K';
+                        return yAxisPrefix + Math.round(value);
                     },
-                    grid: {
-                        color: 'rgba(255, 255, 255, 0.1)'
+                    font: {
+                        family: "'Inter', sans-serif",
+                        size: 11
                     }
+                },
+                grid: {
+                    color: '#333333',
+                    borderDash: [4, 4], // Grelha horizontal tracejada subtil
+                    drawBorder: false
                 }
             }
         }
-    });
+    };
+
+    if (!stakeHistoryChart) {
+        container.innerHTML = '<canvas id="stake-history-chart"></canvas>';
+        const canvas = document.getElementById('stake-history-chart');
+        if (!canvas) return;
+        
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        stakeHistoryChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: chartLabel,
+                    data: data,
+                    backgroundColor: createGradient(ctx),
+                    borderColor: '#3b82f6', // Blue-500
+                    borderWidth: 2,
+                    pointBackgroundColor: '#3b82f6',
+                    pointBorderColor: '#1E1E1E', 
+                    pointBorderWidth: 2,
+                    pointRadius: 2.5,
+                    pointHoverRadius: 4,
+                    tension: 0.15, 
+                    fill: true
+                }]
+            },
+            options: chartOptions
+        });
+    } else {
+        // Update existing chart data
+        stakeHistoryChart.data.labels = labels;
+        stakeHistoryChart.data.datasets[0].data = data;
+        stakeHistoryChart.data.datasets[0].label = chartLabel;
+        
+        // Update scales formatting
+        stakeHistoryChart.options.scales.y.ticks.callback = chartOptions.scales.y.ticks.callback;
+        
+        // Update tooltip callback
+        stakeHistoryChart.options.plugins.tooltip.callbacks.label = chartOptions.plugins.tooltip.callbacks.label;
+
+        stakeHistoryChart.update();
+    }
 }
 
 export function populateOperatorSettingsModal(operatorData) {
