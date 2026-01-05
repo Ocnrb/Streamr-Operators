@@ -6,6 +6,7 @@ import { Router } from './src/core/router.js';
 import * as Autostaker from './src/features/autostaker.js';
 import { navigationController } from './src/ui/navigation.js';
 import { OperatorLogic } from './src/features/operator.js';
+import { removeOperatorProfile, getOperatorProfile } from './src/core/profile.js';
 
 // Lazy-loaded modules
 let RaceLogic = null;
@@ -409,6 +410,9 @@ async function initializeApp() {
         if (bottomNav) {
             bottomNav.className = 'md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#1A1A1A]/95 backdrop-blur-md border-t border-[#2a2a2a] safe-area-bottom';
         }
+
+        // Initialize profile shortcut in sidebar/nav
+        UI.renderProfileShortcut();
 
         // Initialize router and handle current route
         router.init();
@@ -1311,6 +1315,7 @@ function setupRouter() {
         if (VisualLogic) VisualLogic.stop();
         
         UI.displayView('list');
+        UI.hideProfileButtons();
         navigationController.updateActiveState('operators');
         navigationController.updatePageTitle('operators');
         syncOperatorState();
@@ -1337,6 +1342,7 @@ function setupRouter() {
         if (VisualLogic) VisualLogic.stop();
         
         UI.displayView('race');
+        UI.hideProfileButtons();
         navigationController.updateActiveState('race');
         navigationController.updatePageTitle('race');
         
@@ -1356,6 +1362,7 @@ function setupRouter() {
         if (RaceLogic) RaceLogic.stop();
         
         UI.displayView('visual');
+        UI.hideProfileButtons();
         navigationController.updateActiveState('visual');
         navigationController.updatePageTitle('visual');
         // Hide navigation in visual view (full screen)
@@ -1384,6 +1391,7 @@ function setupRouter() {
         if (VisualLogic) VisualLogic.stop();
         
         UI.displayView('delegators-list');
+        UI.hideProfileButtons();
         navigationController.updateActiveState('delegators');
         navigationController.updatePageTitle('delegators');
         
@@ -1408,6 +1416,7 @@ function setupRouter() {
         if (VisualLogic) VisualLogic.stop();
         
         UI.displayView('delegator-detail');
+        UI.hideProfileButtons();
         navigationController.updateActiveState('delegators');
         navigationController.updatePageTitle('delegators', 'Delegator Details');
         

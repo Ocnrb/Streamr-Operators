@@ -1,5 +1,7 @@
 // navigation.js - Handles navigation UI components (sidebar, bottom nav, headers)
 import { STORAGE_KEYS } from '../core/constants.js';
+import { removeOperatorProfile, removeDelegatorProfile } from '../core/profile.js';
+import { renderProfileShortcut, showToast } from './ui.js';
 
 /**
  * Navigation Controller
@@ -202,6 +204,9 @@ class NavigationController {
                 this.openAbout();
             });
         }
+        
+        // Profile shortcut event listeners
+        this.setupProfileEventListeners();
         
         // Mobile wallet button
         if (this.mobileWalletBtn) {
@@ -569,6 +574,85 @@ class NavigationController {
         }
         if (this.mobileHeader) {
             this.mobileHeader.style.display = visible ? '' : 'none';
+        }
+    }
+    
+    /**
+     * Setup event listeners for profile shortcuts
+     */
+    setupProfileEventListeners() {
+        // Sidebar operator profile remove button
+        const sidebarProfileRemove = document.getElementById('sidebar-profile-remove');
+        if (sidebarProfileRemove) {
+            sidebarProfileRemove.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                removeOperatorProfile();
+                renderProfileShortcut();
+                showToast({
+                    type: 'info',
+                    title: 'Profile Removed',
+                    message: 'Operator shortcut has been removed.',
+                    duration: 3000
+                });
+            });
+        }
+        
+        // Sidebar delegator profile remove button
+        const sidebarDelegatorProfileRemove = document.getElementById('sidebar-delegator-profile-remove');
+        if (sidebarDelegatorProfileRemove) {
+            sidebarDelegatorProfileRemove.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                removeDelegatorProfile();
+                renderProfileShortcut();
+                showToast({
+                    type: 'info',
+                    title: 'Profile Removed',
+                    message: 'Delegator shortcut has been removed.',
+                    duration: 3000
+                });
+            });
+        }
+        
+        // Sidebar profile link - navigate to operator
+        const sidebarProfileLink = document.getElementById('sidebar-profile-link');
+        if (sidebarProfileLink) {
+            sidebarProfileLink.addEventListener('click', (e) => {
+                // Let the router handle navigation via href
+            });
+        }
+        
+        // Sidebar delegator profile link - navigate to delegator
+        const sidebarDelegatorProfileLink = document.getElementById('sidebar-delegator-profile-link');
+        if (sidebarDelegatorProfileLink) {
+            sidebarDelegatorProfileLink.addEventListener('click', (e) => {
+                // Let the router handle navigation via href
+            });
+        }
+        
+        // Mobile profile link - close menu and navigate
+        const mobileProfileLink = document.getElementById('mobile-profile-link');
+        if (mobileProfileLink) {
+            mobileProfileLink.addEventListener('click', () => {
+                // Close the more menu
+                const moreMenu = document.getElementById('bottom-nav-more-menu');
+                const overlay = document.getElementById('bottom-nav-overlay');
+                if (moreMenu) moreMenu.classList.add('hidden');
+                if (overlay) overlay.classList.add('hidden');
+            });
+        }
+        
+        // Mobile delegator profile link - close menu and navigate
+        const mobileDelegatorProfileLink = document.getElementById('mobile-delegator-profile-link');
+        if (mobileDelegatorProfileLink) {
+            mobileDelegatorProfileLink.addEventListener('click', () => {
+                // Close the more menu
+                const moreMenu = document.getElementById('bottom-nav-more-menu');
+                const overlay = document.getElementById('bottom-nav-overlay');
+                if (moreMenu) moreMenu.classList.add('hidden');
+                if (overlay) overlay.classList.add('hidden');
+            });
         }
     }
 }

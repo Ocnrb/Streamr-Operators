@@ -13,7 +13,7 @@ import {
     DATA_TOKEN_ADDRESS_POLYGON
 } from '../core/constants.js';
 import { formatBigNumber, shortAddress, parseOperatorMetadata, formatUsdForTooltip } from '../core/utils.js';
-import { showToast, customTooltip } from '../ui/ui.js';
+import { showToast, customTooltip, updateDelegatorProfileButton, handleDelegatorProfileButtonClick, renderProfileShortcut } from '../ui/ui.js';
 
 // ============================================
 // State Management
@@ -272,25 +272,52 @@ async function fetchDelegatorById(address) {
 }
 
 /**
- * Fetch delegator earnings history
+ * Fetch delegator earnings history (all available data with pagination)
  */
 async function fetchDelegatorEarningsHistory(delegatorId) {
-    const query = `
-        query GetEarningsHistory {
-            delegatorDailyBuckets(
-                where: { delegator: "${delegatorId.toLowerCase()}" }, 
-                orderBy: date, 
-                orderDirection: asc, 
-                first: 1000
-            ) {
-                date
-                cumulativeEarningsWei
+    const BATCH_SIZE = 1000;
+    const lowerId = delegatorId.toLowerCase();
+    let allBuckets = [];
+    let lastDate = null;
+    let iterations = 0;
+    const MAX_ITERATIONS = 20; // Safety: max ~20,000 days (~55 years)
+
+    while (iterations < MAX_ITERATIONS) {
+        iterations++;
+        
+        const whereClause = lastDate === null
+            ? `where: { delegator: "${lowerId}" }`
+            : `where: { delegator: "${lowerId}", date_gt: ${lastDate} }`;
+
+        const query = `
+            query GetEarningsHistory {
+                delegatorDailyBuckets(
+                    ${whereClause},
+                    orderBy: date,
+                    orderDirection: asc,
+                    first: ${BATCH_SIZE}
+                ) {
+                    date
+                    cumulativeEarningsWei
+                }
             }
-        }
-    `;
-    
-    const data = await runQuery(query);
-    return data.delegatorDailyBuckets || [];
+        `;
+
+        const data = await runQuery(query);
+        const buckets = data.delegatorDailyBuckets || [];
+
+        if (buckets.length === 0) break;
+
+        allBuckets = allBuckets.concat(buckets);
+
+        // If we received less than batch size, no more data available
+        if (buckets.length < BATCH_SIZE) break;
+
+        // Advance cursor to the last returned date
+        lastDate = buckets[buckets.length - 1].date;
+    }
+
+    return allBuckets;
 }
 
 /**
@@ -589,6 +616,11 @@ function renderDetailHeader(delegator) {
         lastTimestamp = Math.max(...delegator.delegations.map(del => parseInt(del.latestDelegationTimestamp)));
     }
     if (lastSeenEl) lastSeenEl.textContent = lastTimestamp > 0 ? formatTimestamp(lastTimestamp) : "Never";
+    
+    // Update the profile save button in header
+    const avatarUrl = `https://effigy.im/a/${delegator.id}.svg`;
+    const displayName = shortAddress(delegator.id);
+    updateDelegatorProfileButton(delegator.id, displayName, avatarUrl);
 }
 
 /**
@@ -1447,6 +1479,15 @@ export const DelegatorsLogic = {
                 }
             });
         }
+        
+        // Save delegator profile button handlers (in header)
+        document.body.addEventListener('click', (e) => {
+            const profileBtn = e.target.closest('#desktop-save-delegator-profile-btn, #mobile-save-delegator-profile-btn');
+            if (profileBtn) {
+                handleDelegatorProfileButtonClick(profileBtn);
+                return;
+            }
+        });
     },
     
     /**

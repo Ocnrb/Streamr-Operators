@@ -714,7 +714,11 @@ export const OperatorLogic = {
             }
 
             if (!filterQuery || (filterQuery.toLowerCase().startsWith('0x'))) {
-                state.loadedOperatorCount += operators.length;
+                if (isLoadMore) {
+                    state.loadedOperatorCount += operators.length;
+                } else {
+                    state.loadedOperatorCount = operators.length;
+                }
             }
             
             UI.loadMoreOperatorsBtn.style.display = (operators.length === Constants.OPERATORS_PER_PAGE && (!filterQuery || filterQuery.toLowerCase().startsWith('0x'))) ? 'inline-block' : 'none';
@@ -970,6 +974,13 @@ export const OperatorLogic = {
             if (target.id === 'collect-all-earnings-btn') handleCollectAllEarningsClick(target);
             if (target.id === 'load-more-delegators-btn') handleLoadMoreDelegators(target);
             if (target.id === 'edit-operator-settings-btn') handleEditOperatorSettingsClick();
+            
+            // Save as Profile button (in header)
+            const profileBtn = target.closest('#desktop-save-profile-btn, #mobile-save-profile-btn');
+            if (profileBtn) {
+                UI.handleProfileButtonClick(profileBtn);
+                return;
+            }
             
             // Stats panel toggle
             if (target.closest('#toggle-stats-btn')) UI.toggleStatsPanel(false, state.uiState);
