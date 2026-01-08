@@ -63,7 +63,7 @@ export function getProvider(signer = null) {
 const GAS_CONFIG = {
     MIN_GAS_PRICE: 35,           // Minimum gas price for Polygon
     MIN_PRIORITY_FEE: 30,        // Minimum priority fee
-    MAX_GAS_PRICE: 500,          // Maximum gas price we'll accept (safety limit)
+    MAX_GAS_PRICE: 1500,          // Maximum gas price we'll accept (safety limit)
     WARNING_GAS_PRICE: 150,      // Show warning above this threshold
     DEFAULT_GAS_PRICE: 50,       // Fallback if we can't get fee data
     DEFAULT_PRIORITY_FEE: 30     // Fallback priority fee
@@ -1574,4 +1574,5 @@ export async function cleanupClient() {
         streamrClient = null;
     }
 }
+
 
