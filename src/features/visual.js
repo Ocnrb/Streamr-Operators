@@ -60,7 +60,7 @@ export const VisualLogic = {
     
     phyGravity: 0.050,
     phyFriction: 0.05,
-    phyRepulsion: 2.0,
+    phyRepulsion: 3.0,
     phyTension: 0.05,
     
     dataCache: new Map(),
@@ -93,7 +93,7 @@ export const VisualLogic = {
         this.refreshDelayMs = 150;
         this.phyGravity = 0.050;
         this.phyFriction = 0.05;
-        this.phyRepulsion = 2.0;
+        this.phyRepulsion = 3.0;
         this.phyTension = 0.05;
 
         // UI Defaults Helpers
@@ -115,8 +115,8 @@ export const VisualLogic = {
         setVal('vis-friction-slider', 5); 
         setText('vis-friction-display', '0.05');
 
-        setVal('vis-repulsion-slider', 20); 
-        setText('vis-repulsion-display', '2.0x');
+        setVal('vis-repulsion-slider', 30); 
+        setText('vis-repulsion-display', '3.0x');
 
         setVal('vis-tension-slider', 5); 
         setText('vis-tension-display', '0.05');

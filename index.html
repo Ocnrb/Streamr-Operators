@@ -542,11 +542,11 @@
         <!-- Your Profiles Section (hidden by default, shown when any profile is saved) -->
         <div id="sidebar-profiles-section" class="hidden px-2 py-3 border-b border-[#2a2a2a] space-y-2">
             <!-- Operator Profile -->
-            <a id="sidebar-operator-profile-link" href="#" class="hidden group flex items-center gap-3 px-3 py-2 rounded-md text-white bg-gradient-to-r from-blue-900/30 to-transparent hover:from-blue-800/40 transition-all duration-200 relative">
-                <img id="sidebar-operator-profile-avatar" src="" alt="" class="w-9 h-9 rounded-full border-2 border-blue-500/50 flex-shrink-0 object-cover">
-                <div class="hidden lg:block flex-1 min-w-0">
-                    <span class="text-[9px] font-semibold text-blue-400 uppercase tracking-widest">Operator</span>
-                    <p id="sidebar-operator-profile-name" class="text-sm font-medium text-white truncate"></p>
+            <a id="sidebar-operator-profile-link" href="#" class="hidden group flex items-start gap-3 px-3 py-2 rounded-md text-white hover:bg-[#2a2a2a] transition-all duration-200 relative">
+                <img id="sidebar-operator-profile-avatar" src="" alt="" class="w-11 h11 rounded-full border-2 border-blue-500/50 flex-shrink-0 object-cover">
+                <div class="hidden lg:flex lg:flex-col flex-1 min-w-0 pt-0.5">
+                    <span class="text-[9px] font-semibold text-blue-400 uppercase tracking-widest leading-tight">Operator</span>
+                    <p id="sidebar-operator-profile-name" class="text-sm font-medium text-white truncate leading-tight"></p>
                 </div>
                 <button id="sidebar-operator-profile-remove" class="hidden lg:flex absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-1 rounded-md hover:bg-red-500/20 text-gray-400 hover:text-red-400 transition-all" title="Remove shortcut">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -556,11 +556,11 @@
             </a>
             
             <!-- Delegator Profile -->
-            <a id="sidebar-delegator-profile-link" href="#" class="hidden group flex items-center gap-3 px-3 py-2 rounded-md text-white bg-gradient-to-r from-purple-900/30 to-transparent hover:from-purple-800/40 transition-all duration-200 relative">
-                <img id="sidebar-delegator-profile-avatar" src="" alt="" class="w-9 h-9 rounded-full border-2 border-purple-500/50 flex-shrink-0 object-cover">
-                <div class="hidden lg:block flex-1 min-w-0">
-                    <span class="text-[9px] font-semibold text-purple-400 uppercase tracking-widest">Delegator</span>
-                    <p id="sidebar-delegator-profile-name" class="text-sm font-medium text-white truncate"></p>
+            <a id="sidebar-delegator-profile-link" href="#" class="hidden group flex items-start gap-3 px-3 py-2 rounded-md text-white hover:bg-[#2a2a2a] transition-all duration-200 relative">
+                <img id="sidebar-delegator-profile-avatar" src="" alt="" class="w-11 h-11 rounded-full border-2 border-purple-500/50 flex-shrink-0 object-cover">
+                <div class="hidden lg:flex lg:flex-col flex-1 min-w-0 pt-0.5">
+                    <span class="text-[9px] font-semibold text-purple-400 uppercase tracking-widest leading-tight">Delegator</span>
+                    <p id="sidebar-delegator-profile-name" class="text-sm font-medium text-white truncate leading-tight"></p>
                 </div>
                 <button id="sidebar-delegator-profile-remove" class="hidden lg:flex absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-1 rounded-md hover:bg-red-500/20 text-gray-400 hover:text-red-400 transition-all" title="Remove shortcut">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -571,7 +571,7 @@
         </div>
         
         <!-- Navigation -->
-        <nav class="flex-1 py-3 overflow-y-auto">
+        <nav class="flex-1 py-3 lg:overflow-y-auto overflow-hidden">
             <div class="px-2 space-y-0.5">
                 
                 <!-- Section: Explore -->
@@ -827,7 +827,7 @@
                 <div id="bottom-nav-more-menu" class="hidden absolute bottom-full right-0 mb-2 w-48 bg-[#1E1E1E] border border-[#333] rounded-lg shadow-xl overflow-hidden">
                     <!-- Operator Profile (hidden by default) -->
                     <a id="mobile-operator-profile-link" href="#" class="hidden items-center gap-3 px-4 py-2.5 text-gray-300 hover:bg-[#2a2a2a] transition-colors">
-                        <img id="mobile-operator-profile-avatar" src="" alt="" class="w-6 h-6 rounded-full border border-blue-500/50 object-cover">
+                        <img id="mobile-operator-profile-avatar" src="" alt="" class="w-8 h-8 rounded-full border border-blue-500/50 object-cover">
                         <div class="flex-1 min-w-0">
                             <span class="text-[8px] font-semibold text-blue-400 uppercase tracking-wider">Operator</span>
                             <p id="mobile-operator-profile-name" class="text-xs font-medium text-white truncate"></p>
@@ -836,7 +836,7 @@
                     
                     <!-- Delegator Profile (hidden by default) -->
                     <a id="mobile-delegator-profile-link" href="#" class="hidden items-center gap-3 px-4 py-2.5 text-gray-300 hover:bg-[#2a2a2a] transition-colors border-b border-[#333]">
-                        <img id="mobile-delegator-profile-avatar" src="" alt="" class="w-6 h-6 rounded-full border border-purple-500/50 object-cover">
+                        <img id="mobile-delegator-profile-avatar" src="" alt="" class="w-8 h-8 rounded-full border border-purple-500/50 object-cover">
                         <div class="flex-1 min-w-0">
                             <span class="text-[8px] font-semibold text-purple-400 uppercase tracking-wider">Delegator</span>
                             <p id="mobile-delegator-profile-name" class="text-xs font-medium text-white truncate"></p>
@@ -1048,20 +1048,18 @@
 
             <!-- Stats & Toggle Row - aligned with table -->
             <div class="flex items-center justify-between mb-4 px-2">
-                <!-- Left: Stats -->
-                <div class="flex items-center gap-6 text-sm text-gray-500">
-                    <span>Loaded: <strong id="delegators-total-count" class="text-white">0</strong></span>
-                    <span class="relative group">
-                        Total Staked: <strong id="delegators-total-staked" class="text-white">0</strong>
-                        <span class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 text-xs font-normal text-gray-300 bg-[#1a1a1a] border border-[#333] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
-                            Visible
-                        </span>
+                <!-- Left: Total Staked -->
+                <div class="relative group flex flex-col">
+                    <span class="text-xs font-medium text-gray-500">Total Staked</span>
+                    <strong id="delegators-total-staked" class="text-white text-sm whitespace-nowrap">0</strong>
+                    <span class="absolute bottom-full left-0 mb-2 px-3 py-2 text-xs font-normal text-gray-300 bg-[#1a1a1a] border border-[#333] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
+                        Visible delegators only
                     </span>
                 </div>
                 
                 <!-- Right: Self-delegation Toggle -->
-                <label class="flex items-center gap-2 cursor-pointer group select-none">
-                    <span class="text-xs font-medium text-gray-500 group-hover:text-gray-300 transition-colors whitespace-nowrap">Show self-delegation</span>
+                <label class="flex flex-col items-end gap-1 cursor-pointer group select-none">
+                    <span class="text-xs font-medium text-gray-500 group-hover:text-gray-300 transition-colors whitespace-nowrap">Self-delegation</span>
                     <div class="relative">
                         <input type="checkbox" id="delegators-show-self-delegation" class="sr-only peer">
                         <div class="w-8 h-4 bg-[#333333] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-blue-600"></div>
@@ -1070,12 +1068,12 @@
             </div>
 
             <!-- Table -->
-            <div class="bg-[#1E1E1E] border border-[#333] rounded-xl overflow-hidden shadow-xl mb-6">
-                <table class="w-full text-left border-collapse">
+            <div class="bg-[#1E1E1E] border border-[#333] rounded-xl overflow-hidden shadow-xl mb-6 overflow-x-hidden">
+                <table class="w-full text-left border-collapse table-fixed">
                     <thead class="bg-[#252525] text-xs font-semibold text-gray-400 uppercase tracking-wider sticky top-0 z-10">
                         <tr>
-                            <th class="px-4 md:px-6 py-4 border-b border-[#333]">Address</th>
-                            <th class="px-4 md:px-6 py-4 border-b border-[#333] text-right">Staked</th>
+                            <th class="px-3 md:px-6 py-4 border-b border-[#333]">Address</th>
+                            <th class="px-3 md:px-6 py-4 border-b border-[#333] text-right">Staked</th>
                             <th class="px-6 py-4 border-b border-[#333] text-center hidden md:table-cell">Operators</th>
                             <th class="px-6 py-4 border-b border-[#333] text-center hidden md:table-cell">Last Seen</th>
                         </tr>
@@ -1107,16 +1105,16 @@
         </div>
 
         <!-- ===== DELEGATOR DETAIL VIEW ===== -->
-        <div id="delegator-detail-view" class="hidden container mx-auto p-4 md:p-6 space-y-6">
+        <div id="delegator-detail-view" class="hidden container mx-auto p-3 md:p-6 space-y-4 md:space-y-6 overflow-x-hidden">
             <!-- Header Panel -->
-            <div class="bg-[#1E1E1E] border border-[#333] rounded-xl p-6 md:p-8">
-                <div class="flex justify-between items-start mb-6 flex-wrap gap-4">
+            <div class="bg-[#1E1E1E] border border-[#333] rounded-xl p-4 md:p-8">
+                <div class="flex justify-between items-start mb-4 md:mb-6 flex-wrap gap-3 md:gap-4">
                     <!-- Identity -->
-                    <div class="flex items-center gap-5">
-                        <img id="delegator-detail-avatar" src="" onerror="this.src='https://placehold.co/80x80/1E1E1E/a3a3a3?text=?';" alt="Avatar" class="w-16 h-16 rounded-full border-2 border-[#333] shadow-lg">
-                        <div>
-                            <h2 class="text-2xl font-bold text-white mb-1">Delegator</h2>
-                            <a id="delegator-detail-link" href="#" target="_blank" class="font-mono text-sm text-gray-400 hover:text-white transition-colors">
+                    <div class="flex items-center gap-3 md:gap-5 min-w-0">
+                        <img id="delegator-detail-avatar" src="" onerror="this.src='https://placehold.co/80x80/1E1E1E/a3a3a3?text=?';" alt="Avatar" class="w-12 h-12 md:w-16 md:h-16 rounded-full border-2 border-[#333] shadow-lg flex-shrink-0">
+                        <div class="min-w-0">
+                            <h2 class="text-xl md:text-2xl font-bold text-white mb-1">Delegator</h2>
+                            <a id="delegator-detail-link" href="#" target="_blank" class="font-mono text-xs md:text-sm text-gray-400 hover:text-white transition-colors block truncate">
                                 <span id="delegator-detail-address">--</span>
                             </a>
                         </div>
@@ -1130,45 +1128,45 @@
                 </div>
 
                 <!-- Stats Grid -->
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-8">
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
                     <div>
-                        <p class="text-[11px] text-gray-500 font-medium uppercase tracking-wide mb-1">Staked</p>
-                        <p id="delegator-detail-stake" class="text-2xl font-bold text-white tracking-tight cursor-pointer">0</p>
+                        <p class="text-xs sm:text-sm text-gray-400 mb-1">Staked (DATA)</p>
+                        <p id="delegator-detail-stake" class="text-lg sm:text-2xl font-semibold text-white cursor-pointer">0</p>
                     </div>
                     <div>
-                        <p class="text-[11px] text-gray-500 font-medium uppercase tracking-wide mb-1">Initial Delegation</p>
-                        <p id="delegator-detail-initial" class="text-2xl font-bold text-white tracking-tight cursor-pointer">0</p>
+                        <p class="text-xs sm:text-sm text-gray-400 mb-1">Initial Delegation (DATA)</p>
+                        <p id="delegator-detail-initial" class="text-lg sm:text-2xl font-semibold text-white cursor-pointer">0</p>
                     </div>
                     <div>
-                        <p class="text-[11px] text-gray-500 font-medium uppercase tracking-wide mb-1">Total Earnings</p>
-                        <p id="delegator-detail-earnings" class="text-2xl font-bold text-white tracking-tight cursor-pointer">0</p>
+                        <p class="text-xs sm:text-sm text-gray-400 mb-1">Total Earnings (DATA)</p>
+                        <p id="delegator-detail-earnings" class="text-lg sm:text-2xl font-semibold text-white cursor-pointer">0</p>
                     </div>
                     <div>
-                        <p class="text-[11px] text-gray-500 font-medium uppercase tracking-wide mb-1">Active Operators</p>
-                        <p id="delegator-detail-ops-count" class="text-2xl font-bold text-white tracking-tight">0</p>
+                        <p class="text-xs sm:text-sm text-gray-400 mb-1">Operators</p>
+                        <p id="delegator-detail-ops-count" class="text-lg sm:text-2xl font-semibold text-white">0</p>
                     </div>
                 </div>
             </div>
 
             <!-- Current Delegations Table -->
-            <div class="bg-[#1E1E1E] border border-[#333] rounded-xl p-5">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-base font-bold text-gray-200 flex items-center gap-2">
-                        <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div class="bg-[#1E1E1E] border border-[#333] rounded-xl p-3 md:p-5">
+                <div class="flex justify-between items-center mb-3 md:mb-4">
+                    <h3 class="text-sm md:text-base font-bold text-gray-200 flex items-center gap-2">
+                        <svg class="w-4 h-4 md:w-5 md:h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
                         </svg>
                         Current Delegations
                     </h3>
                 </div>
-                <div class="overflow-x-auto border border-[#333] rounded-lg">
-                    <table class="w-full text-xs text-left">
-                        <thead class="text-[10px] text-gray-500 uppercase bg-[#1E1E1E] font-semibold tracking-wider">
+                <div class="-mx-3 md:mx-0 overflow-x-auto md:border md:border-[#333] md:rounded-lg">
+                    <table class="w-full text-sm text-left min-w-[500px]">
+                        <thead class="text-xs text-gray-500 uppercase bg-[#1E1E1E] font-semibold tracking-wider">
                             <tr>
-                                <th class="px-6 py-3">Operator</th>
-                                <th class="px-6 py-3 text-right">Delegated</th>
-                                <th class="px-6 py-3 text-right">Current Stake</th>
-                                <th class="px-6 py-3 text-right">Share %</th>
-                                <th class="px-6 py-3 text-right">Latest Action</th>
+                                <th class="px-3 md:px-6 py-2 md:py-3">Operator</th>
+                                <th class="px-3 md:px-6 py-2 md:py-3 text-right">Delegated</th>
+                                <th class="px-3 md:px-6 py-2 md:py-3 text-right">Current</th>
+                                <th class="px-3 md:px-6 py-2 md:py-3 text-right">Share</th>
+                                <th class="px-3 md:px-6 py-2 md:py-3 text-right">Latest</th>
                             </tr>
                         </thead>
                         <tbody id="delegator-inline-delegations-body" class="bg-[#1E1E1E]/30 text-gray-300"></tbody>
@@ -1177,13 +1175,17 @@
             </div>
 
             <!-- Unified Chart Section -->
-            <div class="bg-[#1E1E1E] border border-[#333] rounded-xl p-5 min-h-[450px] flex flex-col">
-                <div class="flex flex-col gap-2 mb-4">
-                    <div class="flex justify-between items-center flex-wrap gap-2">
+            <div class="bg-[#1E1E1E] border border-[#333] rounded-xl p-3 md:p-5 min-h-[280px] md:min-h-[450px] flex flex-col">
+                <div class="flex flex-col gap-2 mb-3 md:mb-4">
+                    <!-- Pills Row 1: Chart Type + Timeframe -->
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <!-- Chart Type Pills -->
                         <div id="delegator-chart-type-tabs" class="flex bg-[#2C2C2C] p-1 rounded-lg">
                             <button data-chart-type="earnings" class="px-3 py-1.5 text-xs font-medium rounded-md bg-blue-600 text-white transition-colors">Earnings</button>
-                            <button data-chart-type="flow" class="px-3 py-1.5 text-xs font-medium rounded-md text-gray-400 hover:text-white transition-colors">Capital Flow</button>
+                            <button data-chart-type="flow" class="px-3 py-1.5 text-xs font-medium rounded-md text-gray-400 hover:text-white transition-colors">Flow</button>
                         </div>
+                        
+                        <!-- Timeframe Pills (aligned right) -->
                         <div id="delegator-chart-timeframe-buttons" class="flex items-center gap-1 bg-[#2C2C2C] p-1 rounded-lg">
                             <button data-delegator-timeframe="30" class="px-3 py-1 text-xs font-bold rounded-md hover:bg-[#444444] text-gray-300 transition">30D</button>
                             <button data-delegator-timeframe="90" class="px-3 py-1 text-xs font-bold rounded-md hover:bg-[#444444] text-gray-300 transition">90D</button>
@@ -1191,50 +1193,57 @@
                             <button data-delegator-timeframe="all" class="px-3 py-1 text-xs font-bold rounded-md bg-blue-600 text-white transition shadow-sm">All</button>
                         </div>
                     </div>
+                    
+                    <!-- Pills Row 2: Net Flow Stat -->
+                    <div id="delegator-net-flow-stat" class="hidden items-center gap-2 px-3 py-1.5 bg-[#2C2C2C] rounded-lg cursor-pointer hover:bg-[#363636] transition-colors w-fit" title="Click to toggle DATA/USD">
+                        <span class="text-[10px] text-gray-500 font-medium uppercase tracking-wide">Net Flow</span>
+                        <span id="delegator-net-flow-value" class="text-sm font-bold text-white">0 DATA</span>
+                    </div>
+                    
                     <div class="flex justify-end">
-                        <div id="delegator-chart-legend" class="hidden flex gap-4 text-[10px] font-medium uppercase tracking-wide">
-                            <span class="flex items-center gap-1.5 text-gray-500"><div class="w-2 h-2 rounded-full bg-green-500"></div> Delegated</span>
-                            <span class="flex items-center gap-1.5 text-gray-500"><div class="w-2 h-2 rounded-full bg-red-500"></div> Undelegated</span>
+                        <div id="delegator-chart-legend" class="hidden flex gap-3 md:gap-4 text-[9px] md:text-[10px] font-medium uppercase tracking-wide">
+                            <span class="flex items-center gap-1 text-gray-500"><div class="w-2 h-2 rounded-full bg-green-500"></div> Delegated</span>
+                            <span class="flex items-center gap-1 text-gray-500"><div class="w-2 h-2 rounded-full bg-red-500"></div> Undelegated</span>
                         </div>
                     </div>
                 </div>
-                <div id="delegator-chart-container" class="flex-1 relative w-full h-96">
+                <div id="delegator-chart-container" class="flex-1 relative w-full h-52 md:h-96">
                     <canvas id="delegator-unified-chart"></canvas>
                 </div>
             </div>
 
             <!-- Transaction Map (Bubble Chart with Operator Images) -->
-            <div class="bg-[#1E1E1E] border border-[#333] rounded-xl p-5 min-h-[400px] flex flex-col">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-sm font-bold text-gray-200 flex items-center gap-2">
+            <div class="bg-[#1E1E1E] border border-[#333] rounded-xl p-3 md:p-5 min-h-[250px] md:min-h-[400px] flex flex-col">
+                <div class="flex justify-between items-center mb-3 md:mb-4 flex-wrap gap-2">
+                    <h3 class="text-xs md:text-sm font-bold text-gray-200 flex items-center gap-2">
                         <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
                         </svg>
                         Transaction Map
                     </h3>
-                    <div class="flex gap-4 text-[10px] font-medium uppercase tracking-wide">
-                        <span class="flex items-center gap-1.5 text-gray-500"><div class="w-2 h-2 rounded-full bg-blue-500"></div> Delegated</span>
-                        <span class="flex items-center gap-1.5 text-gray-500"><div class="w-2 h-2 rounded-full bg-red-500"></div> Undelegated</span>
+                    <div class="flex gap-3 md:gap-4 text-[9px] md:text-[10px] font-medium uppercase tracking-wide">
+                        <span class="flex items-center gap-1 text-gray-500"><div class="w-2 h-2 rounded-full bg-blue-500"></div> Delegated</span>
+                        <span class="flex items-center gap-1 text-gray-500"><div class="w-2 h-2 rounded-full bg-red-500"></div> Undelegated</span>
                     </div>
                 </div>
-                <div class="flex-1 relative w-full h-80">
+                <div class="flex-1 relative w-full h-44 md:h-80">
                     <canvas id="delegator-map-chart"></canvas>
                 </div>
             </div>
 
             <!-- Data Access Button -->
             <div class="w-full">
-                <button onclick="window.DelegatorsLogic?.openDataModal('history')" class="group w-full bg-[#1E1E1E] border border-[#333] rounded-xl p-6 hover:bg-[#252525] transition-colors flex items-center gap-4 text-left border-l-4 border-l-transparent hover:border-l-blue-500">
-                    <div class="h-12 w-12 bg-[#2C2C2C] rounded-lg flex items-center justify-center group-hover:bg-[#333] transition-colors">
-                        <svg class="w-6 h-6 text-gray-400 group-hover:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <button onclick="window.DelegatorsLogic?.openDataModal('history')" class="group w-full bg-[#1E1E1E] border border-[#333] rounded-xl p-4 md:p-6 hover:bg-[#252525] transition-colors flex items-center gap-3 md:gap-4 text-left border-l-4 border-l-transparent hover:border-l-blue-500">
+                    <div class="h-10 w-10 md:h-12 md:w-12 bg-[#2C2C2C] rounded-lg flex items-center justify-center group-hover:bg-[#333] transition-colors flex-shrink-0">
+                        <svg class="w-5 h-5 md:w-6 md:h-6 text-gray-400 group-hover:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
                         </svg>
                     </div>
-                    <div>
-                        <h3 class="text-base font-bold text-white">Transaction History</h3>
-                        <p class="text-xs text-gray-500 mt-1">Full blockchain ledger (Polygonscan)</p>
+                    <div class="min-w-0 flex-1">
+                        <h3 class="text-sm md:text-base font-bold text-white">Transaction History</h3>
+                        <p class="text-[10px] md:text-xs text-gray-500 mt-0.5 md:mt-1 truncate">Full blockchain ledger</p>
                     </div>
-                    <svg class="ml-auto w-5 h-5 text-gray-600 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="ml-auto w-4 h-4 md:w-5 md:h-5 text-gray-600 group-hover:text-white flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
                     </svg>
                 </button>
@@ -1479,9 +1488,9 @@
                                 <div>
                                     <div class="flex justify-between text-[9px] text-gray-400 mb-1">
                                         <span>Repulsion</span>
-                                        <span id="vis-repulsion-display" class="text-white">2.0x</span>
+                                        <span id="vis-repulsion-display" class="text-white">3.0x</span>
                                     </div>
-                                    <input type="range" id="vis-repulsion-slider" min="1" max="30" value="20" class="w-full">
+                                    <input type="range" id="vis-repulsion-slider" min="1" max="30" value="30" class="w-full">
                                 </div>
                                 <div>
                                     <div class="flex justify-between text-[9px] text-gray-400 mb-1">

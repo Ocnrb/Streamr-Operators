@@ -510,17 +510,17 @@ function renderLeaderboard() {
         const truncatedAddr = d.id.slice(0, 6) + '...' + d.id.slice(-4);
         
         tr.innerHTML = `
-            <td class="px-4 md:px-6 py-5 whitespace-nowrap">
-                <div class="flex items-center gap-3 md:gap-4">
-                    <img src="${avatarUrl}" class="${imgClass} h-8 w-8 md:h-10 md:w-10" alt="">
-                    <div class="flex flex-col">
-                        <span class="text-sm font-mono text-gray-200 group-hover:text-blue-400 transition-colors hidden md:inline">${d.id}</span>
+            <td class="px-3 md:px-6 py-4 md:py-5 md:whitespace-nowrap">
+                <div class="flex items-center gap-2 md:gap-4 min-w-0">
+                    <img src="${avatarUrl}" class="${imgClass} h-8 w-8 md:h-10 md:w-10 flex-shrink-0" alt="">
+                    <div class="flex flex-col min-w-0">
+                        <span class="text-sm font-mono text-gray-200 group-hover:text-blue-400 transition-colors hidden md:inline truncate">${d.id}</span>
                         <span class="text-sm font-mono text-gray-200 group-hover:text-blue-400 transition-colors md:hidden">${truncatedAddr}</span>
                         ${isSelf ? '<span class="text-[10px] text-blue-400 font-medium">Operator</span>' : ''}
                     </div>
                 </div>
             </td>
-            <td class="px-4 md:px-6 py-5 text-right whitespace-nowrap">
+            <td class="px-3 md:px-6 py-4 md:py-5 text-right whitespace-nowrap">
                 <div class="text-sm font-bold text-white">${staked}</div>
             </td>
             <td class="px-6 py-5 text-center whitespace-nowrap hidden md:table-cell">
@@ -555,7 +555,15 @@ function renderDetailHeader(delegator) {
     const opsCountEl = document.getElementById('delegator-detail-ops-count');
     const lastSeenEl = document.getElementById('delegator-detail-last-seen');
     
-    if (addressEl) addressEl.textContent = delegator.id;
+    // Truncated address for mobile: 0x1234...5678
+    const truncatedAddr = delegator.id.slice(0, 6) + '...' + delegator.id.slice(-4);
+    // Use truncated on mobile (< 768px), full on desktop
+    if (addressEl) {
+        // Check if mobile and set appropriate address
+        const isMobile = window.innerWidth < 768;
+        addressEl.textContent = isMobile ? truncatedAddr : delegator.id;
+        addressEl.title = delegator.id; // Always show full address on hover
+    }
     if (linkEl) linkEl.href = `https://polygonscan.com/address/${delegator.id}`;
     if (avatarEl) avatarEl.src = `https://effigy.im/a/${delegator.id}.svg`;
     
@@ -751,28 +759,28 @@ function renderInlineDelegationsTable(delegations) {
             : "border-b border-[#333] hover:bg-[#2a2a2a] transition-colors";
         
         row.innerHTML = `
-            <td class="px-6 py-4">
-                <a href="/operator/${del.operator.id}" class="flex items-center gap-3 hover:opacity-80 transition-opacity" data-nav-link>
+            <td class="px-3 md:px-6 py-3 md:py-4">
+                <a href="/operator/${del.operator.id}" class="flex items-center gap-2 md:gap-3 hover:opacity-80 transition-opacity" data-nav-link>
                     ${imageUrl 
-                        ? `<img src="${imageUrl}" alt="${name}" class="h-10 w-10 rounded-full object-cover flex-shrink-0 ${isUndelegated ? 'opacity-50 grayscale' : ''}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                           <div class="h-10 w-10 rounded-full items-center justify-center text-sm font-bold text-white shadow-sm flex-shrink-0 ${isUndelegated ? 'bg-gray-700' : 'bg-gradient-to-br from-orange-400 to-red-500'}" style="display:none;">
+                        ? `<img src="${imageUrl}" alt="${name}" class="h-8 w-8 md:h-10 md:w-10 rounded-full object-cover flex-shrink-0 ${isUndelegated ? 'opacity-50 grayscale' : ''}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                           <div class="h-8 w-8 md:h-10 md:w-10 rounded-full items-center justify-center text-xs md:text-sm font-bold text-white shadow-sm flex-shrink-0 ${isUndelegated ? 'bg-gray-700' : 'bg-gradient-to-br from-orange-400 to-red-500'}" style="display:none;">
                                ${name.charAt(0).toUpperCase()}
                            </div>`
-                        : `<div class="h-10 w-10 rounded-full flex items-center justify-center text-sm font-bold text-white shadow-sm flex-shrink-0 ${isUndelegated ? 'bg-gray-700' : 'bg-gradient-to-br from-orange-400 to-red-500'}">
+                        : `<div class="h-8 w-8 md:h-10 md:w-10 rounded-full flex items-center justify-center text-xs md:text-sm font-bold text-white shadow-sm flex-shrink-0 ${isUndelegated ? 'bg-gray-700' : 'bg-gradient-to-br from-orange-400 to-red-500'}">
                                ${name.charAt(0).toUpperCase()}
                            </div>`
                     }
-                    <span class="text-sm truncate max-w-[200px] ${isUndelegated ? 'text-gray-500' : 'text-gray-300'}" title="${name}">${name}</span>
+                    <span class="text-sm md:text-base truncate max-w-[100px] md:max-w-[200px] ${isUndelegated ? 'text-gray-500' : 'text-gray-300'}" title="${name}">${name}</span>
                 </a>
             </td>
-            <td class="px-6 py-4 text-right text-xs ${isUndelegated ? 'text-gray-600' : 'text-gray-300'}">
-                <span data-tooltip-value="${delegatedValue}">${formatDATA(del._valueDataWei, 0, 0)} <span class="text-gray-500">DATA</span></span>
+            <td class="px-3 md:px-6 py-3 md:py-4 text-right text-xs md:text-sm ${isUndelegated ? 'text-gray-600' : 'text-gray-300'}">
+                <span data-tooltip-value="${delegatedValue}">${formatDATA(del._valueDataWei, 0, 0)}</span>
             </td>
-            <td class="px-6 py-4 text-right text-xs font-bold ${isUndelegated ? 'text-gray-600' : 'text-orange-400'}">
-                <span data-tooltip-value="${currentStakeData}">${formatDATA(currentStakeWei.toString(), 0, 0)} <span class="text-gray-500">DATA</span></span>
+            <td class="px-3 md:px-6 py-3 md:py-4 text-right text-xs md:text-sm font-bold ${isUndelegated ? 'text-gray-600' : 'text-orange-400'}">
+                <span data-tooltip-value="${currentStakeData}">${formatDATA(currentStakeWei.toString(), 0, 0)}</span>
             </td>
-            <td class="px-6 py-4 text-right text-xs ${isUndelegated ? 'text-gray-600' : 'text-gray-300'}">${Math.round(sharePct)}%</td>
-            <td class="px-6 py-4 text-right text-xs ${isUndelegated ? 'text-gray-600' : 'text-gray-300'}">${date}</td>
+            <td class="px-3 md:px-6 py-3 md:py-4 text-right text-xs md:text-sm ${isUndelegated ? 'text-gray-600' : 'text-gray-300'}">${Math.round(sharePct)}%</td>
+            <td class="px-3 md:px-6 py-3 md:py-4 text-right text-xs md:text-sm ${isUndelegated ? 'text-gray-600' : 'text-gray-300'}">${date}</td>
         `;
         
         tbody.appendChild(row);
@@ -929,6 +937,44 @@ function renderFlowChart() {
     const inflows = flowData.map(d => d.inflow);
     const outflows = flowData.map(d => d.outflow);
     
+    // Calculate and display Net Flow (DATA)
+    const totalInflow = inflows.reduce((sum, v) => sum + v, 0);
+    const totalOutflow = outflows.reduce((sum, v) => sum + v, 0);
+    const netFlow = totalInflow - totalOutflow;
+    
+    // Calculate Net Flow in USD using historical prices
+    const netFlowUSD = flowData.reduce((sum, d) => {
+        const inflowUSD = d.inflow * (d.historicalPrice || 0);
+        const outflowUSD = d.outflow * (d.historicalPrice || 0);
+        return sum + inflowUSD - outflowUSD;
+    }, 0);
+    
+    // Store net flow values in state for toggle functionality
+    state.netFlowValue = netFlow;
+    state.netFlowValueUSD = netFlowUSD;
+    state.netFlowShowUSD = state.netFlowShowUSD || false;
+    
+    // Update Net Flow stat
+    const sign = netFlow >= 0 ? '+' : '-';
+    const colorClass = netFlow >= 0 ? 'text-green-400' : 'text-red-400';
+    
+    let formattedValue;
+    if (state.netFlowShowUSD) {
+        const signUSD = netFlowUSD >= 0 ? '+' : '-';
+        formattedValue = `${signUSD}$${Math.round(Math.abs(netFlowUSD)).toLocaleString('fr-FR')}`;
+    } else {
+        formattedValue = `${sign}${formatDATA(Math.abs(netFlow) * 1e18, 0, 0)} DATA`;
+    }
+    
+    const netFlowStat = document.getElementById('delegator-net-flow-stat');
+    const netFlowValue = document.getElementById('delegator-net-flow-value');
+    if (netFlowStat && netFlowValue) {
+        netFlowStat.classList.remove('hidden');
+        netFlowStat.classList.add('flex');
+        netFlowValue.textContent = formattedValue;
+        netFlowValue.className = `text-sm font-bold ${colorClass}`;
+    }
+    
     state.charts.unified = new Chart(ctx, {
         type: 'bar',
         data: {
@@ -972,7 +1018,7 @@ function renderFlowChart() {
             },
             scales: {
                 y: { stacked: true, grid: { color: '#333333', borderDash: [4, 4], drawBorder: false }, ticks: { color: '#6b7280', font: { family: "'Inter', sans-serif", size: 11 } }, border: { display: false } },
-                x: { stacked: true, grid: { display: false }, ticks: { color: '#6b7280', maxTicksLimit: 8, maxRotation: 45, minRotation: 45, font: { family: "'Inter', sans-serif", size: 11 } }, border: { display: false } }
+                x: { stacked: true, grid: { display: false }, ticks: { color: '#6b7280', maxTicksLimit: 8, maxRotation: 0, autoSkip: true, font: { family: "'Inter', sans-serif", size: 11 } }, border: { display: false } }
             }
         }
     });
@@ -986,6 +1032,13 @@ function renderEarningsChart() {
     
     const ctx = document.getElementById('delegator-unified-chart')?.getContext('2d');
     if (!ctx) return;
+    
+    // Hide Net Flow stat (only shown for Flow chart)
+    const netFlowStat = document.getElementById('delegator-net-flow-stat');
+    if (netFlowStat) {
+        netFlowStat.classList.add('hidden');
+        netFlowStat.classList.remove('flex');
+    }
     
     // Destroy existing unified chart
     if (state.charts.unified) {
@@ -1090,7 +1143,7 @@ function renderEarningsChart() {
                     }, 
                     border: { display: false } 
                 },
-                x: { grid: { display: false }, ticks: { color: '#6b7280', maxTicksLimit: 8, maxRotation: 45, minRotation: 45, font: { family: "'Inter', sans-serif", size: 11 } }, border: { display: false } }
+                x: { grid: { display: false }, ticks: { color: '#6b7280', maxTicksLimit: 8, maxRotation: 0, autoSkip: true, font: { family: "'Inter', sans-serif", size: 11 } }, border: { display: false } }
             }
         }
     });
@@ -1488,6 +1541,39 @@ export const DelegatorsLogic = {
                 return;
             }
         });
+        
+        // Net Flow stat click handler (toggle DATA/USD)
+        const netFlowStat = document.getElementById('delegator-net-flow-stat');
+        if (netFlowStat) {
+            netFlowStat.addEventListener('click', () => {
+                if (state.netFlowValue === undefined) return;
+                
+                // Toggle state
+                state.netFlowShowUSD = !state.netFlowShowUSD;
+                
+                // Recalculate display
+                const netFlow = state.netFlowValue;
+                const netFlowUSD = state.netFlowValueUSD || 0;
+                
+                let formattedValue;
+                let colorClass;
+                if (state.netFlowShowUSD) {
+                    const sign = netFlowUSD >= 0 ? '+' : '-';
+                    colorClass = netFlowUSD >= 0 ? 'text-green-400' : 'text-red-400';
+                    formattedValue = `${sign}$${Math.round(Math.abs(netFlowUSD)).toLocaleString('fr-FR')}`;
+                } else {
+                    const sign = netFlow >= 0 ? '+' : '-';
+                    colorClass = netFlow >= 0 ? 'text-green-400' : 'text-red-400';
+                    formattedValue = `${sign}${formatDATA(Math.abs(netFlow) * 1e18, 0, 0)} DATA`;
+                }
+                
+                const netFlowValue = document.getElementById('delegator-net-flow-value');
+                if (netFlowValue) {
+                    netFlowValue.textContent = formattedValue;
+                    netFlowValue.className = `text-sm font-bold ${colorClass}`;
+                }
+            });
+        }
     },
     
     /**
