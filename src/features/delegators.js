@@ -957,13 +957,18 @@ function renderFlowChart() {
     // Update Net Flow stat
     const sign = netFlow >= 0 ? '+' : '-';
     const colorClass = netFlow >= 0 ? 'text-green-400' : 'text-red-400';
+    const colorClassUSD = netFlowUSD >= 0 ? 'text-green-400' : 'text-red-400';
     
     let formattedValue;
+    let activeColorClass;
     if (state.netFlowShowUSD) {
-        const signUSD = netFlowUSD >= 0 ? '+' : '-';
-        formattedValue = `${signUSD}$${Math.round(Math.abs(netFlowUSD)).toLocaleString('fr-FR')}`;
+        const signUSD = netFlowUSD >= 0 ? '+ ' : '- ';
+        const formattedUSD = Math.round(Math.abs(netFlowUSD)).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+        formattedValue = `${signUSD}$${formattedUSD}`;
+        activeColorClass = colorClassUSD;
     } else {
         formattedValue = `${sign}${formatDATA(Math.abs(netFlow) * 1e18, 0, 0)} DATA`;
+        activeColorClass = colorClass;
     }
     
     const netFlowStat = document.getElementById('delegator-net-flow-stat');
@@ -972,16 +977,41 @@ function renderFlowChart() {
         netFlowStat.classList.remove('hidden');
         netFlowStat.classList.add('flex');
         netFlowValue.textContent = formattedValue;
-        netFlowValue.className = `text-sm font-bold ${colorClass}`;
+        netFlowValue.className = `text-sm font-bold ${activeColorClass}`;
     }
+    
+    // Symmetric log transformation for handling both positive and negative values
+    // Uses a softer log curve (log10(1 + value/1000)) to better differentiate values visually
+    // This makes small transactions visible even when there are very large ones
+    const symLog = (value) => {
+        if (value === 0) return 0;
+        const sign = value >= 0 ? 1 : -1;
+        // Divide by 1000 to create a softer curve - 1M becomes ~3, 10K becomes ~1
+        return sign * Math.log10(1 + Math.abs(value) / 1000);
+    };
+    
+    // Inverse transformation to get original value from log scale
+    const symLogInverse = (logValue) => {
+        if (logValue === 0) return 0;
+        const sign = logValue >= 0 ? 1 : -1;
+        return sign * (Math.pow(10, Math.abs(logValue)) - 1) * 1000;
+    };
+    
+    // Transform data for logarithmic display
+    const inflowsLog = inflows.map(v => symLog(v));
+    const outflowsLog = outflows.map(v => symLog(-v)); // Keep negative for stacking
+    
+    // Store original values for tooltip access
+    const originalInflows = [...inflows];
+    const originalOutflows = [...outflows];
     
     state.charts.unified = new Chart(ctx, {
         type: 'bar',
         data: {
             labels: dates,
             datasets: [
-                { label: '+', data: inflows, backgroundColor: '#22c55e', borderRadius: 4 },
-                { label: '-', data: outflows.map(v => -v), backgroundColor: '#ef4444', borderRadius: 4 }
+                { label: '+', data: inflowsLog, backgroundColor: '#22c55e', borderRadius: 4 },
+                { label: '-', data: outflowsLog, backgroundColor: '#ef4444', borderRadius: 4 }
             ]
         },
         options: {
@@ -1002,8 +1032,11 @@ function renderFlowChart() {
                     bodyFont: { family: "'Inter', sans-serif", size: 13 },
                     callbacks: {
                         label: (context) => {
-                            const value = Math.abs(context.raw);
-                            const dataPoint = flowData[context.dataIndex];
+                            // Use original values for tooltip, not the log-transformed ones
+                            const dataIndex = context.dataIndex;
+                            const isInflow = context.dataset.label === '+';
+                            const value = isInflow ? originalInflows[dataIndex] : originalOutflows[dataIndex];
+                            const dataPoint = flowData[dataIndex];
                             const sign = context.dataset.label;
                             const lines = [];
                             lines.push(`${sign}${formatDATA(value * 1e18, 0, 0)} DATA`);
@@ -1017,7 +1050,30 @@ function renderFlowChart() {
                 }
             },
             scales: {
-                y: { stacked: true, grid: { color: '#333333', borderDash: [4, 4], drawBorder: false }, ticks: { color: '#6b7280', font: { family: "'Inter', sans-serif", size: 11 } }, border: { display: false } },
+                y: { 
+                    stacked: true, 
+                    grid: { color: '#333333', borderDash: [4, 4], drawBorder: false }, 
+                    ticks: { 
+                        color: '#6b7280', 
+                        font: { family: "'Inter', sans-serif", size: 11 },
+                        callback: function(logValue) {
+                            // Convert log value back to original scale for display
+                            const originalValue = symLogInverse(logValue);
+                            const absValue = Math.abs(originalValue);
+                            if (absValue < 1) return '0';
+                            if (absValue >= 1000000) {
+                                const mValue = originalValue / 1000000;
+                                return `${mValue >= 0 ? '' : '-'}${Math.abs(mValue).toFixed(absValue >= 10000000 ? 0 : 1)}M`;
+                            }
+                            if (absValue >= 1000) {
+                                const kValue = originalValue / 1000;
+                                return `${kValue >= 0 ? '' : '-'}${Math.abs(kValue).toFixed(absValue >= 100000 ? 0 : 0)}K`;
+                            }
+                            return Math.round(originalValue).toString();
+                        }
+                    }, 
+                    border: { display: false } 
+                },
                 x: { stacked: true, grid: { display: false }, ticks: { color: '#6b7280', maxTicksLimit: 8, maxRotation: 0, autoSkip: true, font: { family: "'Inter', sans-serif", size: 11 } }, border: { display: false } }
             }
         }
@@ -1558,9 +1614,10 @@ export const DelegatorsLogic = {
                 let formattedValue;
                 let colorClass;
                 if (state.netFlowShowUSD) {
-                    const sign = netFlowUSD >= 0 ? '+' : '-';
+                    const sign = netFlowUSD >= 0 ? '+ ' : '- ';
                     colorClass = netFlowUSD >= 0 ? 'text-green-400' : 'text-red-400';
-                    formattedValue = `${sign}$${Math.round(Math.abs(netFlowUSD)).toLocaleString('fr-FR')}`;
+                    const formattedUSD = Math.round(Math.abs(netFlowUSD)).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+                    formattedValue = `${sign}$${formattedUSD}`;
                 } else {
                     const sign = netFlow >= 0 ? '+' : '-';
                     colorClass = netFlow >= 0 ? 'text-green-400' : 'text-red-400';
