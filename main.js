@@ -12,9 +12,11 @@ import { removeOperatorProfile, getOperatorProfile } from './src/core/profile.js
 let RaceLogic = null;
 let VisualLogic = null;
 let DelegatorsLogic = null;
+let StreamsLogic = null;
 let raceModuleLoading = false;
 let visualModuleLoading = false;
 let delegatorsModuleLoading = false;
+let streamsModuleLoading = false;
 
 // PWA Installation - use global variable set by inline script in HTML
 // The inline script captures beforeinstallprompt early, before modules load
@@ -279,6 +281,40 @@ async function loadDelegatorsModule() {
     }
 }
 
+/**
+ * Lazy load the Streams module
+ * @returns {Promise<object>} The StreamsLogic module
+ */
+async function loadStreamsModule() {
+    if (StreamsLogic) return StreamsLogic;
+    if (streamsModuleLoading) {
+        // Wait for existing load to complete
+        while (streamsModuleLoading) {
+            await new Promise(resolve => setTimeout(resolve, 50));
+        }
+        return StreamsLogic;
+    }
+    
+    streamsModuleLoading = true;
+    
+    try {
+        const module = await import('./src/features/streams.js');
+        StreamsLogic = module.StreamsLogic;
+        StreamsLogic.setupEventListeners();
+        return StreamsLogic;
+    } catch (error) {
+        UI.showToast({
+            type: 'error',
+            title: 'Failed to load Streams View',
+            message: error.message,
+            duration: 5000
+        });
+        throw error;
+    } finally {
+        streamsModuleLoading = false;
+    }
+}
+
 const { logger } = Utils;
 
 // --- Private Key Encryption Utilities (Keystore V3 - Ethers.js Standard) ---
@@ -449,6 +485,7 @@ async function connectWithWallet() {
         const provider = new ethers.providers.Web3Provider(injectedProvider);
         await provider.send("eth_requestAccounts", []);
         state.signer = provider.getSigner();
+        window.appSigner = state.signer;
         state.myRealAddress = await state.signer.getAddress();
 
         if (!await Services.checkAndSwitchNetwork()) {
@@ -465,6 +502,7 @@ async function connectWithWallet() {
         logger.error("Wallet connection error:", err);
         state.myRealAddress = '';
         state.signer = null;
+        window.appSigner = null;
         const message = (err.code === 4001 || err.info?.error?.code === 4001) 
             ? "The signature request was rejected in your wallet."
             : "Wallet connection request was rejected or failed.";
@@ -477,6 +515,7 @@ async function connectAsGuest() {
     UI.setLoginModalState('loading', 'guest');
     state.myRealAddress = '';
     state.signer = null;
+    window.appSigner = null;
     navigationController.updateWallet(null);
     sessionStorage.removeItem('authMethod');
     await initializeApp();
@@ -512,6 +551,7 @@ async function connectWithPrivateKey(privateKey, encryptionPassword = null) {
         const wallet = new ethers.Wallet(formattedKey, Services.getReadOnlyProvider());
         
         state.signer = wallet;
+        window.appSigner = state.signer;
         state.myRealAddress = wallet.address;
         
         // Save encrypted key if requested (password is provided)
@@ -530,6 +570,7 @@ async function connectWithPrivateKey(privateKey, encryptionPassword = null) {
         logger.error("Private key connection error:", err);
         state.myRealAddress = '';
         state.signer = null;
+        window.appSigner = null;
         UI.showToast({ type: 'error', title: 'Connection Failed', message: err.message || 'Invalid private key.', duration: 8000 });
         UI.setLoginModalState('buttons');
     }
@@ -626,6 +667,7 @@ function logout(clearSavedKey = true) {
     
     // Clear state
     state.signer = null;
+    window.appSigner = null;
     state.myRealAddress = '';
     
     // Clear session
@@ -1313,6 +1355,8 @@ function setupRouter() {
         Services.unsubscribeFromCoordinationStream();
         if (RaceLogic) RaceLogic.stop();
         if (VisualLogic) VisualLogic.stop();
+        if (DelegatorsLogic) DelegatorsLogic.deactivate();
+        if (StreamsLogic) StreamsLogic.stop();
         
         UI.displayView('list');
         UI.hideProfileButtons();
@@ -1327,6 +1371,8 @@ function setupRouter() {
     router.addRoute('/operator/:id', async (params) => {
         if (RaceLogic) RaceLogic.stop();
         if (VisualLogic) VisualLogic.stop();
+        if (DelegatorsLogic) DelegatorsLogic.deactivate();
+        if (StreamsLogic) StreamsLogic.stop();
         
         UI.displayView('detail');
         navigationController.updateActiveState('operators');
@@ -1340,6 +1386,8 @@ function setupRouter() {
         OperatorLogic.stop();
         Services.unsubscribeFromCoordinationStream();
         if (VisualLogic) VisualLogic.stop();
+        if (DelegatorsLogic) DelegatorsLogic.deactivate();
+        if (StreamsLogic) StreamsLogic.stop();
         
         UI.displayView('race');
         UI.hideProfileButtons();
@@ -1360,6 +1408,8 @@ function setupRouter() {
         OperatorLogic.stop();
         Services.unsubscribeFromCoordinationStream();
         if (RaceLogic) RaceLogic.stop();
+        if (DelegatorsLogic) DelegatorsLogic.deactivate();
+        if (StreamsLogic) StreamsLogic.stop();
         
         UI.displayView('visual');
         UI.hideProfileButtons();
@@ -1389,6 +1439,7 @@ function setupRouter() {
         Services.unsubscribeFromCoordinationStream();
         if (RaceLogic) RaceLogic.stop();
         if (VisualLogic) VisualLogic.stop();
+        if (StreamsLogic) StreamsLogic.stop();
         
         UI.displayView('delegators-list');
         UI.hideProfileButtons();
@@ -1414,6 +1465,7 @@ function setupRouter() {
         Services.unsubscribeFromCoordinationStream();
         if (RaceLogic) RaceLogic.stop();
         if (VisualLogic) VisualLogic.stop();
+        if (StreamsLogic) StreamsLogic.stop();
         
         UI.displayView('delegator-detail');
         UI.hideProfileButtons();
@@ -1430,6 +1482,67 @@ function setupRouter() {
         } catch (error) {
             console.error('Failed to load delegators module:', error);
             router.navigate('/delegators');
+        }
+    });
+
+    // Streams list route
+    router.addRoute('/streams', async () => {
+        OperatorLogic.stop();
+        Services.unsubscribeFromCoordinationStream();
+        if (RaceLogic) RaceLogic.stop();
+        if (VisualLogic) VisualLogic.stop();
+        if (DelegatorsLogic) DelegatorsLogic.deactivate();
+        if (StreamsLogic) StreamsLogic.stop();
+        
+        UI.displayView('streams-list');
+        UI.hideProfileButtons();
+        navigationController.updateActiveState('streams');
+        navigationController.updatePageTitle('streams');
+        
+        try {
+            const streamsModule = await loadStreamsModule();
+            streamsModule.setSharedState({ 
+                dataPriceUSD: state.dataPriceUSD
+            });
+            streamsModule.init();
+        } catch (error) {
+            console.error('Failed to load streams module:', error);
+            router.navigate('/');
+        }
+    });
+    
+    // Stream detail route - use wildcard /* because stream IDs contain slashes
+    router.addRoute('/stream/*', async (params) => {
+        OperatorLogic.stop();
+        Services.unsubscribeFromCoordinationStream();
+        if (RaceLogic) RaceLogic.stop();
+        if (VisualLogic) VisualLogic.stop();
+        if (DelegatorsLogic) DelegatorsLogic.deactivate();
+        if (StreamsLogic) StreamsLogic.stop();
+        
+        UI.displayView('stream-detail');
+        UI.hideProfileButtons();
+        navigationController.updateActiveState('streams');
+        navigationController.updatePageTitle('streams', 'Stream Details');
+        
+        try {
+            const streamsModule = await loadStreamsModule();
+            streamsModule.setSharedState({ 
+                dataPriceUSD: state.dataPriceUSD
+            });
+            
+            // Parse URL search params for sponsored flag
+            const urlParams = new URLSearchParams(window.location.search);
+            const isSponsored = urlParams.get('sponsored') === 'true';
+            const sponsorshipId = urlParams.get('sponsorshipId');
+            
+            // Stream IDs can contain special characters, decode them
+            const streamId = decodeURIComponent(params.id);
+            
+            streamsModule.loadStreamDetail(streamId, isSponsored, sponsorshipId);
+        } catch (error) {
+            console.error('Failed to load stream detail:', error);
+            router.navigate('/streams');
         }
     });
 }

@@ -582,7 +582,7 @@ class NavigationController {
      */
     setupProfileEventListeners() {
         // Sidebar operator profile remove button
-        const sidebarProfileRemove = document.getElementById('sidebar-profile-remove');
+        const sidebarProfileRemove = document.getElementById('sidebar-operator-profile-remove');
         if (sidebarProfileRemove) {
             sidebarProfileRemove.addEventListener('click', (e) => {
                 e.preventDefault();

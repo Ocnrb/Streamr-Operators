@@ -74,7 +74,7 @@ const GAS_CONFIG = {
  * Polygon requires higher gas prices than the default ethers.js estimation
  * Includes safety limits to prevent excessive gas costs
  */
-async function getGasOverrides(provider) {
+export async function getGasOverrides(provider) {
     try {
         const feeData = await provider.getFeeData();
         const minGasPrice = ethers.utils.parseUnits(String(GAS_CONFIG.MIN_GAS_PRICE), 'gwei');

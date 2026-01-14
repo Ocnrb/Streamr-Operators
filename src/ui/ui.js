@@ -20,6 +20,8 @@ export const raceView = document.getElementById('race-view');
 export const visualView = document.getElementById('visual-view'); 
 export const delegatorsListView = document.getElementById('delegators-list-view'); 
 export const delegatorDetailView = document.getElementById('delegator-detail-view'); 
+export const streamsListView = document.getElementById('streams-list-view'); 
+export const streamDetailView = document.getElementById('stream-detail-view'); 
 export const customTooltip = document.getElementById('custom-tooltip');
 export const loaderOverlay = document.getElementById('loader-overlay');
 export const dataPriceValueEl = document.getElementById('data-price-value');
@@ -356,6 +358,12 @@ export function displayView(view) {
     if (visualView) visualView.style.display = 'none';
     if (delegatorsListView) delegatorsListView.style.display = 'none';
     if (delegatorDetailView) delegatorDetailView.style.display = 'none';
+    
+    // For streams views, also try dynamic lookup as fallback
+    const streamsListEl = streamsListView || document.getElementById('streams-list-view');
+    const streamDetailEl = streamDetailView || document.getElementById('stream-detail-view');
+    if (streamsListEl) streamsListEl.style.display = 'none';
+    if (streamDetailEl) streamDetailEl.style.display = 'none';
 
     // Show/hide navigation based on view (visual is fullscreen)
     const bottomNav = document.getElementById('bottom-nav');
@@ -375,6 +383,11 @@ export function displayView(view) {
         if (delegatorsListView) delegatorsListView.style.display = 'block';
     } else if (view === 'delegator-detail') {
         if (delegatorDetailView) delegatorDetailView.style.display = 'block';
+        window.scrollTo(0, 0);
+    } else if (view === 'streams-list') {
+        if (streamsListEl) streamsListEl.style.display = 'block';
+    } else if (view === 'stream-detail') {
+        if (streamDetailEl) streamDetailEl.style.display = 'block';
         window.scrollTo(0, 0);
     } else { // 'detail'
         operatorDetailView.style.display = 'block';

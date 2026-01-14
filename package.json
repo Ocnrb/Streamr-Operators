@@ -6,6 +6,7 @@
   "scripts": {
     "build:css": "tailwindcss -i src/input.css -o styles.css",
     "watch:css": "tailwindcss -i src/input.css -o styles.css --watch",
+    "dev": "npx serve -s -l 5500",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

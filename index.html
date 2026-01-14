@@ -591,17 +591,10 @@
                     <span class="hidden lg:block text-sm font-medium">Delegators</span>
                 </a>
                 
-                <!-- Streams (Coming Soon) -->
-                <a href="#" data-nav="streams" class="nav-link group flex items-center gap-3 px-3 py-2.5 rounded-md text-gray-600 cursor-not-allowed" title="Coming Soon">
-                    <svg class="w-5 h-5 flex-shrink-0 opacity-40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/>
-                        <path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/>
-                        <circle cx="12" cy="12" r="2"/>
-                        <path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/>
-                        <path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/>
-                    </svg>
+                <!-- Streams -->
+                <a href="/streams" data-nav="streams" class="nav-link group flex items-center gap-3 px-3 py-2.5 rounded-md text-gray-400 hover:text-white hover:bg-white/[0.03] transition-all duration-200">
+                    <img src="/assets/stream_icon.png" alt="Streams" class="w-5 h-5 flex-shrink-0 opacity-70 group-hover:opacity-100">
                     <span class="hidden lg:block text-sm font-medium">Streams</span>
-                    <span class="hidden lg:inline-flex ml-auto px-1.5 py-0.5 text-[8px] font-semibold bg-gray-800 text-gray-500 rounded">SOON</span>
                 </a>
                 
                 <!-- Divider -->
@@ -795,14 +788,11 @@
                 <span class="text-[10px] font-medium">Delegators</span>
             </a>
             
-            <!-- Streams (Coming Soon) -->
-            <div class="bottom-nav-item flex flex-col items-center justify-center gap-1 p-2 min-w-[56px] text-gray-600 cursor-not-allowed opacity-50">
-                <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/>
-                    <circle cx="12" cy="12" r="3"/>
-                </svg>
+            <!-- Streams -->
+            <a href="/streams" data-nav="streams" class="bottom-nav-item flex flex-col items-center justify-center gap-1 p-2 min-w-[56px] text-gray-400 transition-colors">
+                <img src="/assets/stream_icon.png" alt="Streams" class="w-6 h-6">
                 <span class="text-[10px] font-medium">Streams</span>
-            </div>
+            </a>
             
             <!-- Autostaker -->
             <button id="bottom-nav-autostaker" class="bottom-nav-item flex flex-col items-center justify-center gap-1 p-2 min-w-[56px] text-gray-400 transition-colors">
@@ -1248,6 +1238,466 @@
                     </svg>
                 </button>
             </div>
+        </div>
+
+        <!-- ===== STREAMS LIST VIEW ===== -->
+        <div id="streams-list-view" class="hidden container mx-auto px-2 md:px-6 py-4 md:py-6 space-y-4 overflow-x-hidden">
+            
+            <!-- Tab Navigation - Professional Tab Markers -->
+            <div class="relative border-b border-[#333] overflow-x-auto">
+                <div class="flex min-w-max">
+                    <button id="streams-tab-sponsored" class="streams-tab relative px-3 md:px-6 py-3 md:py-4 text-xs md:text-sm font-semibold transition-all flex items-center gap-2 md:gap-3 text-white border-b-2 border-blue-500 bg-gradient-to-t from-blue-500/10 to-transparent">
+                        <div class="flex items-center justify-center w-6 h-6 md:w-8 md:h-8 rounded-lg bg-green-500/20">
+                            <svg class="w-3 h-3 md:w-4 md:h-4 text-green-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                            </svg>
+                        </div>
+                        <div class="flex flex-col items-start">
+                            <span>Sponsored</span>
+                            <span class="hidden md:block text-xs text-gray-400 font-normal">With active funding</span>
+                        </div>
+                        <span id="streams-tab-sponsored-count" class="ml-1 md:ml-2 px-1.5 md:px-2.5 py-0.5 md:py-1 text-xs font-bold bg-green-500/20 text-green-400 rounded-md">0</span>
+                    </button>
+                    <button id="streams-tab-nonsponsored" class="streams-tab relative px-3 md:px-6 py-3 md:py-4 text-xs md:text-sm font-semibold transition-all flex items-center gap-2 md:gap-3 text-gray-400 hover:text-white border-b-2 border-transparent hover:border-gray-600">
+                        <div class="flex items-center justify-center w-6 h-6 md:w-8 md:h-8 rounded-lg bg-gray-500/20">
+                            <svg class="w-3 h-3 md:w-4 md:h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/>
+                                <path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/>
+                                <circle cx="12" cy="12" r="2"/>
+                                <path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/>
+                                <path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/>
+                            </svg>
+                        </div>
+                        <div class="flex flex-col items-start">
+                            <span>Non-Sponsored</span>
+                            <span class="hidden md:block text-xs text-gray-500 font-normal">Community streams</span>
+                        </div>
+                        <span id="streams-tab-nonsponsored-count" class="ml-1 md:ml-2 px-1.5 md:px-2.5 py-0.5 md:py-1 text-xs font-bold bg-gray-500/20 text-gray-400 rounded-md">0</span>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Sponsored Streams Panel -->
+            <div id="streams-panel-sponsored" class="bg-[#1E1E1E] border border-[#333] rounded-xl overflow-hidden">
+                <div class="px-4 md:px-6 py-4 border-b border-[#333] flex items-center justify-between">
+                    <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                        <svg class="w-5 h-5 text-green-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                        </svg>
+                        Sponsored Streams
+                    </h2>
+                    <div class="flex items-center gap-4">
+                        <!-- Expired Sponsorships Toggle -->
+                        <label class="flex items-center gap-2 cursor-pointer group select-none">
+                            <span class="text-xs font-medium text-gray-500 group-hover:text-gray-300 transition-colors whitespace-nowrap">Show Expired</span>
+                            <div class="relative">
+                                <input type="checkbox" id="streams-show-expired-toggle" class="sr-only peer">
+                                <div class="w-8 h-4 bg-[#333333] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-blue-600"></div>
+                            </div>
+                        </label>
+                        <span class="text-xs text-gray-500">Ordered by Payout</span>
+                    </div>
+                </div>
+                
+                <!-- Table Container -->
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="text-xs text-gray-500 uppercase bg-[#252525] font-semibold tracking-wider">
+                            <tr>
+                                <th class="px-4 py-3 text-left whitespace-nowrap">Stream ID</th>
+                                <th class="px-4 py-3 text-right whitespace-nowrap">Payout (DATA/day)</th>
+                                <th class="px-4 py-3 text-right whitespace-nowrap">APY</th>
+                                <th class="px-4 py-3 text-right whitespace-nowrap">Staked (DATA)</th>
+                                <th class="px-4 py-3 text-right whitespace-nowrap">Operators</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sponsored-streams-tbody" class="text-gray-300 divide-y divide-[#333]">
+                            <!-- Rows populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Empty State -->
+                <div id="sponsored-streams-empty" class="hidden py-12 text-center">
+                    <svg class="w-12 h-12 mx-auto text-gray-600 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5M12 12h.01M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5M19.1 4.9C23 8.8 23 15.1 19.1 19"/>
+                    </svg>
+                    <p class="text-gray-400">No sponsored streams found</p>
+                </div>
+                
+                <!-- Load More -->
+                <div class="px-4 py-4 border-t border-[#333] text-center">
+                    <button id="load-more-sponsored-btn" class="bg-[#2C2C2C] hover:bg-[#3A3A3A] text-white font-medium py-2 px-6 rounded-lg transition-colors text-sm hidden">
+                        Load More
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Non-Sponsored Streams Panel -->
+            <div id="streams-panel-nonsponsored" class="hidden bg-[#1E1E1E] border border-[#333] rounded-xl overflow-hidden">
+                <div class="px-4 md:px-6 py-4 border-b border-[#333] flex items-center justify-between">
+                    <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                        <svg class="w-5 h-5 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/>
+                            <path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/>
+                            <circle cx="12" cy="12" r="2"/>
+                            <path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/>
+                            <path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/>
+                        </svg>
+                        Non-Sponsored Streams
+                    </h2>
+                    <span class="text-xs text-gray-500">Ordered by Last Updated</span>
+                </div>
+                
+                <!-- Table Container -->
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="text-xs text-gray-500 uppercase bg-[#252525] font-semibold tracking-wider">
+                            <tr>
+                                <th class="px-4 py-3 text-left whitespace-nowrap">Stream ID</th>
+                                <th class="px-4 py-3 text-center whitespace-nowrap">Partitions</th>
+                                <th class="px-4 py-3 text-right whitespace-nowrap">Created</th>
+                                <th class="px-4 py-3 text-right whitespace-nowrap">Last Updated</th>
+                            </tr>
+                        </thead>
+                        <tbody id="nonsponsored-streams-tbody" class="text-gray-300 divide-y divide-[#333]">
+                            <!-- Rows populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Empty State -->
+                <div id="nonsponsored-streams-empty" class="hidden py-12 text-center">
+                    <svg class="w-12 h-12 mx-auto text-gray-600 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5M12 12h.01M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5M19.1 4.9C23 8.8 23 15.1 19.1 19"/>
+                    </svg>
+                    <p class="text-gray-400">No non-sponsored streams found</p>
+                </div>
+                
+                <!-- Load More -->
+                <div class="px-4 py-4 border-t border-[#333] text-center">
+                    <button id="load-more-nonsponsored-btn" class="bg-[#2C2C2C] hover:bg-[#3A3A3A] text-white font-medium py-2 px-6 rounded-lg transition-colors text-sm hidden">
+                        Load More
+                    </button>
+                </div>
+            </div>
+            
+        </div>
+
+        <!-- ===== STREAM DETAIL VIEW ===== -->
+        <div id="stream-detail-view" class="hidden container mx-auto p-3 md:p-6 space-y-4 md:space-y-6 overflow-x-hidden">
+            
+            <!-- Operator Stake Action Button (top left, outside tiles) -->
+            <div id="stream-operator-stake-action" class="hidden">
+                <button id="stream-stake-btn" class="px-4 py-2.5 bg-blue-800 hover:bg-blue-900 text-white text-sm font-bold rounded-lg transition-colors flex items-center gap-2 shadow-lg">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                    </svg>
+                    <span id="stream-stake-btn-text">Join as Operator</span>
+                </button>
+            </div>
+            
+            <!-- Header Panel - Consistent with Operator Detail -->
+            <div class="bg-[#1E1E1E] border border-[#333] rounded-xl p-4 md:p-6">
+                <div class="flex items-start gap-4 md:gap-6">
+                    <!-- Stream Icon -->
+                    <div class="flex items-center justify-center w-14 h-14 md:w-20 md:h-20 rounded-full bg-gradient-to-br from-blue-500/20 to-purple-500/20 border-2 border-[#333] flex-shrink-0">
+                        <svg class="w-7 h-7 md:w-10 md:h-10 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/>
+                            <path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/>
+                            <circle cx="12" cy="12" r="2"/>
+                            <path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/>
+                            <path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/>
+                        </svg>
+                    </div>
+                    <!-- Stream Info -->
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-start justify-between gap-4 flex-wrap">
+                            <div class="min-w-0 flex-1">
+                                <h2 id="stream-detail-title" class="text-lg md:text-2xl lg:text-3xl font-bold text-white break-words">Loading...</h2>
+                                <p id="stream-detail-id" class="font-mono text-xs md:text-sm text-gray-400 mt-1 break-all">--</p>
+                            </div>
+                            <!-- Sponsored Badge + APY (for sponsored streams) -->
+                            <div id="stream-sponsored-badge" class="hidden flex-shrink-0 text-right">
+                                <p class="text-xs md:text-sm text-gray-400 font-semibold mb-1">APY</p>
+                                <p id="stream-header-apy" class="text-2xl md:text-3xl lg:text-4xl font-extrabold text-green-400 whitespace-nowrap">--%</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Stats Grid -->
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6 mt-4 md:mt-6">
+                    <div>
+                        <p class="text-xs md:text-sm text-gray-400">Access</p>
+                        <div id="stream-access-control" class="mt-1">
+                            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-500/20 text-gray-400 text-sm font-medium">
+                                Loading...
+                            </span>
+                        </div>
+                    </div>
+                    <div>
+                        <p class="text-xs md:text-sm text-gray-400">Partitions</p>
+                        <p id="stream-partitions" class="text-lg md:text-2xl font-semibold text-white">--</p>
+                    </div>
+                    <div>
+                        <p class="text-xs md:text-sm text-gray-400">Created</p>
+                        <p id="stream-created" class="text-lg md:text-2xl font-semibold text-white">--</p>
+                    </div>
+                    <div>
+                        <p class="text-xs md:text-sm text-gray-400">Last Updated</p>
+                        <p id="stream-updated" class="text-lg md:text-2xl font-semibold text-white">--</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Description (if available) -->
+            <div id="stream-description-panel" class="hidden bg-[#1E1E1E] border border-[#333] rounded-xl p-4 md:p-6">
+                <h3 class="text-sm font-semibold text-gray-400 mb-2">Description</h3>
+                <p id="stream-description" class="text-gray-300"></p>
+            </div>
+            
+            <!-- Two Column Layout for Sponsored Streams -->
+            <div id="stream-sponsorship-panel" class="hidden overflow-x-hidden">
+                
+                <!-- Unified Chart Section - Full Width -->
+                <div class="bg-[#1E1E1E] border border-[#333] rounded-xl p-4 md:p-6 mb-4 md:mb-6">
+                    <div class="flex flex-col gap-2 mb-4">
+                        <!-- Pills Row: Chart Type + View Mode -->
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <!-- Chart Type Pills -->
+                            <div id="stream-chart-type-tabs" class="flex bg-[#2C2C2C] p-1 rounded-lg">
+                                <button data-stream-chart-type="apy" class="px-3 py-1.5 text-xs font-medium rounded-md bg-blue-600 text-white transition-colors">APY</button>
+                                <button data-stream-chart-type="stake" class="px-3 py-1.5 text-xs font-medium rounded-md text-gray-400 hover:text-white transition-colors">Stake</button>
+                                <button data-stream-chart-type="operators" class="px-3 py-1.5 text-xs font-medium rounded-md text-gray-400 hover:text-white transition-colors">Operators</button>
+                            </div>
+                            
+                            <!-- View Mode Pills (DATA/USD) - only for stake chart -->
+                            <div id="stream-chart-view-buttons" class="hidden flex items-center gap-1 bg-[#2C2C2C] p-1 rounded-lg">
+                                <button data-stream-view="data" class="px-3 py-1 text-xs font-bold rounded-md bg-blue-600 text-white transition">DATA</button>
+                                <button data-stream-view="usd" class="px-3 py-1 text-xs font-bold rounded-md text-gray-300 hover:bg-[#444444] transition">USD</button>
+                            </div>
+                        </div>
+                        
+                        <!-- Timeframe Pills Row -->
+                        <div class="flex justify-end">
+                            <div id="stream-chart-timeframe-buttons" class="flex items-center gap-1 bg-[#2C2C2C] p-1 rounded-lg">
+                                <button data-stream-days="30" class="px-3 py-1 text-xs font-bold rounded-md hover:bg-[#444444] text-gray-300 transition">30D</button>
+                                <button data-stream-days="90" class="px-3 py-1 text-xs font-bold rounded-md hover:bg-[#444444] text-gray-300 transition">90D</button>
+                                <button data-stream-days="365" class="px-3 py-1 text-xs font-bold rounded-md hover:bg-[#444444] text-gray-300 transition">1Y</button>
+                                <button data-stream-days="all" class="px-3 py-1 text-xs font-bold rounded-md bg-blue-600 text-white transition shadow-sm">All</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="stream-chart-container" class="h-64">
+                        <canvas id="stream-unified-chart"></canvas>
+                    </div>
+                </div>
+                
+                <!-- Two Column Grid -->
+                <div class="grid lg:grid-cols-2 gap-4 md:gap-6 items-start overflow-hidden">
+                    
+                    <!-- ROW 1: Sponsorship Details + Staked Operators -->
+                    <!-- Sponsorship Stats - fixed height based on content -->
+                    <div id="sponsorship-details-tile" class="bg-[#1E1E1E] border border-[#333] rounded-xl p-4 md:p-6 overflow-hidden">
+                        <h3 class="text-sm md:text-base font-bold text-gray-200 flex items-center gap-2 mb-4">
+                            <svg class="w-4 h-4 md:w-5 md:h-5 text-green-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                            </svg>
+                            Sponsorship Details
+                        </h3>
+                        
+                        <div class="space-y-4">
+                            <div class="flex justify-between items-center py-2 border-b border-[#333]">
+                                <span class="text-xs md:text-sm text-gray-400">Total Sponsored</span>
+                                <div class="text-right">
+                                    <span id="stream-total-sponsored" class="text-sm md:text-lg font-semibold text-white cursor-pointer" data-tooltip-value="0">--</span>
+                                </div>
+                            </div>
+                            <div class="flex justify-between items-center py-2 border-b border-[#333]">
+                                <span class="text-xs md:text-sm text-gray-400">Remaining Balance</span>
+                                <div class="text-right">
+                                    <span id="stream-remaining" class="text-sm md:text-lg font-semibold text-white cursor-pointer" data-tooltip-value="0">--</span>
+                                </div>
+                            </div>
+                            <div class="flex justify-between items-center py-2 border-b border-[#333]">
+                                <span class="text-xs md:text-sm text-gray-400">Total Staked</span>
+                                <div class="text-right">
+                                    <span id="stream-total-staked" class="text-sm md:text-lg font-semibold text-white cursor-pointer" data-tooltip-value="0">--</span>
+                                </div>
+                            </div>
+                            <div class="flex justify-between items-center py-2 border-b border-[#333]">
+                                <span class="text-xs md:text-sm text-gray-400">Payout Rate</span>
+                                <div class="text-right">
+                                    <span id="stream-payout-rate" class="text-sm md:text-lg font-semibold text-white">--</span>
+                                    <span class="text-xs text-gray-500 ml-1">DATA/day</span>
+                                </div>
+                            </div>
+                            <div class="flex justify-between items-center py-2 border-b border-[#333]">
+                                <span class="text-xs md:text-sm text-gray-400">Min Stake Duration</span>
+                                <span id="stream-min-stake-duration" class="text-sm md:text-lg font-semibold text-white">--</span>
+                            </div>
+                            <div class="flex justify-between items-center py-2">
+                                <span class="text-xs md:text-sm text-gray-400">Projected Insolvency</span>
+                                <span id="stream-insolvency" class="text-sm md:text-lg font-semibold text-white">--</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Staked Operators - matches height of Sponsorship Details via JS -->
+                    <div id="staked-operators-tile" class="bg-[#1E1E1E] border border-[#333] rounded-xl p-4 md:p-6 flex flex-col max-h-[380px] overflow-hidden">
+                        <h3 class="text-sm md:text-base font-bold text-gray-200 flex items-center gap-2 mb-4 flex-shrink-0">
+                            <svg class="w-4 h-4 md:w-5 md:h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+                            </svg>
+                            Staked Operators
+                            <span id="stream-operators-count" class="ml-auto text-xs text-gray-500">(0)</span>
+                        </h3>
+                        <div id="stream-operators-list" class="flex-1 overflow-y-auto min-h-0">
+                            <!-- Operators will be injected here -->
+                        </div>
+                    </div>
+                    
+                    <!-- ROW 2: Funding History + Permissions -->
+                    <!-- Funding History -->
+                    <div class="bg-[#1E1E1E] border border-[#333] rounded-xl p-4 md:p-6 overflow-hidden">
+                        <h3 class="text-sm md:text-base font-bold text-gray-200 flex items-center gap-2 mb-4">
+                            <svg class="w-4 h-4 md:w-5 md:h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            Funding History
+                        </h3>
+                        <div id="stream-funding-history" class="max-h-64 overflow-y-auto">
+                            <!-- Funding history will be injected here -->
+                        </div>
+                    </div>
+                        
+                    <!-- Permissions Table -->
+                    <div class="bg-[#1E1E1E] border border-[#333] rounded-xl p-4 md:p-6 overflow-hidden">
+                        <h3 class="text-sm md:text-base font-bold text-gray-200 flex items-center gap-2 mb-4">
+                            <svg class="w-4 h-4 md:w-5 md:h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                            </svg>
+                            Permissions
+                        </h3>
+                        <div id="stream-permissions-empty" class="hidden py-8 text-center">
+                            <p class="text-gray-500 text-sm">No specific permissions set. Stream uses default access.</p>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table id="stream-permissions-table" class="w-full text-sm min-w-[400px]">
+                                <thead class="text-xs text-gray-500 uppercase bg-[#252525]">
+                                    <tr>
+                                        <th class="px-4 py-3 text-left">Address</th>
+                                        <th class="px-4 py-3 text-center">Pub</th>
+                                        <th class="px-4 py-3 text-center">Sub</th>
+                                        <th class="px-4 py-3 text-center">Edit</th>
+                                        <th class="px-4 py-3 text-center">Del</th>
+                                        <th class="px-4 py-3 text-center">Grant</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="stream-permissions-tbody" class="divide-y divide-[#333]">
+                                    <!-- Permissions injected by JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Permissions Panel for Non-Sponsored Streams -->
+            <div id="stream-permissions-panel-standalone" class="hidden bg-[#1E1E1E] border border-[#333] rounded-xl p-4 md:p-6 overflow-hidden">
+                <h3 class="text-sm md:text-base font-bold text-gray-200 flex items-center gap-2 mb-4">
+                    <svg class="w-4 h-4 md:w-5 md:h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                    </svg>
+                    Permissions
+                </h3>
+                <div id="stream-permissions-empty-standalone" class="hidden py-8 text-center">
+                    <p class="text-gray-500 text-sm">No specific permissions set. Stream uses default access.</p>
+                </div>
+                <div class="overflow-x-auto">
+                    <table id="stream-permissions-table-standalone" class="w-full text-sm min-w-[400px]">
+                        <thead class="text-xs text-gray-500 uppercase bg-[#252525]">
+                            <tr>
+                                <th class="px-4 py-3 text-left">Address</th>
+                                <th class="px-4 py-3 text-center">Pub</th>
+                                <th class="px-4 py-3 text-center">Sub</th>
+                                <th class="px-4 py-3 text-center">Edit</th>
+                                <th class="px-4 py-3 text-center">Del</th>
+                                <th class="px-4 py-3 text-center">Grant</th>
+                            </tr>
+                        </thead>
+                        <tbody id="stream-permissions-tbody-standalone" class="divide-y divide-[#333]">
+                            <!-- Permissions injected by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Live Data Player (only for public streams) -->
+            <div id="stream-player-panel" class="hidden bg-[#1E1E1E] border border-[#333] rounded-xl p-4 md:p-6">
+                <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
+                    <h3 class="text-sm md:text-base font-bold text-gray-200 flex items-center gap-2">
+                        <svg class="w-4 h-4 md:w-5 md:h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        Live Data Viewer
+                    </h3>
+                    <div class="flex items-center gap-3">
+                        <!-- Partition Selector (shown only if partitions > 1) -->
+                        <div id="stream-partition-selector" class="hidden flex items-center gap-2">
+                            <select id="stream-partition-select" class="bg-[#252525] border border-[#444] text-gray-200 text-sm rounded-lg px-3 py-1.5 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none">
+                                <!-- Populated by JS -->
+                            </select>
+                            <label class="flex items-center gap-1.5 text-sm text-gray-400 cursor-pointer">
+                                <input type="checkbox" id="stream-subscribe-all" class="w-3.5 h-3.5 rounded border-[#444] bg-[#252525] text-purple-500 focus:ring-purple-500 focus:ring-offset-0 cursor-pointer">
+                                <span>All</span>
+                            </label>
+                        </div>
+                        <button id="stream-play-btn" class="flex items-center gap-1.5 px-3 py-1.5 border border-purple-500/50 text-purple-400 hover:bg-purple-500/10 rounded-lg transition-colors text-sm font-medium">
+                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M8 5v14l11-7z"/>
+                            </svg>
+                            Subscribe
+                        </button>
+                        <button id="stream-stop-btn" class="hidden flex items-center gap-1.5 px-3 py-1.5 border border-red-500/50 text-red-400 hover:bg-red-500/10 rounded-lg transition-colors text-sm font-medium">
+                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                                <rect x="6" y="6" width="12" height="12" rx="1"/>
+                            </svg>
+                            Stop
+                        </button>
+                        <button id="stream-clear-btn" class="flex items-center gap-1.5 px-2.5 py-1.5 text-gray-500 hover:text-gray-300 hover:bg-[#333] rounded-lg transition-colors text-sm">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Player Stats -->
+                <div class="grid grid-cols-2 md:flex md:items-center gap-2 md:gap-6 mb-4 text-xs md:text-sm">
+                    <div class="flex items-center gap-2">
+                        <span id="stream-player-status" class="w-2 h-2 rounded-full bg-gray-500"></span>
+                        <span id="stream-player-status-text" class="text-gray-400">Idle</span>
+                    </div>
+                    <div class="text-gray-500">
+                        Msgs: <span id="stream-player-msg-count" class="text-white font-mono">0</span>
+                    </div>
+                    <div class="text-gray-500">
+                        Rate: <span id="stream-player-rate" class="text-white font-mono">0</span> <span class="text-gray-600">msg/s</span>
+                    </div>
+                    <div class="text-gray-500">
+                        <span id="stream-player-kbps" class="text-white font-mono">0</span> <span class="text-gray-600">Kbps</span>
+                    </div>
+                </div>
+                
+                <!-- Message Log -->
+                <div id="stream-player-log" class="bg-[#0d0d0d] border border-[#333] rounded-lg p-3 md:p-4 h-60 md:h-80 overflow-y-auto font-mono text-xs">
+                    <div class="text-gray-500 text-center py-8">Click "Subscribe" to start receiving live data</div>
+                </div>
+            </div>
+            
         </div>
 
         <!-- Race View -->

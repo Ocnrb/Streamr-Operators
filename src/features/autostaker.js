@@ -22,8 +22,8 @@ const DEFAULT_AUTO_COLLECT_INTERVAL_HOURS = 24; // Auto collect every 24 hours b
 
 // Gas settings for Polygon
 const POLYGON_GAS_SETTINGS = {
-    maxPriorityFeePerGas: ethers.utils.parseUnits('50', 'gwei'), // 50 gwei tip
-    maxFeePerGas: ethers.utils.parseUnits('300', 'gwei') // 300 gwei max
+    maxPriorityFeePerGas: ethers.utils.parseUnits('60', 'gwei'), // 60 gwei tip
+    maxFeePerGas: ethers.utils.parseUnits('1500', 'gwei') // 1500 gwei max
 };
 
 // Storage keys

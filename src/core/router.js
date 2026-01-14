@@ -51,11 +51,11 @@ export class Router {
      * @param {string} path - The path to navigate to
      * @param {boolean} pushState - Whether to add to browser history (default: true)
      */
-    navigate(path, pushState = true) {
+    async navigate(path, pushState = true) {
         if (pushState) {
             window.history.pushState({}, '', path);
         }
-        this.handleRoute(path, false);
+        await this.handleRoute(path, false);
     }
 
     /**
@@ -64,8 +64,12 @@ export class Router {
      * @param {boolean} pushState - Whether to add to browser history
      */
     async handleRoute(path, pushState = true) {
-        // Normalize path
+        // Normalize path - strip query string for matching
         path = path || '/';
+        const queryIndex = path.indexOf('?');
+        if (queryIndex !== -1) {
+            path = path.substring(0, queryIndex);
+        }
         if (path !== '/' && path.endsWith('/')) {
             path = path.slice(0, -1);
         }
@@ -76,7 +80,11 @@ export class Router {
         for (const [pattern, handler] of this.routes) {
             const params = this.matchRoute(pattern, path);
             if (params !== null) {
-                await handler(params);
+                try {
+                    await handler(params);
+                } catch (error) {
+                    console.error('Route handler error:', error);
+                }
                 return;
             }
         }
@@ -101,6 +109,19 @@ export class Router {
         // Exact match
         if (pattern === path) {
             return {};
+        }
+
+        // Special handling for wildcard patterns like /stream/*
+        // This captures everything after /stream/ as the 'id' parameter
+        if (pattern.endsWith('/*')) {
+            const prefix = pattern.slice(0, -1); // Remove the *
+            if (path.startsWith(prefix)) {
+                const wildcardValue = path.slice(prefix.length);
+                if (wildcardValue) {
+                    return { id: wildcardValue };
+                }
+            }
+            return null;
         }
 
         // Pattern with parameters (e.g., /operator/:id)
