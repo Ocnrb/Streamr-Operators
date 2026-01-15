@@ -1,6 +1,6 @@
 /**
  * Streams Feature Module
- * Handles the streams list view with Sponsored and Non-Sponsored streams tables
+ * Handles the streams list view with Sponsorships and All Streams tables
  */
 
 import * as Utils from '../core/utils.js';
@@ -14,37 +14,50 @@ const { logger } = Utils;
 // Constants
 // ============================================
 
-const STREAMS_PER_PAGE = 25;
+const STREAMS_PER_PAGE = 1000;
 
 // ============================================
 // State Management
 // ============================================
 
 const state = {
-    // Sponsored streams
-    sponsoredStreams: [],
-    sponsoredSkip: 0,
-    hasMoreSponsored: true,
-    sponsoredLoading: false,
+    // Sponsorships
+    sponsorships: [],
+    sponsorshipsSkip: 0,
+    hasMoreSponsorships: true,
+    sponsorshipsLoading: false,
     
-    // Expired sponsorships
-    expiredStreams: [],
-    expiredSkip: 0,
-    hasMoreExpired: true,
-    expiredLoading: false,
-    showExpired: false, // Toggle state for expired sponsorships
+    // Zero balance sponsorships (remaining balance = 0)
+    zeroBalanceStreams: [],
+    zeroBalanceSkip: 0,
+    hasMoreZeroBalance: true,
+    zeroBalanceLoading: false,
+    showZeroBalance: false, // Toggle state for zero balance sponsorships
     
-    // Non-sponsored streams
-    nonSponsoredStreams: [],
-    nonSponsoredSkip: 0,
-    hasMoreNonSponsored: true,
-    nonSponsoredLoading: false,
+    // All streams 
+    allStreams: [],
+    allStreamsSkip: 0,
+    hasMoreAllStreams: true,
+    allStreamsLoading: false,
+    
+    // Search state
+    searchQuery: '',
+    searchMode: false,
+    filteredSponsorships: [],
+    filteredAllStreams: [],
+    
+    // Sort state for sponsorships
+    sortField: 'apy', // 'payout', 'apy', 'staked', 'operators'
+    sortDirection: 'desc', // 'asc' or 'desc'
     
     // Shared state
     dataPriceUSD: null,
     
     // Active tab
-    activeTab: 'sponsored',
+    activeTab: 'sponsorships',
+    
+    // Operator stakes - Set of sponsorship IDs where user's operator has stake
+    operatorStakes: new Set(),
 };
 
 // ============================================
@@ -52,17 +65,17 @@ const state = {
 // ============================================
 
 /**
- * Fetch sponsored streams (streams with active sponsorships, ordered by Payout desc)
+ * Fetch sponsorships 
  */
-async function fetchSponsoredStreams(skip = 0) {
+async function fetchSponsorships(skip = 0) {
     const query = `
-        query GetSponsoredStreams {
+        query Getsponsorships {
             sponsorships(
                 first: ${STREAMS_PER_PAGE},
                 skip: ${skip},
-                orderBy: totalPayoutWeiPerSec,
+                orderBy: spotAPY,
                 orderDirection: desc,
-                where: { isRunning: true, spotAPY_gt: "0" }
+                where: { isRunning: true, remainingWei_gt: "0" }
             ) {
                 id
                 spotAPY
@@ -91,15 +104,82 @@ async function fetchSponsoredStreams(skip = 0) {
 }
 
 /**
- * Fetch expired sponsorships (streams with expired sponsorships, ordered by totalPayoutWeiPerSec desc)
+ * Fetch current stakes for the user's operator
+ * Returns a Set of sponsorship IDs where the operator has stake
  */
-async function fetchExpiredSponsorships(skip = 0) {
+async function fetchOperatorStakes() {
+    const operatorProfile = getOperatorProfile();
+    if (!operatorProfile || !operatorProfile.id) {
+        return new Set();
+    }
+    
+    const operatorId = operatorProfile.id.toLowerCase();
     const query = `
-        query GetExpiredSponsorships {
+        {
+            stakes(
+                where: { operator: "${operatorId}" }
+                first: 1000
+            ) {
+                sponsorship { id }
+            }
+        }
+    `;
+    
+    try {
+        const data = await Services.runQuery(query);
+        const stakes = data.stakes || [];
+        return new Set(stakes.map(stake => stake.sponsorship.id));
+    } catch (e) {
+        console.warn('Failed to fetch operator stakes:', e);
+        return new Set();
+    }
+}
+
+/**
+ * Fetch zero balance or stopped sponsorships (sponsorships with remaining balance = 0 OR isRunning = false)
+ * Makes two queries and combines results to capture all "inactive" sponsorships
+ */
+async function fetchZeroBalanceSponsorships(skip = 0) {
+    // Query for zero balance sponsorships 
+    const queryZeroBalance = `
+        query GetZeroBalanceSponsorships {
             sponsorships(
                 first: ${STREAMS_PER_PAGE},
                 skip: ${skip},
-                orderBy: totalPayoutWeiPerSec,
+                orderBy: spotAPY,
+                orderDirection: desc,
+                where: { remainingWei: "0", operatorCount_gt: 0 }
+            ) {
+                id
+                spotAPY
+                totalStakedWei
+                remainingWei
+                operatorCount
+                isRunning
+                totalPayoutWeiPerSec
+                stream {
+                    id
+                    metadata
+                }
+                stakes(first: 100, orderBy: amountWei, orderDirection: desc) {
+                    operator {
+                        id
+                        metadataJsonString
+                    }
+                    amountWei
+                }
+            }
+        }
+    `;
+    
+    // Query for stopped sponsorships (isRunning = false) - no operatorCount filter
+    // This will catch ALL stopped sponsorships including those with remaining balance
+    const queryNotRunning = `
+        query GetStoppedSponsorships {
+            sponsorships(
+                first: ${STREAMS_PER_PAGE},
+                skip: ${skip},
+                orderBy: spotAPY,
                 orderDirection: desc,
                 where: { isRunning: false }
             ) {
@@ -125,19 +205,49 @@ async function fetchExpiredSponsorships(skip = 0) {
         }
     `;
     
-    const data = await Services.runQuery(query);
-    return data.sponsorships || [];
+    try {
+        // Run both queries in parallel
+        const [dataZeroBalance, dataNotRunning] = await Promise.all([
+            Services.runQuery(queryZeroBalance),
+            Services.runQuery(queryNotRunning)
+        ]);
+        
+        const zeroBalanceSpons = dataZeroBalance.sponsorships || [];
+        const notRunningSpons = dataNotRunning.sponsorships || [];
+        
+        logger.log(`Zero balance sponsorships: ${zeroBalanceSpons.length}, Stopped sponsorships: ${notRunningSpons.length}`);
+        
+        // Combine and deduplicate by sponsorship ID
+        const seen = new Set();
+        const combined = [];
+        
+        for (const s of [...zeroBalanceSpons, ...notRunningSpons]) {
+            if (!seen.has(s.id)) {
+                seen.add(s.id);
+                combined.push(s);
+            }
+        }
+        
+        // Sort by APY descending
+        combined.sort((a, b) => parseFloat(b.spotAPY || 0) - parseFloat(a.spotAPY || 0));
+        
+        logger.log(`Combined inactive sponsorships: ${combined.length}`);
+        
+        return combined;
+    } catch (error) {
+        logger.error('Failed to fetch zero balance/stopped sponsorships:', error);
+        return [];
+    }
 }
 
 /**
- * Fetch non-sponsored streams (streams without ANY sponsorships, ordered by updatedAt desc)
+ * Fetch all streams (ordered by updatedAt desc)
  */
-async function fetchNonSponsoredStreams(skip = 0) {
-    // Get recent streams and filter out those with sponsorships
+async function fetchAllStreams(skip = 0) {
     const query = `
-        query GetRecentStreams {
+        query GetAllStreams {
             streams(
-                first: ${STREAMS_PER_PAGE * 3},
+                first: ${STREAMS_PER_PAGE},
                 skip: ${skip},
                 orderBy: updatedAt,
                 orderDirection: desc
@@ -146,8 +256,58 @@ async function fetchNonSponsoredStreams(skip = 0) {
                 createdAt
                 updatedAt
                 metadata
-                sponsorships(first: 1) {
+            }
+        }
+    `;
+    
+    try {
+        const data = await Services.runQuery(query);
+        return data.streams || [];
+    } catch (error) {
+        logger.error('Failed to fetch streams:', error);
+        return [];
+    }
+}
+
+/**
+ * Search sponsorships via API by stream ID
+ * @param {string} searchTerm - Search term to match stream ID
+ * @param {boolean} includeInactive - Include zero balance/stopped sponsorships
+ */
+async function searchSponsorships(searchTerm, includeInactive = false) {
+    // Escape special characters for GraphQL
+    const sanitizedTerm = searchTerm.replace(/"/g, '\\"');
+    
+    // Build where conditions based on includeInactive toggle
+    const activeCondition = includeInactive 
+        ? '' // No filter - get all 
+        : ', isRunning: true, remainingWei_gt: "0"';
+    
+    const query = `
+        query searchSponsorships {
+            sponsorships(
+                first: ${STREAMS_PER_PAGE},
+                orderBy: spotAPY,
+                orderDirection: desc,
+                where: { stream_: { idAsString_contains_nocase: "${sanitizedTerm}" }${activeCondition} }
+            ) {
+                id
+                spotAPY
+                totalStakedWei
+                remainingWei
+                operatorCount
+                isRunning
+                totalPayoutWeiPerSec
+                stream {
                     id
+                    metadata
+                }
+                stakes(first: 100, orderBy: amountWei, orderDirection: desc) {
+                    operator {
+                        id
+                        metadataJsonString
+                    }
+                    amountWei
                 }
             }
         }
@@ -155,13 +315,42 @@ async function fetchNonSponsoredStreams(skip = 0) {
     
     try {
         const data = await Services.runQuery(query);
-        // Filter out streams with ANY sponsorships (active or expired)
-        const filtered = (data.streams || [])
-            .filter(s => !s.sponsorships || s.sponsorships.length === 0)
-            .slice(0, STREAMS_PER_PAGE);
-        return filtered;
+        return data.sponsorships || [];
     } catch (error) {
-        logger.error('Failed to fetch non-sponsored streams:', error);
+        logger.error('Failed to Search sponsorships:', error);
+        return [];
+    }
+}
+
+/**
+ * Search all streams via API by stream ID
+ * @param {string} searchTerm - Search term to match stream ID
+ */
+async function searchAllStreams(searchTerm) {
+    // Escape special characters for GraphQL
+    const sanitizedTerm = searchTerm.replace(/"/g, '\\"');
+    
+    const query = `
+        query SearchAllStreams {
+            streams(
+                first: ${STREAMS_PER_PAGE},
+                orderBy: updatedAt,
+                orderDirection: desc,
+                where: { idAsString_contains_nocase: "${sanitizedTerm}" }
+            ) {
+                id
+                createdAt
+                updatedAt
+                metadata
+            }
+        }
+    `;
+    
+    try {
+        const data = await Services.runQuery(query);
+        return data.streams || [];
+    } catch (error) {
+        logger.error('Failed to search all streams:', error);
         return [];
     }
 }
@@ -343,16 +532,19 @@ function getAccessControlBadge(accessType) {
 // ============================================
 
 /**
- * Create HTML for a sponsored stream row
+ * Create HTML for a sponsorship row
  */
-function createSponsoredStreamRowHtml(sponsorship, index) {
+function createSponsorshipRowHtml(sponsorship, index) {
     const streamId = sponsorship.stream?.id || 'Unknown Stream';
     const displayStreamId = streamId.length > 50 ? streamId.substring(0, 47) + '...' : streamId;
     const apy = parseFloat(sponsorship.spotAPY || 0);
     const apyFormatted = Math.round(apy * 100);
     const totalStaked = Utils.convertWeiToData(sponsorship.totalStakedWei || '0');
     const operatorCount = sponsorship.operatorCount || 0;
-    const isExpired = !sponsorship.isRunning;
+    const hasZeroBalance = sponsorship.remainingWei === '0' || BigInt(sponsorship.remainingWei || '0') === BigInt(0);
+    const isNotRunning = !sponsorship.isRunning;
+    const isInactive = hasZeroBalance || isNotRunning;
+    const isStaked = state.operatorStakes.has(sponsorship.id);
     
     // Calculate payout rate in DATA/day
     const payoutWeiPerSec = BigInt(sponsorship.totalPayoutWeiPerSec || '0');
@@ -365,21 +557,29 @@ function createSponsoredStreamRowHtml(sponsorship, index) {
     const encodedStreamId = streamId.split('/').map(part => encodeURIComponent(part)).join('/');
     const sponsorshipId = sponsorship.id;
     
-    // Badge for expired sponsorships
-    const expiredBadge = isExpired ? '<span class="ml-2 px-1.5 py-0.5 text-[10px] font-semibold bg-orange-500/20 text-orange-400 rounded">EXPIRED</span>' : '';
+    // Badge for inactive sponsorships - show specific reason
+    let inactiveBadge = '';
+    if (hasZeroBalance) {
+        inactiveBadge = '<span class="ml-2 px-1.5 py-0.5 text-[10px] font-semibold bg-orange-500/20 text-orange-400 rounded">ZERO BALANCE</span>';
+    } else if (isNotRunning) {
+        inactiveBadge = '<span class="ml-2 px-1.5 py-0.5 text-[10px] font-semibold bg-red-500/20 text-red-400 rounded">STOPPED</span>';
+    }
     
-    // Row styling for expired
-    const rowClasses = isExpired ? 'stream-row cursor-pointer hover:bg-white/5 transition-colors group opacity-70' : 'stream-row cursor-pointer hover:bg-white/5 transition-colors group';
+    // Staked badge for sponsorships where user's operator has stake
+    const stakedBadge = isStaked ? '<span class="ml-2 px-1.5 py-0.5 text-[10px] font-semibold bg-blue-500/20 text-blue-400 rounded">STAKED</span>' : '';
+    
+    // Row styling for inactive
+    const rowClasses = isInactive ? 'stream-row cursor-pointer hover:bg-white/5 transition-colors group opacity-70' : 'stream-row cursor-pointer hover:bg-white/5 transition-colors group';
     
     return `
         <tr class="${rowClasses}" 
             data-stream-id="${Utils.escapeHtml(streamId)}" 
             data-sponsorship-id="${sponsorshipId}"
             data-sponsored="true"
-            data-expired="${isExpired}"
+            data-inactive="${isInactive}"
             onclick="event.preventDefault(); window.router.navigate('/stream/${encodedStreamId}?sponsored=true&sponsorshipId=${sponsorshipId}')">
             <td class="px-4 py-3">
-                <span class="font-mono text-sm group-hover:text-blue-400 transition-colors" title="${Utils.escapeHtml(streamId)}">${Utils.escapeHtml(displayStreamId)}</span>${expiredBadge}
+                <span class="font-mono text-sm group-hover:text-blue-400 transition-colors" title="${Utils.escapeHtml(streamId)}">${Utils.escapeHtml(displayStreamId)}</span>${stakedBadge}${inactiveBadge}
             </td>
             <td class="px-4 py-3 text-right font-mono text-gray-300 whitespace-nowrap">${payoutPerDayFormatted}</td>
             <td class="px-4 py-3 text-right font-mono text-gray-300 whitespace-nowrap">${apyFormatted}%</td>
@@ -390,9 +590,9 @@ function createSponsoredStreamRowHtml(sponsorship, index) {
 }
 
 /**
- * Create HTML for a non-sponsored stream row
+ * Create HTML for an all streams row
  */
-function createNonSponsoredStreamRowHtml(stream, index) {
+function createAllStreamRowHtml(stream, index) {
     const streamId = stream.id || 'Unknown Stream';
     const displayStreamId = streamId.length > 50 ? streamId.substring(0, 47) + '...' : streamId;
     const createdAt = stream.createdAt ? new Date(parseInt(stream.createdAt) * 1000).toLocaleDateString() : 'N/A';
@@ -426,12 +626,12 @@ function createNonSponsoredStreamRowHtml(stream, index) {
 }
 
 /**
- * Render sponsored streams table
+ * Render sponsorships table
  */
-function renderSponsoredStreamsTable(streams, isAppend = false) {
-    const tbody = document.getElementById('sponsored-streams-tbody');
-    const loadMoreBtn = document.getElementById('load-more-sponsored-btn');
-    const emptyState = document.getElementById('sponsored-streams-empty');
+function renderSponsorshipsTable(streams, isAppend = false) {
+    const tbody = document.getElementById('sponsorships-tbody');
+    const loadMoreBtn = document.getElementById('load-more-sponsorships-btn');
+    const emptyState = document.getElementById('sponsorships-empty');
     
     if (!tbody) return;
     
@@ -447,8 +647,8 @@ function renderSponsoredStreamsTable(streams, isAppend = false) {
     
     if (emptyState) emptyState.classList.add('hidden');
     
-    const startIndex = isAppend ? state.sponsoredStreams.length - streams.length : 0;
-    const html = streams.map((s, i) => createSponsoredStreamRowHtml(s, startIndex + i)).join('');
+    const startIndex = isAppend ? state.sponsorships.length - streams.length : 0;
+    const html = streams.map((s, i) => createSponsorshipRowHtml(s, startIndex + i)).join('');
     
     if (isAppend) {
         tbody.insertAdjacentHTML('beforeend', html);
@@ -458,17 +658,17 @@ function renderSponsoredStreamsTable(streams, isAppend = false) {
     
     // Update load more button
     if (loadMoreBtn) {
-        loadMoreBtn.classList.toggle('hidden', !state.hasMoreSponsored);
+        loadMoreBtn.classList.toggle('hidden', !state.hasMoreSponsorships);
     }
 }
 
 /**
- * Render non-sponsored streams table
+ * Render all streams table
  */
-function renderNonSponsoredStreamsTable(streams, isAppend = false) {
-    const tbody = document.getElementById('nonsponsored-streams-tbody');
+function renderAllStreamsTable(streams, isAppend = false) {
+    const tbody = document.getElementById('nonsponsorships-tbody');
     const loadMoreBtn = document.getElementById('load-more-nonsponsored-btn');
-    const emptyState = document.getElementById('nonsponsored-streams-empty');
+    const emptyState = document.getElementById('nonsponsorships-empty');
     
     if (!tbody) return;
     
@@ -484,8 +684,8 @@ function renderNonSponsoredStreamsTable(streams, isAppend = false) {
     
     if (emptyState) emptyState.classList.add('hidden');
     
-    const startIndex = isAppend ? state.nonSponsoredStreams.length - streams.length : 0;
-    const html = streams.map((s, i) => createNonSponsoredStreamRowHtml(s, startIndex + i)).join('');
+    const startIndex = isAppend ? state.allStreams.length - streams.length : 0;
+    const html = streams.map((s, i) => createAllStreamRowHtml(s, startIndex + i)).join('');
     
     if (isAppend) {
         tbody.insertAdjacentHTML('beforeend', html);
@@ -495,7 +695,7 @@ function renderNonSponsoredStreamsTable(streams, isAppend = false) {
     
     // Update load more button
     if (loadMoreBtn) {
-        loadMoreBtn.classList.toggle('hidden', !state.hasMoreNonSponsored);
+        loadMoreBtn.classList.toggle('hidden', !state.hasMoreAllStreams);
     }
 }
 
@@ -509,58 +709,65 @@ function renderNonSponsoredStreamsTable(streams, isAppend = false) {
 function switchTab(tab) {
     state.activeTab = tab;
     
-    const sponsoredTab = document.getElementById('streams-tab-sponsored');
-    const nonSponsoredTab = document.getElementById('streams-tab-nonsponsored');
-    const sponsoredPanel = document.getElementById('streams-panel-sponsored');
-    const nonSponsoredPanel = document.getElementById('streams-panel-nonsponsored');
-    const sponsoredCount = document.getElementById('streams-tab-sponsored-count');
-    const nonSponsoredCount = document.getElementById('streams-tab-nonsponsored-count');
+    const sponsorshipsTab = document.getElementById('streams-tab-sponsorships');
+    const allStreamsTab = document.getElementById('streams-tab-nonsponsored');
+    const sponsorshipsPanel = document.getElementById('streams-panel-sponsorships');
+    const allStreamsPanel = document.getElementById('streams-panel-nonsponsored');
+    const sponsorshipsCount = document.getElementById('streams-tab-sponsorships-count');
+    const allStreamsTabCount = document.getElementById('streams-tab-nonsponsored-count');
+    const searchInput = document.getElementById('streams-search-input');
     
     // Safety check - if elements don't exist yet, skip UI updates
-    if (!sponsoredTab || !nonSponsoredTab || !sponsoredPanel || !nonSponsoredPanel) {
+    if (!sponsorshipsTab || !allStreamsTab || !sponsorshipsPanel || !allStreamsPanel) {
         return;
     }
     
-    if (tab === 'sponsored') {
-        // Update sponsored tab to active
-        sponsoredTab.classList.remove('text-gray-400', 'border-transparent', 'hover:border-gray-600');
-        sponsoredTab.classList.add('text-white', 'border-blue-500', 'bg-gradient-to-t', 'from-blue-500/10', 'to-transparent');
-        if (sponsoredCount) {
-            sponsoredCount.classList.remove('bg-gray-500/20', 'text-gray-400');
-            sponsoredCount.classList.add('bg-green-500/20', 'text-green-400');
+    if (tab === 'sponsorships') {
+        // Update sponsorships tab to active
+        sponsorshipsTab.classList.remove('text-gray-400', 'border-transparent', 'hover:border-gray-600');
+        sponsorshipsTab.classList.add('text-white', 'border-blue-500', 'bg-gradient-to-t', 'from-blue-500/10', 'to-transparent');
+        if (sponsorshipsCount) {
+            sponsorshipsCount.classList.remove('bg-gray-500/20', 'text-gray-400');
+            sponsorshipsCount.classList.add('bg-green-500/20', 'text-green-400');
         }
         
-        // Update non-sponsored tab to inactive
-        nonSponsoredTab.classList.remove('text-white', 'border-blue-500', 'bg-gradient-to-t', 'from-blue-500/10', 'to-transparent');
-        nonSponsoredTab.classList.add('text-gray-400', 'border-transparent', 'hover:border-gray-600');
-        if (nonSponsoredCount) {
-            nonSponsoredCount.classList.remove('bg-green-500/20', 'text-green-400');
-            nonSponsoredCount.classList.add('bg-gray-500/20', 'text-gray-400');
+        // Update all streams tab to inactive
+        allStreamsTab.classList.remove('text-white', 'border-blue-500', 'bg-gradient-to-t', 'from-blue-500/10', 'to-transparent');
+        allStreamsTab.classList.add('text-gray-400', 'border-transparent', 'hover:border-gray-600');
+        if (allStreamsTabCount) {
+            allStreamsTabCount.classList.remove('bg-green-500/20', 'text-green-400');
+            allStreamsTabCount.classList.add('bg-gray-500/20', 'text-gray-400');
         }
         
         // Show/hide panels
-        sponsoredPanel.classList.remove('hidden');
-        nonSponsoredPanel.classList.add('hidden');
+        sponsorshipsPanel.classList.remove('hidden');
+        allStreamsPanel.classList.add('hidden');
     } else {
-        // Update non-sponsored tab to active
-        nonSponsoredTab.classList.remove('text-gray-400', 'border-transparent', 'hover:border-gray-600');
-        nonSponsoredTab.classList.add('text-white', 'border-blue-500', 'bg-gradient-to-t', 'from-blue-500/10', 'to-transparent');
-        if (nonSponsoredCount) {
-            nonSponsoredCount.classList.remove('bg-gray-500/20', 'text-gray-400');
-            nonSponsoredCount.classList.add('bg-green-500/20', 'text-green-400');
+        // Update all streams tab to active
+        allStreamsTab.classList.remove('text-gray-400', 'border-transparent', 'hover:border-gray-600');
+        allStreamsTab.classList.add('text-white', 'border-blue-500', 'bg-gradient-to-t', 'from-blue-500/10', 'to-transparent');
+        if (allStreamsTabCount) {
+            allStreamsTabCount.classList.remove('bg-gray-500/20', 'text-gray-400');
+            allStreamsTabCount.classList.add('bg-green-500/20', 'text-green-400');
         }
         
-        // Update sponsored tab to inactive
-        sponsoredTab.classList.remove('text-white', 'border-blue-500', 'bg-gradient-to-t', 'from-blue-500/10', 'to-transparent');
-        sponsoredTab.classList.add('text-gray-400', 'border-transparent', 'hover:border-gray-600');
-        if (sponsoredCount) {
-            sponsoredCount.classList.remove('bg-green-500/20', 'text-green-400');
-            sponsoredCount.classList.add('bg-gray-500/20', 'text-gray-400');
+        // Update sponsorships tab to inactive
+        sponsorshipsTab.classList.remove('text-white', 'border-blue-500', 'bg-gradient-to-t', 'from-blue-500/10', 'to-transparent');
+        sponsorshipsTab.classList.add('text-gray-400', 'border-transparent', 'hover:border-gray-600');
+        if (sponsorshipsCount) {
+            sponsorshipsCount.classList.remove('bg-green-500/20', 'text-green-400');
+            sponsorshipsCount.classList.add('bg-gray-500/20', 'text-gray-400');
         }
         
         // Show/hide panels
-        nonSponsoredPanel.classList.remove('hidden');
-        sponsoredPanel.classList.add('hidden');
+        allStreamsPanel.classList.remove('hidden');
+        sponsorshipsPanel.classList.add('hidden');
+    }
+    
+    // If there's an active search query, execute search for the new tab
+    const searchTerm = searchInput ? searchInput.value.toLowerCase().trim() : '';
+    if (searchTerm) {
+        handleStreamSearch(searchTerm);
     }
 }
 
@@ -568,91 +775,91 @@ function switchTab(tab) {
  * Update tab counters
  */
 function updateTabCounters() {
-    const sponsoredCount = document.getElementById('streams-tab-sponsored-count');
-    const nonSponsoredCount = document.getElementById('streams-tab-nonsponsored-count');
+    const sponsorshipsCount = document.getElementById('streams-tab-sponsorships-count');
+    const allStreamsCount = document.getElementById('streams-tab-nonsponsored-count');
     
-    if (sponsoredCount) {
-        // Include expired count if toggle is on
-        const totalSponsored = state.showExpired 
-            ? state.sponsoredStreams.length + state.expiredStreams.length 
-            : state.sponsoredStreams.length;
-        const hasMore = state.showExpired 
-            ? (state.hasMoreSponsored || state.hasMoreExpired) 
-            : state.hasMoreSponsored;
-        sponsoredCount.textContent = totalSponsored + (hasMore ? '+' : '');
+    if (sponsorshipsCount) {
+        // Include zero balance count if toggle is on
+        const totalSponsorships = state.showZeroBalance 
+            ? state.sponsorships.length + state.zeroBalanceStreams.length 
+            : state.sponsorships.length;
+        const hasMore = state.showZeroBalance 
+            ? (state.hasMoreSponsorships || state.hasMoreZeroBalance) 
+            : state.hasMoreSponsorships;
+        sponsorshipsCount.textContent = totalSponsorships + (hasMore ? '+' : '');
     }
-    if (nonSponsoredCount) {
-        nonSponsoredCount.textContent = state.nonSponsoredStreams.length + (state.hasMoreNonSponsored ? '+' : '');
+    if (allStreamsCount) {
+        allStreamsCount.textContent = state.allStreams.length + (state.hasMoreAllStreams ? '+' : '');
     }
 }
 
 /**
- * Handle load more sponsored streams
+ * Handle load more sponsorships
  */
-async function handleLoadMoreSponsored() {
-    // Check if we're in expired mode
-    if (state.showExpired) {
-        // In expired mode, we can load more if either has more
-        if (state.sponsoredLoading || state.expiredLoading) return;
-        if (!state.hasMoreSponsored && !state.hasMoreExpired) return;
+async function handleLoadMoreSponsorships() {
+    // Check if we're in zero balance mode
+    if (state.showZeroBalance) {
+        // In zero balance mode, we can load more if either has more
+        if (state.sponsorshipsLoading || state.zeroBalanceLoading) return;
+        if (!state.hasMoreSponsorships && !state.hasMoreZeroBalance) return;
     } else {
-        if (state.sponsoredLoading || !state.hasMoreSponsored) return;
+        if (state.sponsorshipsLoading || !state.hasMoreSponsorships) return;
     }
     
-    const btn = document.getElementById('load-more-sponsored-btn');
+    const btn = document.getElementById('load-more-sponsorships-btn');
     if (btn) {
         btn.disabled = true;
         btn.innerHTML = '<div class="w-4 h-4 border-2 border-white rounded-full border-t-transparent animate-spin inline-block mr-2"></div>Loading...';
     }
     
-    state.sponsoredLoading = true;
+    state.sponsorshipsLoading = true;
     
     try {
-        // Load more sponsored streams if available
-        if (state.hasMoreSponsored) {
-            const newStreams = await fetchSponsoredStreams(state.sponsoredSkip);
+        // Load more sponsorships if available
+        if (state.hasMoreSponsorships) {
+            const newStreams = await fetchSponsorships(state.sponsorshipsSkip);
             
             if (newStreams.length < STREAMS_PER_PAGE) {
-                state.hasMoreSponsored = false;
+                state.hasMoreSponsorships = false;
             }
             
-            state.sponsoredStreams = [...state.sponsoredStreams, ...newStreams];
-            state.sponsoredSkip += newStreams.length;
+            state.sponsorships = [...state.sponsorships, ...newStreams];
+            state.sponsorshipsSkip += newStreams.length;
         }
         
-        // In expired mode, also load more expired if available
-        if (state.showExpired && state.hasMoreExpired) {
-            state.expiredLoading = true;
-            const newExpired = await fetchExpiredSponsorships(state.expiredSkip);
+        // In zero balance mode, also load more zero balance if available
+        if (state.showZeroBalance && state.hasMoreZeroBalance) {
+            state.zeroBalanceLoading = true;
+            const newZeroBalance = await fetchZeroBalanceSponsorships(state.zeroBalanceSkip);
             
-            if (newExpired.length < STREAMS_PER_PAGE) {
-                state.hasMoreExpired = false;
+            if (newZeroBalance.length < STREAMS_PER_PAGE) {
+                state.hasMoreZeroBalance = false;
             }
             
-            state.expiredStreams = [...state.expiredStreams, ...newExpired];
-            state.expiredSkip += newExpired.length;
-            state.expiredLoading = false;
+            state.zeroBalanceStreams = [...state.zeroBalanceStreams, ...newZeroBalance];
+            state.zeroBalanceSkip += newZeroBalance.length;
+            state.zeroBalanceLoading = false;
         }
         
-        // Re-render the table
-        if (state.showExpired) {
-            const combined = [...state.sponsoredStreams, ...state.expiredStreams];
-            renderSponsoredStreamsTable(combined, false);
+        // Re-render the table with sorting
+        if (state.showZeroBalance) {
+            const combined = [...state.sponsorships, ...state.zeroBalanceStreams];
+            renderSponsorshipsTable(sortSponsorships(combined), false);
             // Update button visibility
             if (btn) {
-                btn.classList.toggle('hidden', !state.hasMoreSponsored && !state.hasMoreExpired);
+                btn.classList.toggle('hidden', !state.hasMoreSponsorships && !state.hasMoreZeroBalance);
             }
         } else {
-            renderSponsoredStreamsTable(state.sponsoredStreams, false);
+            renderSponsorshipsTable(sortSponsorships(state.sponsorships), false);
         }
         
         updateTabCounters();
     } catch (error) {
-        logger.error('Failed to load more sponsored streams:', error);
+        logger.error('Failed to Load more sponsorships:', error);
         UI.showToast({ type: 'error', title: 'Error', message: 'Failed to load more streams' });
     } finally {
-        state.sponsoredLoading = false;
-        state.expiredLoading = false;
+        state.sponsorshipsLoading = false;
+        state.zeroBalanceLoading = false;
         if (btn) {
             btn.disabled = false;
             btn.textContent = 'Load More';
@@ -661,10 +868,10 @@ async function handleLoadMoreSponsored() {
 }
 
 /**
- * Handle load more non-sponsored streams
+ * Handle load more all streams
  */
-async function handleLoadMoreNonSponsored() {
-    if (state.nonSponsoredLoading || !state.hasMoreNonSponsored) return;
+async function handleLoadMoreAllStreams() {
+    if (state.allStreamsLoading || !state.hasMoreAllStreams) return;
     
     const btn = document.getElementById('load-more-nonsponsored-btn');
     if (btn) {
@@ -672,25 +879,25 @@ async function handleLoadMoreNonSponsored() {
         btn.innerHTML = '<div class="w-4 h-4 border-2 border-white rounded-full border-t-transparent animate-spin inline-block mr-2"></div>Loading...';
     }
     
-    state.nonSponsoredLoading = true;
+    state.allStreamsLoading = true;
     
     try {
-        const newStreams = await fetchNonSponsoredStreams(state.nonSponsoredSkip);
+        const newStreams = await fetchAllStreams(state.allStreamsSkip);
         
         if (newStreams.length < STREAMS_PER_PAGE) {
-            state.hasMoreNonSponsored = false;
+            state.hasMoreAllStreams = false;
         }
         
-        state.nonSponsoredStreams = [...state.nonSponsoredStreams, ...newStreams];
-        state.nonSponsoredSkip += newStreams.length;
+        state.allStreams = [...state.allStreams, ...newStreams];
+        state.allStreamsSkip += newStreams.length;
         
-        renderNonSponsoredStreamsTable(newStreams, true);
+        renderAllStreamsTable(newStreams, true);
         updateTabCounters();
     } catch (error) {
-        logger.error('Failed to load more non-sponsored streams:', error);
+        logger.error('Failed to load more streams:', error);
         UI.showToast({ type: 'error', title: 'Error', message: 'Failed to load more streams' });
     } finally {
-        state.nonSponsoredLoading = false;
+        state.allStreamsLoading = false;
         if (btn) {
             btn.disabled = false;
             btn.textContent = 'Load More';
@@ -699,49 +906,252 @@ async function handleLoadMoreNonSponsored() {
 }
 
 /**
- * Handle expired sponsorships toggle
+ * Handle zero balance sponsorships toggle
  */
-async function handleExpiredToggle(event) {
-    state.showExpired = event.target.checked;
+async function handleZeroBalanceToggle(event) {
+    state.showZeroBalance = event.target.checked;
     
-    const tbody = document.getElementById('sponsored-streams-tbody');
-    const loadMoreBtn = document.getElementById('load-more-sponsored-btn');
+    const loadMoreBtn = document.getElementById('load-more-sponsorships-btn');
+    const searchInput = document.getElementById('streams-search-input');
+    const searchTerm = searchInput ? searchInput.value.toLowerCase().trim() : '';
     
-    if (state.showExpired) {
-        // Load expired sponsorships if not already loaded
-        if (state.expiredStreams.length === 0) {
+    if (state.showZeroBalance) {
+        // Load zero balance sponsorships if not already loaded
+        if (state.zeroBalanceStreams.length === 0) {
             UI.showLoader(true);
             try {
-                const expired = await fetchExpiredSponsorships(0);
-                state.expiredStreams = expired;
-                state.expiredSkip = expired.length;
-                state.hasMoreExpired = expired.length >= STREAMS_PER_PAGE;
+                const zeroBalance = await fetchZeroBalanceSponsorships(0);
+                state.zeroBalanceStreams = zeroBalance;
+                state.zeroBalanceSkip = zeroBalance.length;
+                state.hasMoreZeroBalance = zeroBalance.length >= STREAMS_PER_PAGE;
             } catch (error) {
-                logger.error('Failed to load expired sponsorships:', error);
-                UI.showToast({ type: 'error', title: 'Error', message: 'Failed to load expired sponsorships' });
+                logger.error('Failed to load zero balance sponsorships:', error);
+                UI.showToast({ type: 'error', title: 'Error', message: 'Failed to load zero balance sponsorships' });
             } finally {
                 UI.showLoader(false);
             }
         }
         
-        // Combine active and expired sponsorships for rendering
-        const combined = [...state.sponsoredStreams, ...state.expiredStreams];
-        renderSponsoredStreamsTable(combined, false);
+        // Combine active and zero balance sponsorships
+        let combined = [...state.sponsorships, ...state.zeroBalanceStreams];
+        
+        // Apply search filter if there's a search term
+        if (searchTerm) {
+            combined = combined.filter(s => (s.stream?.id || '').toLowerCase().includes(searchTerm));
+            state.filteredSponsorships = sortSponsorships(combined);
+            renderSponsorshipsTable(state.filteredSponsorships, false);
+        } else {
+            renderSponsorshipsTable(sortSponsorships(combined), false);
+        }
         
         // Update load more button logic
         if (loadMoreBtn) {
-            loadMoreBtn.classList.toggle('hidden', !state.hasMoreSponsored && !state.hasMoreExpired);
+            loadMoreBtn.classList.toggle('hidden', !state.hasMoreSponsorships && !state.hasMoreZeroBalance);
         }
     } else {
-        // Show only active sponsorships
-        renderSponsoredStreamsTable(state.sponsoredStreams, false);
+        // Show only active sponsorships with balance > 0
+        let streams = state.sponsorships;
+        
+        // Apply search filter if there's a search term
+        if (searchTerm) {
+            streams = streams.filter(s => (s.stream?.id || '').toLowerCase().includes(searchTerm));
+            state.filteredSponsorships = sortSponsorships(streams);
+            renderSponsorshipsTable(state.filteredSponsorships, false);
+        } else {
+            renderSponsorshipsTable(sortSponsorships(streams), false);
+        }
         
         if (loadMoreBtn) {
-            loadMoreBtn.classList.toggle('hidden', !state.hasMoreSponsored);
+            loadMoreBtn.classList.toggle('hidden', !state.hasMoreSponsorships);
         }
     }
     
     updateTabCounters();
+}
+
+/**
+ * Sort sponsorships based on current sort state
+ */
+function sortSponsorships(streams) {
+    const sorted = [...streams];
+    
+    sorted.sort((a, b) => {
+        let aVal, bVal;
+        
+        switch (state.sortField) {
+            case 'payout':
+                aVal = BigInt(a.totalPayoutWeiPerSec || '0');
+                bVal = BigInt(b.totalPayoutWeiPerSec || '0');
+                break;
+            case 'apy':
+                aVal = parseFloat(a.spotAPY || 0);
+                bVal = parseFloat(b.spotAPY || 0);
+                break;
+            case 'staked':
+                aVal = BigInt(a.totalStakedWei || '0');
+                bVal = BigInt(b.totalStakedWei || '0');
+                break;
+            case 'operators':
+                aVal = parseInt(a.operatorCount || 0);
+                bVal = parseInt(b.operatorCount || 0);
+                break;
+            default:
+                aVal = parseFloat(a.spotAPY || 0);
+                bVal = parseFloat(b.spotAPY || 0);
+        }
+        
+        // Handle BigInt comparison
+        if (typeof aVal === 'bigint' && typeof bVal === 'bigint') {
+            if (state.sortDirection === 'desc') {
+                return aVal > bVal ? -1 : aVal < bVal ? 1 : 0;
+            } else {
+                return aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
+            }
+        }
+        
+        // Handle number comparison
+        if (state.sortDirection === 'desc') {
+            return bVal - aVal;
+        } else {
+            return aVal - bVal;
+        }
+    });
+    
+    return sorted;
+}
+
+/**
+ * Handle sort column click
+ */
+function handleSortClick(field) {
+    // Toggle direction if same field, otherwise set to desc
+    if (state.sortField === field) {
+        state.sortDirection = state.sortDirection === 'desc' ? 'asc' : 'desc';
+    } else {
+        state.sortField = field;
+        state.sortDirection = 'desc';
+    }
+    
+    // Update header UI
+    updateSortHeaderUI();
+    
+    // Re-render with sorted data
+    const streams = state.showZeroBalance 
+        ? [...state.sponsorships, ...state.zeroBalanceStreams]
+        : state.sponsorships;
+    
+    // If in search mode, sort filtered results
+    if (state.searchMode && state.filteredSponsorships.length > 0) {
+        renderSponsorshipsTable(sortSponsorships(state.filteredSponsorships), false);
+    } else {
+        renderSponsorshipsTable(sortSponsorships(streams), false);
+    }
+}
+
+/**
+ * Update sort header UI to show current sort state
+ */
+function updateSortHeaderUI() {
+    const fields = ['payout', 'apy', 'staked', 'operators'];
+    const downArrow = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>';
+    const upArrow = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/>';
+    const neutralArrow = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/>';
+    
+    fields.forEach(field => {
+        const header = document.getElementById(`sponsorships-sort-${field}`);
+        if (!header) return;
+        
+        const icon = header.querySelector('.sort-icon');
+        if (!icon) return;
+        
+        if (state.sortField === field) {
+            header.classList.add('text-blue-400');
+            header.classList.remove('text-gray-500');
+            icon.classList.add('opacity-100');
+            icon.classList.remove('opacity-0', 'group-hover:opacity-50');
+            icon.innerHTML = state.sortDirection === 'desc' ? downArrow : upArrow;
+        } else {
+            header.classList.remove('text-blue-400');
+            header.classList.add('text-gray-500');
+            icon.classList.remove('opacity-100');
+            icon.classList.add('opacity-0', 'group-hover:opacity-50');
+            icon.innerHTML = neutralArrow;
+        }
+    });
+}
+
+/**
+ * Handle stream search - queries API directly for results
+ */
+async function handleStreamSearch(term) {
+    state.searchQuery = term;
+    
+    if (!term) {
+        // Reset to show all
+        state.searchMode = false;
+        state.filteredSponsorships = [];
+        state.filteredAllStreams = [];
+        
+        // Re-render with original data
+        if (state.activeTab === 'sponsorships') {
+            const streams = state.showZeroBalance 
+                ? [...state.sponsorships, ...state.zeroBalanceStreams]
+                : state.sponsorships;
+            renderSponsorshipsTable(sortSponsorships(streams), false);
+        } else {
+            renderAllStreamsTable(state.allStreams, false);
+        }
+        updateTabCounters();
+        return;
+    }
+    
+    state.searchMode = true;
+    
+    // Hide Load More buttons during search mode
+    const loadMoreSponsorshipsBtn = document.getElementById('load-more-sponsorships-btn');
+    const loadMoreAllStreamsBtn = document.getElementById('load-more-nonsponsored-btn');
+    if (loadMoreSponsorshipsBtn) loadMoreSponsorshipsBtn.classList.add('hidden');
+    if (loadMoreAllStreamsBtn) loadMoreAllStreamsBtn.classList.add('hidden');
+    
+    // Show loading indicator
+    UI.showLoader(true);
+    
+    try {
+        // Search via API based on current tab
+        if (state.activeTab === 'sponsorships') {
+            // Search sponsorships via API, considering the inactive toggle
+            const results = await searchSponsorships(term, state.showZeroBalance);
+            state.filteredSponsorships = sortSponsorships(results);
+            renderSponsorshipsTable(state.filteredSponsorships, false);
+            
+            // Hide Load More for sponsorships during search
+            if (loadMoreSponsorshipsBtn) loadMoreSponsorshipsBtn.classList.add('hidden');
+        } else {
+            // Search all streams via API
+            const results = await searchAllStreams(term);
+            state.filteredAllStreams = results;
+            renderAllStreamsTable(state.filteredAllStreams, false);
+            
+            // Hide Load More for all streams during search
+            if (loadMoreAllStreamsBtn) loadMoreAllStreamsBtn.classList.add('hidden');
+        }
+        
+        // Update counters to reflect search results
+        const sponsorshipsCount = document.getElementById('streams-tab-sponsorships-count');
+        const allStreamsCount = document.getElementById('streams-tab-nonsponsored-count');
+        
+        if (sponsorshipsCount && state.filteredSponsorships.length > 0) {
+            sponsorshipsCount.textContent = state.filteredSponsorships.length;
+        }
+        if (allStreamsCount && state.filteredAllStreams.length > 0) {
+            allStreamsCount.textContent = state.filteredAllStreams.length;
+        }
+    } catch (error) {
+        logger.error('Failed to search streams:', error);
+        UI.showToast({ type: 'error', title: 'Search Error', message: 'Failed to search streams' });
+    } finally {
+        UI.showLoader(false);
+    }
 }
 
 // ============================================
@@ -772,60 +1182,78 @@ export const StreamsLogic = {
         logger.log('StreamsLogic: Initializing...');
         
         // Reset state
-        state.sponsoredStreams = [];
-        state.nonSponsoredStreams = [];
-        state.expiredStreams = [];
-        state.sponsoredSkip = 0;
-        state.nonSponsoredSkip = 0;
-        state.expiredSkip = 0;
-        state.hasMoreSponsored = true;
-        state.hasMoreNonSponsored = true;
-        state.hasMoreExpired = true;
-        state.showExpired = false;
-        state.sponsoredLoading = false;
-        state.nonSponsoredLoading = false;
-        state.expiredLoading = false;
-        state.activeTab = 'sponsored';
+        state.sponsorships = [];
+        state.allStreams = [];
+        state.zeroBalanceStreams = [];
+        state.sponsorshipsSkip = 0;
+        state.allStreamsSkip = 0;
+        state.zeroBalanceSkip = 0;
+        state.hasMoreSponsorships = true;
+        state.hasMoreAllStreams = true;
+        state.hasMoreZeroBalance = true;
+        state.showZeroBalance = false;
+        state.sponsorshipsLoading = false;
+        state.allStreamsLoading = false;
+        state.zeroBalanceLoading = false;
+        state.activeTab = 'sponsorships';
+        state.searchQuery = '';
+        state.searchMode = false;
+        state.filteredSponsorships = [];
+        state.filteredAllStreams = [];
+        state.sortField = 'apy';
+        state.sortDirection = 'desc';
+        state.operatorStakes = new Set();
         
-        // Reset expired toggle UI
-        const expiredToggle = document.getElementById('streams-show-expired-toggle');
-        if (expiredToggle) {
-            expiredToggle.checked = false;
+        // Reset search input
+        const searchInput = document.getElementById('streams-search-input');
+        if (searchInput) {
+            searchInput.value = '';
         }
         
+        // Reset zero balance toggle UI
+        const zeroBalanceToggle = document.getElementById('streams-show-zero-balance-toggle');
+        if (zeroBalanceToggle) {
+            zeroBalanceToggle.checked = false;
+        }
+        
+        // Reset sort header UI
+        updateSortHeaderUI();
+        
         // Reset UI to default tab
-        switchTab('sponsored');
+        switchTab('sponsorships');
         
         // Show loading state
         UI.showLoader(true);
         
         try {
-            // Fetch both lists in parallel
-            const [sponsored, nonSponsored] = await Promise.all([
-                fetchSponsoredStreams(0),
-                fetchNonSponsoredStreams(0)
+            // Fetch all data in parallel (including operator stakes for badge display)
+            const [sponsored, allStreams, operatorStakes] = await Promise.all([
+                fetchSponsorships(0),
+                fetchAllStreams(0),
+                fetchOperatorStakes()
             ]);
             
-            state.sponsoredStreams = sponsored;
-            state.nonSponsoredStreams = nonSponsored;
-            state.sponsoredSkip = sponsored.length;
-            state.nonSponsoredSkip = nonSponsored.length;
+            state.operatorStakes = operatorStakes;
+            state.sponsorships = sponsored;
+            state.allStreams = allStreams;
+            state.sponsorshipsSkip = sponsored.length;
+            state.allStreamsSkip = allStreams.length;
             
             if (sponsored.length < STREAMS_PER_PAGE) {
-                state.hasMoreSponsored = false;
+                state.hasMoreSponsorships = false;
             }
-            if (nonSponsored.length < STREAMS_PER_PAGE) {
-                state.hasMoreNonSponsored = false;
+            if (allStreams.length < STREAMS_PER_PAGE) {
+                state.hasMoreAllStreams = false;
             }
             
             // Render tables
-            renderSponsoredStreamsTable(sponsored, false);
-            renderNonSponsoredStreamsTable(nonSponsored, false);
+            renderSponsorshipsTable(sponsored, false);
+            renderAllStreamsTable(allStreams, false);
             
             // Update tab counters
             updateTabCounters();
             
-            logger.log(`StreamsLogic: Loaded ${sponsored.length} sponsored, ${nonSponsored.length} non-sponsored streams`);
+            logger.log(`StreamsLogic: Loaded ${sponsored.length} sponsorships, ${allStreams.length} streams`);
         } catch (error) {
             logger.error('StreamsLogic: Failed to initialize:', error);
             UI.showToast({ type: 'error', title: 'Error', message: 'Failed to load streams' });
@@ -838,32 +1266,55 @@ export const StreamsLogic = {
      * Setup event listeners
      */
     setupEventListeners() {
-        const loadMoreSponsoredBtn = document.getElementById('load-more-sponsored-btn');
-        const loadMoreNonSponsoredBtn = document.getElementById('load-more-nonsponsored-btn');
-        const sponsoredTab = document.getElementById('streams-tab-sponsored');
-        const nonSponsoredTab = document.getElementById('streams-tab-nonsponsored');
+        const loadMoreSponsoredBtn = document.getElementById('load-more-sponsorships-btn');
+        const loadMoreAllStreamsBtn = document.getElementById('load-more-nonsponsored-btn');
+        const sponsorshipsTab = document.getElementById('streams-tab-sponsorships');
+        const allStreamsTab = document.getElementById('streams-tab-nonsponsored');
         
         if (loadMoreSponsoredBtn) {
-            loadMoreSponsoredBtn.addEventListener('click', handleLoadMoreSponsored);
+            loadMoreSponsoredBtn.addEventListener('click', handleLoadMoreSponsorships);
         }
         
-        if (loadMoreNonSponsoredBtn) {
-            loadMoreNonSponsoredBtn.addEventListener('click', handleLoadMoreNonSponsored);
+        if (loadMoreAllStreamsBtn) {
+            loadMoreAllStreamsBtn.addEventListener('click', handleLoadMoreAllStreams);
         }
         
-        if (sponsoredTab) {
-            sponsoredTab.addEventListener('click', () => switchTab('sponsored'));
+        if (sponsorshipsTab) {
+            sponsorshipsTab.addEventListener('click', () => switchTab('sponsorships'));
         }
         
-        if (nonSponsoredTab) {
-            nonSponsoredTab.addEventListener('click', () => switchTab('nonsponsored'));
+        if (allStreamsTab) {
+            allStreamsTab.addEventListener('click', () => switchTab('nonsponsored'));
         }
         
-        // Expired sponsorships toggle
-        const expiredToggle = document.getElementById('streams-show-expired-toggle');
-        if (expiredToggle) {
-            expiredToggle.addEventListener('change', handleExpiredToggle);
+        // Search input
+        const searchInput = document.getElementById('streams-search-input');
+        if (searchInput) {
+            let searchTimeout;
+            searchInput.addEventListener('input', (e) => {
+                const term = e.target.value.toLowerCase().trim();
+                clearTimeout(searchTimeout);
+                
+                searchTimeout = setTimeout(() => {
+                    handleStreamSearch(term);
+                }, 300);
+            });
         }
+        
+        // Zero balance sponsorships toggle
+        const zeroBalanceToggle = document.getElementById('streams-show-zero-balance-toggle');
+        if (zeroBalanceToggle) {
+            zeroBalanceToggle.addEventListener('change', handleZeroBalanceToggle);
+        }
+        
+        // Sort column headers
+        const sortHeaders = ['payout', 'apy', 'staked', 'operators'];
+        sortHeaders.forEach(field => {
+            const header = document.getElementById(`sponsorships-sort-${field}`);
+            if (header) {
+                header.addEventListener('click', () => handleSortClick(field));
+            }
+        });
     },
     
     /**
@@ -901,6 +1352,10 @@ export const StreamsLogic = {
      */
     async loadStreamDetail(streamId, isSponsored = false, sponsorshipId = null) {
         logger.log(`StreamsLogic: Loading stream detail for ${streamId}`);
+        
+        // Stop any existing stream player and clear log before loading new stream
+        await stopStreamPlayer();
+        clearStreamPlayerLog();
         
         detailState.currentStreamId = streamId;
         detailState.currentSponsorshipId = sponsorshipId;
@@ -1037,7 +1492,7 @@ function renderStreamDetail(stream, isSponsored, sponsorshipId) {
         if (sponsorshipPanel) sponsorshipPanel.classList.add('hidden');
         if (sponsoredBadge) sponsoredBadge.classList.add('hidden');
         if (permissionsStandalone) permissionsStandalone.classList.remove('hidden');
-        // Render permissions in standalone panel for non-sponsored streams
+        // Render permissions in standalone panel for streams without sponsorship
         renderPermissionsTable(stream.permissions, true);
     }
     
@@ -1080,7 +1535,16 @@ function renderPermissionsTable(permissions, standalone = false) {
     
     const now = Math.floor(Date.now() / 1000);
     
-    const html = permissions.map(p => {
+    // Sort permissions to put Public (0x0000...) address first
+    const sortedPermissions = [...permissions].sort((a, b) => {
+        const aIsPublic = a.userAddress && a.userAddress.toLowerCase() === '0x0000000000000000000000000000000000000000';
+        const bIsPublic = b.userAddress && b.userAddress.toLowerCase() === '0x0000000000000000000000000000000000000000';
+        if (aIsPublic && !bIsPublic) return -1;
+        if (!aIsPublic && bIsPublic) return 1;
+        return 0;
+    });
+    
+    const html = sortedPermissions.map(p => {
         const isPublicAddress = p.userAddress && p.userAddress.toLowerCase() === '0x0000000000000000000000000000000000000000';
         const displayAddress = isPublicAddress ? 'Public' : Utils.shortAddress(p.userAddress);
         const addressClass = isPublicAddress ? 'text-blue-400 font-medium' : 'font-mono text-gray-300';
@@ -1133,8 +1597,8 @@ function renderSponsorshipDetails(sponsorship) {
     };
     
     // Cumulative sponsored
-    const totalSponsored = Utils.convertWeiToData(sponsorship.cumulativeSponsoring || '0');
-    setValueWithTooltip('stream-total-sponsored', totalSponsored, Utils.formatBigNumber(totalSponsored) + ' DATA');
+    const totalSponsorships = Utils.convertWeiToData(sponsorship.cumulativeSponsoring || '0');
+    setValueWithTooltip('stream-total-sponsored', totalSponsorships, Utils.formatBigNumber(totalSponsorships) + ' DATA');
     
     // Remaining balance
     const remaining = Utils.convertWeiToData(sponsorship.remainingWei || '0');
@@ -1824,7 +2288,6 @@ let playerListenersSetup = false;
 function initializePartitionSelector(partitions) {
     const selectorContainer = document.getElementById('stream-partition-selector');
     const select = document.getElementById('stream-partition-select');
-    const subscribeAllCheckbox = document.getElementById('stream-subscribe-all');
     
     if (!selectorContainer || !select) return;
     
@@ -1833,8 +2296,16 @@ function initializePartitionSelector(partitions) {
         selectorContainer.classList.remove('hidden');
         selectorContainer.classList.add('flex');
         
-        // Populate partition options
+        // Populate partition options with "All" first
         select.innerHTML = '';
+        
+        // Add "All" option first
+        const allOption = document.createElement('option');
+        allOption.value = 'all';
+        allOption.textContent = 'All';
+        select.appendChild(allOption);
+        
+        // Add individual partition options
         for (let i = 0; i < partitions; i++) {
             const option = document.createElement('option');
             option.value = i;
@@ -1842,10 +2313,8 @@ function initializePartitionSelector(partitions) {
             select.appendChild(option);
         }
         
-        // Reset checkbox
-        if (subscribeAllCheckbox) {
-            subscribeAllCheckbox.checked = false;
-        }
+        // Set default to Partition 0
+        select.value = '0';
     } else {
         selectorContainer.classList.add('hidden');
         selectorContainer.classList.remove('flex');
@@ -1859,6 +2328,7 @@ function setupStreamPlayerListeners() {
     const playBtn = document.getElementById('stream-play-btn');
     const stopBtn = document.getElementById('stream-stop-btn');
     const clearBtn = document.getElementById('stream-clear-btn');
+    const partitionSelect = document.getElementById('stream-partition-select');
     
     if (playBtn) {
         playBtn.addEventListener('click', startStreamPlayer);
@@ -1871,11 +2341,27 @@ function setupStreamPlayerListeners() {
     if (clearBtn) {
         clearBtn.addEventListener('click', clearStreamPlayerLog);
     }
+    
+    // Add change listener for partition selector to auto-switch subscription
+    if (partitionSelect) {
+        partitionSelect.addEventListener('change', handlePartitionChange);
+    }
+}
+
+/**
+ * Handle partition dropdown change - auto-switch subscription if active
+ */
+async function handlePartitionChange() {
+    // Only re-subscribe if there's an active subscription
+    const isSubscribed = detailState.subscription || detailState.subscriptions.length > 0;
+    if (!isSubscribed) return;
+    
+    // Stop current subscription and start new one with selected partition
+    await stopStreamPlayer();
+    await startStreamPlayer();
 }
 
 async function startStreamPlayer() {
-    if (detailState.subscription || detailState.subscriptions.length > 0) return;
-    
     const streamId = detailState.currentStreamId;
     if (!streamId) return;
     
@@ -1884,7 +2370,6 @@ async function startStreamPlayer() {
     const statusDot = document.getElementById('stream-player-status');
     const statusText = document.getElementById('stream-player-status-text');
     const logContainer = document.getElementById('stream-player-log');
-    const subscribeAllCheckbox = document.getElementById('stream-subscribe-all');
     const partitionSelect = document.getElementById('stream-partition-select');
     
     statusText.textContent = 'Connecting...';
@@ -1905,7 +2390,8 @@ async function startStreamPlayer() {
         logContainer.innerHTML = '';
         
         // Determine which partitions to subscribe to
-        const subscribeToAll = subscribeAllCheckbox && subscribeAllCheckbox.checked;
+        const selectedValue = partitionSelect ? partitionSelect.value : '0';
+        const subscribeToAll = selectedValue === 'all';
         const partitions = detailState.partitions;
         
         if (subscribeToAll && partitions > 1) {

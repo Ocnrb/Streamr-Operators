@@ -1962,9 +1962,6 @@
   .text-purple-400 {
     color: var(--color-purple-400);
   }
-  .text-purple-500 {
-    color: var(--color-purple-500);
-  }
   .text-red-400 {
     color: var(--color-red-400);
   }
@@ -2169,6 +2166,13 @@
     &:is(:where(.group):hover *) {
       @media (hover: hover) {
         color: var(--color-white);
+      }
+    }
+  }
+  .group-hover\:opacity-50 {
+    &:is(:where(.group):hover *) {
+      @media (hover: hover) {
+        opacity: 50%;
       }
     }
   }
