@@ -1523,18 +1523,20 @@ function setupRouter() {
         UI.displayView('stream-detail');
         UI.hideProfileButtons();
         navigationController.updateActiveState('streams');
-        navigationController.updatePageTitle('streams', 'Stream Details');
+        
+        // Parse URL search params for sponsored flag
+        const urlParams = new URLSearchParams(window.location.search);
+        const isSponsored = urlParams.get('sponsored') === 'true';
+        const sponsorshipId = urlParams.get('sponsorshipId');
+        
+        // Update page title based on whether it's sponsored or not
+        navigationController.updatePageTitle('streams', isSponsored ? 'Sponsorship Details' : 'Stream Details');
         
         try {
             const streamsModule = await loadStreamsModule();
             streamsModule.setSharedState({ 
                 dataPriceUSD: state.dataPriceUSD
             });
-            
-            // Parse URL search params for sponsored flag
-            const urlParams = new URLSearchParams(window.location.search);
-            const isSponsored = urlParams.get('sponsored') === 'true';
-            const sponsorshipId = urlParams.get('sponsorshipId');
             
             // Stream IDs can contain special characters, decode them
             const streamId = decodeURIComponent(params.id);

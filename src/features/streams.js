@@ -54,7 +54,7 @@ const state = {
     dataPriceUSD: null,
     
     // Active tab
-    activeTab: 'sponsorships',
+    activeTab: 'allStreams',
     
     // Operator stakes - Set of sponsorship IDs where user's operator has stake
     operatorStakes: new Set(),
@@ -256,6 +256,14 @@ async function fetchAllStreams(skip = 0) {
                 createdAt
                 updatedAt
                 metadata
+                sponsorships(first: 1) {
+                    id
+                }
+                permissions(first: 10) {
+                    userAddress
+                    subscribeExpiration
+                    publishExpiration
+                }
             }
         }
     `;
@@ -342,6 +350,9 @@ async function searchAllStreams(searchTerm) {
                 createdAt
                 updatedAt
                 metadata
+                sponsorships(first: 1) {
+                    id
+                }
             }
         }
     `;
@@ -401,6 +412,11 @@ async function fetchStreamDetails(streamId) {
                     publishExpiration
                     subscribeExpiration
                     canGrant
+                }
+                storageNodes {
+                    id
+                    metadata
+                    lastSeen
                 }
                 sponsorships(first: 10, orderBy: spotAPY, orderDirection: desc) {
                     id
@@ -594,9 +610,30 @@ function createSponsorshipRowHtml(sponsorship, index) {
  */
 function createAllStreamRowHtml(stream, index) {
     const streamId = stream.id || 'Unknown Stream';
-    const displayStreamId = streamId.length > 50 ? streamId.substring(0, 47) + '...' : streamId;
-    const createdAt = stream.createdAt ? new Date(parseInt(stream.createdAt) * 1000).toLocaleDateString() : 'N/A';
-    const updatedAt = stream.updatedAt ? new Date(parseInt(stream.updatedAt) * 1000).toLocaleDateString() : 'N/A';
+    // Desktop: show more characters, Mobile: abbreviated format
+    const displayStreamIdDesktop = streamId.length > 80 ? streamId.substring(0, 77) + '...' : streamId;
+    const displayStreamIdMobile = streamId.length > 30 ? streamId.substring(0, 27) + '...' : streamId;
+    
+    // Format date as dd/mm/yyyy hh:mm
+    let createdAt = 'N/A';
+    if (stream.createdAt) {
+        const date = new Date(parseInt(stream.createdAt) * 1000);
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const year = date.getFullYear();
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        createdAt = `${day}/${month}/${year} ${hours}:${minutes}`;
+    }
+    
+    // Check if stream has sponsorships
+    const hasSponsorship = stream.sponsorships && stream.sponsorships.length > 0;
+    const sponsorshipIcon = hasSponsorship 
+        ? `<svg class="w-5 h-5" viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg" title="Has Sponsorship">
+            <circle cx="28" cy="28" r="28" fill="#F7600A"/>
+            <path fill-rule="evenodd" clip-rule="evenodd" d="M32.9091 10.2118V9.08164C32.9091 8.69418 32.5861 8.38241 32.199 8.4008C24.6009 8.76169 18.5119 14.8843 18.2056 22.4955C18.2219 22.9725 18.608 23.0974 18.8351 23.0974H19.983C20.3463 23.0974 20.6441 22.8122 20.6629 22.4495C20.989 16.1879 26.0134 11.1697 32.278 10.8522C32.7558 10.7908 32.9091 10.5297 32.9091 10.2118ZM22.5761 23.0974H23.6747C24.0313 23.0974 24.3221 22.8195 24.348 22.4638C24.6586 18.2097 28.0701 14.8164 32.3324 14.5336C32.523 14.521 32.9091 14.3783 32.9091 13.8844V12.7659C32.9091 12.3707 32.5739 12.0603 32.1795 12.0861C26.6654 12.4459 22.256 16.8547 21.8961 22.3679C21.8704 22.7623 22.1808 23.0974 22.5761 23.0974ZM37.1763 32.9026C37.4035 32.9026 37.7895 33.0275 37.8058 33.5045C37.4995 41.1158 31.4105 47.2383 23.8124 47.5993C23.4253 47.6176 23.1023 47.3059 23.1023 46.9183V45.7883C23.1023 45.4704 23.2556 45.2093 23.7333 45.1479C29.9981 44.8304 35.0224 39.8121 35.3485 33.5505C35.3673 33.1878 35.6651 32.9026 36.0284 32.9026H37.1763ZM33.4353 32.9026C33.8306 32.9026 34.141 33.2377 34.1153 33.6321C33.7554 39.1454 29.346 43.5542 23.8319 43.914C23.4375 43.9398 23.1023 43.6293 23.1023 43.2341V42.1155C23.1023 41.6217 23.4884 41.4791 23.679 41.4664C27.9413 41.1837 31.3529 37.7903 31.6633 33.5362C31.6893 33.1805 31.9801 32.9026 32.3367 32.9026H33.4353ZM29.7445 32.9026C30.1445 32.9026 30.463 33.246 30.4231 33.6441C30.0758 37.1151 27.3154 39.8751 23.8438 40.2224C23.4458 40.2623 23.1023 39.9438 23.1023 39.5438V38.4201C23.1023 37.9604 23.5015 37.795 23.6961 37.7715C25.9261 37.5025 27.6953 35.7373 27.9703 33.5095C28.0129 33.1647 28.2999 32.9026 28.6474 32.9026H29.7445ZM10.212 23.0945C10.53 23.0945 10.7911 23.2477 10.8525 23.7254C11.1701 29.9892 16.189 35.0129 22.4516 35.3389C22.8143 35.3577 23.0996 35.6555 23.0996 36.0187V37.1666C23.0996 37.3936 22.9746 37.7796 22.4976 37.7959C14.8853 37.4896 8.76181 31.4015 8.4008 23.8045C8.3824 23.4174 8.69423 23.0945 9.0818 23.0945H10.212ZM13.8853 23.0945C14.3792 23.0945 14.5219 23.4805 14.5346 23.6711C14.8173 27.9328 18.2111 31.3439 22.4659 31.6543C22.8216 31.6803 23.0996 31.971 23.0996 32.3276V33.426C23.0996 33.8212 22.7644 34.1316 22.3699 34.1059C16.8559 33.746 12.4464 29.3373 12.0866 23.824C12.0608 23.4296 12.3713 23.0945 12.7666 23.0945H13.8853ZM33.5024 18.1729C41.1148 18.4792 47.2382 24.5673 47.5993 32.1644C47.6176 32.5514 47.3058 32.8744 46.9183 32.8744H45.788C45.4701 32.8744 45.2089 32.7211 45.1475 32.2434C44.8299 25.9795 39.811 20.956 33.5485 20.6299C33.1857 20.6111 32.9005 20.3133 32.9005 19.9501V18.8023C32.9005 18.5752 33.0253 18.1892 33.5024 18.1729ZM33.6301 21.8629C39.1442 22.2227 43.5536 26.6315 43.9135 32.1448C43.9392 32.5392 43.6288 32.8744 43.2335 32.8744H42.1148C41.6208 32.8744 41.4782 32.4883 41.4655 32.2977C41.1828 28.036 37.7889 24.6249 33.5342 24.3145C33.1784 24.2886 32.9005 23.9978 32.9005 23.6412V22.5428C32.9005 22.1476 33.2357 21.8372 33.6301 21.8629ZM33.642 25.5545C37.1136 25.9019 39.874 28.6619 40.2213 32.1329C40.2612 32.5309 39.9427 32.8744 39.5427 32.8744H38.4188C37.959 32.8744 37.7936 32.4752 37.7701 32.2806C37.501 30.0509 35.7356 28.282 33.5075 28.0071C33.1626 27.9645 32.9005 27.6775 32.9005 27.33V26.2331C32.9005 25.8331 33.244 25.5147 33.642 25.5545ZM17.5812 23.0945C18.0411 23.0945 18.2064 23.4936 18.2299 23.6882C18.4991 25.9179 20.2644 27.6868 22.4926 27.9618C22.8374 28.0043 23.0996 28.2913 23.0996 28.6388V29.7357C23.0996 30.1357 22.7561 30.4541 22.358 30.4144C18.8865 30.0669 16.1261 27.3069 15.7786 23.8359C15.7388 23.4379 16.0573 23.0945 16.4574 23.0945H17.5812ZM32.9091 16.4562V17.5798C32.9091 18.0396 32.51 18.205 32.3152 18.2285C30.0853 18.4976 28.3161 20.2627 28.0411 22.4905C27.9985 22.8353 27.7115 23.0974 27.364 23.0974H26.2669C25.8669 23.0974 25.5484 22.7539 25.5882 22.3559C25.9357 18.885 28.6961 16.125 32.1675 15.7776C32.5656 15.7378 32.9091 16.0562 32.9091 16.4562Z" fill="white"/>
+           </svg>` 
+        : '';
     
     // Parse partitions from metadata
     let partitions = 1;
@@ -607,6 +644,21 @@ function createAllStreamRowHtml(stream, index) {
         }
     } catch (e) { /* ignore */ }
     
+    // Create partition pill (purple badge like in Live Data Viewer)
+    const partitionPill = `<span class="px-1.5 py-0.5 bg-purple-500/20 text-purple-400 rounded text-[10px] font-medium">P${partitions}</span>`;
+    
+    // Determine access control (public vs private)
+    const accessType = determineAccessControl(stream.permissions);
+    const isPublic = accessType === 'public-all' || accessType === 'public-subscribe';
+    const accessIcon = isPublic
+        ? `<svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" title="Public Stream">
+             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+           </svg>`
+        : `<svg class="w-4 h-4 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" title="Private Stream">
+             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+           </svg>`;
+    
     // Encode the stream ID for URL - preserve slashes but encode other special chars
     const encodedStreamId = streamId.split('/').map(part => encodeURIComponent(part)).join('/');
     
@@ -616,11 +668,13 @@ function createAllStreamRowHtml(stream, index) {
             data-sponsored="false"
             onclick="event.preventDefault(); window.router.navigate('/stream/${encodedStreamId}')">
             <td class="px-4 py-3">
-                <span class="font-mono text-sm group-hover:text-blue-400 transition-colors" title="${Utils.escapeHtml(streamId)}">${Utils.escapeHtml(displayStreamId)}</span>
+                <span class="font-mono text-sm group-hover:text-blue-400 transition-colors hidden md:inline" title="${Utils.escapeHtml(streamId)}">${Utils.escapeHtml(displayStreamIdDesktop)}</span>
+                <span class="font-mono text-sm group-hover:text-blue-400 transition-colors md:hidden" title="${Utils.escapeHtml(streamId)}">${Utils.escapeHtml(displayStreamIdMobile)}</span>
             </td>
-            <td class="px-4 py-3 text-center text-gray-400 whitespace-nowrap">${partitions}</td>
-            <td class="px-4 py-3 text-right text-gray-400 whitespace-nowrap">${createdAt}</td>
-            <td class="px-4 py-3 text-right text-gray-400 whitespace-nowrap">${updatedAt}</td>
+            <td class="px-4 py-3 text-center">${sponsorshipIcon}</td>
+            <td class="px-4 py-3 text-center">${accessIcon}</td>
+            <td class="px-4 py-3 text-center whitespace-nowrap">${partitionPill}</td>
+            <td class="px-4 py-3 text-right text-gray-400 whitespace-nowrap hidden md:table-cell">${createdAt}</td>
         </tr>
     `;
 }
@@ -1220,7 +1274,7 @@ export const StreamsLogic = {
         updateSortHeaderUI();
         
         // Reset UI to default tab
-        switchTab('sponsorships');
+        switchTab('nonsponsored');
         
         // Show loading state
         UI.showLoader(true);
@@ -1433,10 +1487,23 @@ function renderStreamDetail(stream, isSponsored, sponsorshipId) {
     // Store partitions in state for player
     detailState.partitions = partitions;
     
-    // Stream title/name
-    const streamName = metadata.name || stream.id.split('/').pop() || 'Unknown Stream';
-    setText('stream-detail-title', streamName);
+    // Stream title/name - extract path from stream ID (everything after the first /)
+    const streamIdParts = stream.id.split('/');
+    const streamPath = streamIdParts.length > 1 ? streamIdParts.slice(1).join('/') : stream.id;
+    setText('stream-detail-title', streamPath);
     setText('stream-detail-id', stream.id);
+    
+    // Setup click handler for stream ID to navigate to Stream Details (non-sponsored view)
+    const streamIdEl = document.getElementById('stream-detail-id');
+    if (streamIdEl && isSponsored) {
+        streamIdEl.onclick = () => {
+            window.router.navigate(`/stream/${encodeURIComponent(stream.id)}`);
+        };
+        streamIdEl.title = 'Click to view Stream Details';
+    } else if (streamIdEl) {
+        streamIdEl.onclick = null;
+        streamIdEl.title = '';
+    }
     
     // Partitions
     setText('stream-partitions', partitions);
@@ -1469,11 +1536,21 @@ function renderStreamDetail(stream, isSponsored, sponsorshipId) {
     const sponsorshipPanel = document.getElementById('stream-sponsorship-panel');
     const sponsoredBadge = document.getElementById('stream-sponsored-badge');
     const permissionsStandalone = document.getElementById('stream-permissions-panel-standalone');
+    const streamStatsGrid = document.getElementById('stream-stats-grid');
+    const sponsorshipStatsGrid = document.getElementById('sponsorship-stats-grid');
     
     if (isSponsored && stream.sponsorships && stream.sponsorships.length > 0) {
         if (sponsorshipPanel) sponsorshipPanel.classList.remove('hidden');
         if (sponsoredBadge) sponsoredBadge.classList.remove('hidden');
         if (permissionsStandalone) permissionsStandalone.classList.add('hidden');
+        // Show sponsorship stats, hide stream stats
+        if (streamStatsGrid) streamStatsGrid.classList.add('hidden');
+        if (sponsorshipStatsGrid) sponsorshipStatsGrid.classList.remove('hidden');
+        // Hide Stream Details specific panels
+        const sponsorshipsListPanel = document.getElementById('stream-sponsorships-list-panel');
+        const storagePanel = document.getElementById('stream-storage-panel');
+        if (sponsorshipsListPanel) sponsorshipsListPanel.classList.add('hidden');
+        if (storagePanel) storagePanel.classList.add('hidden');
         
         const targetSponsorship = sponsorshipId 
             ? stream.sponsorships.find(s => s.id === sponsorshipId) || stream.sponsorships[0]
@@ -1482,6 +1559,9 @@ function renderStreamDetail(stream, isSponsored, sponsorshipId) {
         // Update header APY
         const apy = parseFloat(targetSponsorship.spotAPY || 0);
         setText('stream-header-apy', (apy * 100).toFixed(0) + '%');
+        
+        // Update header stats for sponsorship
+        updateSponsorshipHeaderStats(targetSponsorship);
         
         renderSponsorshipDetails(targetSponsorship);
         setupChartEventListeners();
@@ -1492,8 +1572,15 @@ function renderStreamDetail(stream, isSponsored, sponsorshipId) {
         if (sponsorshipPanel) sponsorshipPanel.classList.add('hidden');
         if (sponsoredBadge) sponsoredBadge.classList.add('hidden');
         if (permissionsStandalone) permissionsStandalone.classList.remove('hidden');
+        // Show stream stats, hide sponsorship stats
+        if (streamStatsGrid) streamStatsGrid.classList.remove('hidden');
+        if (sponsorshipStatsGrid) sponsorshipStatsGrid.classList.add('hidden');
         // Render permissions in standalone panel for streams without sponsorship
         renderPermissionsTable(stream.permissions, true);
+        // Render sponsorships list for stream details view
+        renderStreamSponsorshipsList(stream.sponsorships);
+        // Render storage nodes
+        renderStreamStorageNodes(stream.storageNodes);
     }
     
     // Also render permissions in the sponsored panel if sponsored
@@ -1571,6 +1658,235 @@ function renderPermissionsTable(permissions, standalone = false) {
 }
 
 /**
+ * Render sponsorships list for Stream Details view (non-sponsored)
+ * @param {Array} sponsorships - Sponsorship entries
+ */
+function renderStreamSponsorshipsList(sponsorships) {
+    const panel = document.getElementById('stream-sponsorships-list-panel');
+    const content = document.getElementById('stream-sponsorships-list-content');
+    const emptyState = document.getElementById('stream-sponsorships-list-empty');
+    
+    if (!panel || !content) return;
+    
+    // Always show the panel for stream details
+    panel.classList.remove('hidden');
+    
+    if (!sponsorships || sponsorships.length === 0) {
+        if (emptyState) emptyState.classList.remove('hidden');
+        content.innerHTML = '';
+        return;
+    }
+    
+    if (emptyState) emptyState.classList.add('hidden');
+    
+    // Build table HTML
+    let tableHtml = `
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead class="text-xs text-gray-500 uppercase bg-[#252525]">
+                    <tr>
+                        <th class="px-4 py-3 text-left">Status</th>
+                        <th class="px-4 py-3 text-right">APY</th>
+                        <th class="px-4 py-3 text-right hidden md:table-cell">Operators</th>
+                        <th class="px-4 py-3 text-right hidden md:table-cell">Payout (DATA/day)</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-[#333]">
+    `;
+    
+    sponsorships.forEach(s => {
+        const apy = parseFloat(s.spotAPY || 0) * 100;
+        const apyRounded = Math.round(apy);
+        const apyColor = apyRounded > 0 ? 'text-green-400' : 'text-gray-500';
+        const operatorCount = s.operatorCount || 0;
+        const payoutWeiPerSec = BigInt(s.totalPayoutWeiPerSec || '0');
+        const payoutWeiPerDay = payoutWeiPerSec * BigInt(86400);
+        const payoutPerDay = Utils.convertWeiToData(payoutWeiPerDay.toString());
+        
+        // Check if active
+        const now = Math.floor(Date.now() / 1000);
+        const insolvencyTs = parseInt(s.projectedInsolvency || 0);
+        const isActive = s.isRunning && insolvencyTs > now;
+        
+        const statusBadge = isActive
+            ? `<span class="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-green-500/20 text-green-400 text-xs font-medium">
+                 <span class="w-1.5 h-1.5 rounded-full bg-green-400"></span>Active
+               </span>`
+            : `<span class="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-red-500/20 text-red-400 text-xs font-medium">
+                 <span class="w-1.5 h-1.5 rounded-full bg-red-400"></span>Inactive
+               </span>`;
+        
+        tableHtml += `
+            <tr class="sponsorship-link hover:bg-white/5 cursor-pointer transition-colors"
+                data-sponsorship-id="${s.id}">
+                <td class="px-4 py-3">${statusBadge}</td>
+                <td class="px-4 py-3 text-right ${apyColor} font-semibold">${apyRounded}%</td>
+                <td class="px-4 py-3 text-right text-gray-400 hidden md:table-cell">${operatorCount}</td>
+                <td class="px-4 py-3 text-right text-gray-400 hidden md:table-cell">${Utils.formatBigNumber(parseFloat(payoutPerDay))}</td>
+            </tr>
+        `;
+    });
+    
+    tableHtml += `
+                </tbody>
+            </table>
+        </div>
+    `;
+    
+    content.innerHTML = tableHtml;
+    
+    // Add click handlers for navigation - use event delegation on tbody
+    const tbody = content.querySelector('tbody');
+    if (tbody) {
+        tbody.addEventListener('click', (e) => {
+            const row = e.target.closest('.sponsorship-link');
+            if (row) {
+                e.preventDefault();
+                const sponsorshipId = row.dataset.sponsorshipId;
+                if (sponsorshipId && detailState.currentStreamId) {
+                    // Navigate to sponsorship details
+                    const encodedStreamId = detailState.currentStreamId.split('/').map(part => encodeURIComponent(part)).join('/');
+                    window.router.navigate(`/stream/${encodedStreamId}?sponsored=true&sponsorshipId=${sponsorshipId}`);
+                }
+            }
+        });
+    }
+}
+
+/**
+ * Render storage nodes for Stream Details view
+ * @param {Array} storageNodes - Storage node entries
+ */
+function renderStreamStorageNodes(storageNodes) {
+    const panel = document.getElementById('stream-storage-panel');
+    const content = document.getElementById('stream-storage-content');
+    const emptyState = document.getElementById('stream-storage-empty');
+    
+    if (!panel || !content) return;
+    
+    // Always show the panel for stream details
+    panel.classList.remove('hidden');
+    
+    if (!storageNodes || storageNodes.length === 0) {
+        if (emptyState) emptyState.classList.remove('hidden');
+        content.innerHTML = '';
+        return;
+    }
+    
+    if (emptyState) emptyState.classList.add('hidden');
+    
+    const html = storageNodes.map(node => {
+        const nodeId = node.id || 'Unknown';
+        const displayId = nodeId.length > 20 ? nodeId.substring(0, 10) + '...' + nodeId.substring(nodeId.length - 8) : nodeId;
+        
+        // Parse metadata for node name if available
+        let nodeName = null;
+        try {
+            if (node.metadata) {
+                const meta = JSON.parse(node.metadata);
+                nodeName = meta.name;
+            }
+        } catch (e) { /* ignore */ }
+        
+        // Calculate last seen
+        let lastSeenText = 'Unknown';
+        if (node.lastSeen) {
+            const lastSeenDate = new Date(parseInt(node.lastSeen) * 1000);
+            const now = new Date();
+            const diffMs = now - lastSeenDate;
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffHours = Math.floor(diffMs / 3600000);
+            const diffDays = Math.floor(diffMs / 86400000);
+            
+            if (diffMins < 5) {
+                lastSeenText = 'Online';
+            } else if (diffMins < 60) {
+                lastSeenText = `${diffMins}m ago`;
+            } else if (diffHours < 24) {
+                lastSeenText = `${diffHours}h ago`;
+            } else {
+                lastSeenText = `${diffDays}d ago`;
+            }
+        }
+        
+        const isOnline = lastSeenText === 'Online';
+        const statusDot = isOnline
+            ? '<span class="w-2 h-2 rounded-full bg-green-400"></span>'
+            : '<span class="w-2 h-2 rounded-full bg-gray-500"></span>';
+        
+        return `
+            <div class="flex items-center justify-between p-3 bg-[#252525] rounded-lg">
+                <div class="flex items-center gap-3">
+                    ${statusDot}
+                    <div>
+                        ${nodeName ? `<span class="text-white font-medium">${Utils.escapeHtml(nodeName)}</span>` : ''}
+                        <span class="font-mono text-sm ${nodeName ? 'text-gray-500 ml-2' : 'text-gray-300'}" title="${nodeId}">${displayId}</span>
+                    </div>
+                </div>
+                <span class="text-sm ${isOnline ? 'text-green-400' : 'text-gray-500'}">${lastSeenText}</span>
+            </div>
+        `;
+    }).join('');
+    
+    content.innerHTML = html;
+}
+
+/**
+ * Update the header stats grid for sponsorship details view
+ */
+function updateSponsorshipHeaderStats(sponsorship) {
+    const setHtml = (id, html) => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = html;
+    };
+    const setText = (id, text) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = text;
+    };
+    
+    // Status badge
+    const now = Math.floor(Date.now() / 1000);
+    const insolvencyTs = parseInt(sponsorship.projectedInsolvency || 0);
+    const isActive = sponsorship.isRunning && insolvencyTs > now;
+    
+    if (isActive) {
+        setHtml('stream-sponsorship-status', `
+            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-500/20 text-green-400 text-sm font-medium">
+                <span class="w-2 h-2 rounded-full bg-green-400"></span>
+                Active
+            </span>
+        `);
+    } else {
+        setHtml('stream-sponsorship-status', `
+            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/20 text-red-400 text-sm font-medium">
+                <span class="w-2 h-2 rounded-full bg-red-400"></span>
+                Inactive
+            </span>
+        `);
+    }
+    
+    // Operators count
+    setText('stream-header-operators', sponsorship.operatorCount || '0');
+    
+    // Payout rate (DATA/day)
+    const payoutWeiPerSec = BigInt(sponsorship.totalPayoutWeiPerSec || '0');
+    const payoutWeiPerDay = payoutWeiPerSec * BigInt(86400);
+    const payoutPerDay = Utils.convertWeiToData(payoutWeiPerDay.toString());
+    setText('stream-header-payout', Utils.formatBigNumber(parseFloat(payoutPerDay)));
+    
+    // Expires date
+    if (insolvencyTs > 0) {
+        const insolvencyDate = new Date(insolvencyTs * 1000);
+        const day = String(insolvencyDate.getDate()).padStart(2, '0');
+        const month = String(insolvencyDate.getMonth() + 1).padStart(2, '0');
+        const year = insolvencyDate.getFullYear();
+        setText('stream-header-expires', `${day}/${month}/${year}`);
+    } else {
+        setText('stream-header-expires', 'N/A');
+    }
+}
+
+/**
  * Render sponsorship details
  */
 function renderSponsorshipDetails(sponsorship) {
@@ -1582,11 +1898,6 @@ function renderSponsorshipDetails(sponsorship) {
         if (el) {
             el.textContent = displayText;
             el.setAttribute('data-tooltip-value', value.toString());
-            // Add USD tooltip on hover
-            if (dataPriceUSD) {
-                const usdValue = value * dataPriceUSD;
-                el.title = `≈ $${Utils.formatBigNumber(usdValue)} USD`;
-            }
         }
     };
     
@@ -1635,7 +1946,6 @@ function renderSponsorshipDetails(sponsorship) {
     
     // Operators list
     renderOperatorsList(sponsorship.stakes);
-    document.getElementById('stream-operators-count').textContent = `(${sponsorship.operatorCount || 0})`;
     
     // Funding history
     renderFundingHistory(sponsorship.sponsoringEvents);
@@ -2024,7 +2334,7 @@ function renderFundingHistory(events) {
                     <span class="text-gray-400 text-xs">${date}</span>
                     <span class="text-gray-600 text-xs font-mono hidden sm:inline">${sponsor}</span>
                 </div>
-                <span class="text-green-400 font-semibold text-sm" data-tooltip-value="${rawAmount}">+${amount}</span>
+                <span class="text-green-400 font-semibold text-sm" data-tooltip-value="${rawAmount}">+ ${amount} DATA</span>
             </div>
         `;
     }).join('');

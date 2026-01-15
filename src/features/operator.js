@@ -967,6 +967,24 @@ export const OperatorLogic = {
                 return;
             }
             
+            // Delegator link click - navigate to Delegator Details
+            const delegatorLink = target.closest('.delegator-link');
+            if (delegatorLink && delegatorLink.dataset.delegatorId) {
+                e.preventDefault();
+                window.router.navigate(`/delegator/${delegatorLink.dataset.delegatorId}`);
+                return;
+            }
+            
+            // Sponsorship link click - navigate to Sponsorship Details
+            const sponsorshipLink = target.closest('.sponsorship-link');
+            if (sponsorshipLink && sponsorshipLink.dataset.streamId) {
+                e.preventDefault();
+                const streamId = sponsorshipLink.dataset.streamId;
+                const sponsorshipId = sponsorshipLink.dataset.sponsorshipId;
+                window.router.navigate(`/stream/${encodeURIComponent(streamId)}?sponsored=true&sponsorshipId=${sponsorshipId}`);
+                return;
+            }
+            
             // Transaction buttons
             if (target.id === 'delegate-btn') handleDelegateClick();
             if (target.id === 'undelegate-btn') handleUndelegateClick();

@@ -1,4 +1,4 @@
-import { escapeHtml, formatBigNumber, convertWeiToData, createAddressLink, createEntityLink, parseOperatorMetadata, calculateWeightedApy } from '../core/utils.js';
+import { escapeHtml, formatBigNumber, convertWeiToData, createAddressLink, createEntityLink, createDelegatorLink, createSponsorshipLink, parseOperatorMetadata, calculateWeightedApy } from '../core/utils.js';
 import { getMaticBalance } from '../core/services.js';
 import { regionToLocationMap } from './locationData.js';
 import { MAX_STREAM_MESSAGES } from '../core/constants.js';
@@ -615,7 +615,7 @@ export function updateDelegatorsSection(delegations, totalDelegatorCount, operat
         
         return `
         <li class="flex justify-between items-center py-2 border-b border-[#333333]">
-            <div class="font-mono text-xs text-gray-300 truncate">${createAddressLink(delegation.delegator.id)}</div>
+            <div class="font-mono text-xs text-gray-300 truncate">${createDelegatorLink(delegation.delegator.id)}</div>
             <div class="text-right"><span class="font-mono text-xs text-green-400 block" data-tooltip-value="${currentDataValue}">${formatBigNumber(currentDataValue)} DATA</span></div>
         </li>`;
     }).join('');
@@ -1183,8 +1183,8 @@ export function renderOperatorDetails(data, globalState) {
     const sponsorshipsHtml = op.stakes?.length > 0 ? op.stakes.map(stake => {
         const sp = stake.sponsorship;
         if (!sp) return '';
-        const sponsorshipUrl = `https://streamr.network/hub/network/sponsorships/${sp.id}`;
         const sponsorshipDisplayText = escapeHtml(sp.stream?.id || sp.id);
+        const streamId = sp.stream?.id || sp.id;
         const editStakeLink = isAgent
             ? `<a href="#" class="block px-4 py-2 text-sm text-gray-200 hover:bg-[#444444] edit-stake-link" data-sponsorship-id="${sp.id}" data-current-stake="${stake.amountWei}">Edit Stake</a>`
             : `<span class="block px-4 py-2 text-sm text-gray-500 opacity-50 cursor-not-allowed" data-tooltip-content="You must be an agent for this operator to edit stake.">Edit Stake</span>`;
@@ -1192,7 +1192,7 @@ export function renderOperatorDetails(data, globalState) {
         return `
             <li class="relative flex justify-between items-center py-3 border-b border-[#333333]">
                 <div class="flex-1 min-w-0">
-                    <a href="${sponsorshipUrl}" target="_blank" rel="noopener noreferrer" class="font-mono text-xs text-gray-300 hover:text-white transition-colors truncate block" title="${sponsorshipDisplayText}">${sponsorshipDisplayText}</a>
+                    <a href="#" class="font-mono text-xs text-gray-300 hover:text-white transition-colors truncate block sponsorship-link" data-sponsorship-id="${sp.id}" data-stream-id="${escapeHtml(streamId)}" title="${sponsorshipDisplayText}">${sponsorshipDisplayText}</a>
                     <div class="text-xs mt-2 space-y-1">
                         <div class="flex justify-between items-center"><span class="text-gray-400">Staked:</span><strong class="text-white font-mono" data-tooltip-value="${convertWeiToData(stake.amountWei)}">${formatBigNumber(convertWeiToData(stake.amountWei))} DATA</strong></div>
                         <div class="flex justify-between items-center"><span class="text-gray-400">APY:</span><strong class="text-green-400 font-mono">${Math.round(Number(sp.spotAPY) * 100)}%</strong></div>

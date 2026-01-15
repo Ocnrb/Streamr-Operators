@@ -152,6 +152,29 @@ export function createEntityLink(entity) {
 }
 
 /**
+ * Creates an internal app link to a delegator's detail view.
+ * @param {string} address The delegator's address.
+ * @returns {string} The HTML anchor tag.
+ */
+export function createDelegatorLink(address) {
+    if (!address) return '';
+    const abbreviated = `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
+    return `<a href="#" class="text-gray-300 hover:text-white transition-colors delegator-link" data-delegator-id="${address}" title="${escapeHtml(address)}">${abbreviated}</a>`;
+}
+
+/**
+ * Creates an internal app link to a sponsorship details view.
+ * @param {object} sponsorship The sponsorship object with id and stream info.
+ * @returns {string} The HTML anchor tag.
+ */
+export function createSponsorshipLink(sponsorship) {
+    if (!sponsorship || !sponsorship.id) return '';
+    const streamId = sponsorship.stream?.id || sponsorship.id;
+    const displayText = escapeHtml(streamId);
+    return `<a href="#" class="text-gray-300 hover:text-white transition-colors sponsorship-link" data-sponsorship-id="${sponsorship.id}" data-stream-id="${escapeHtml(streamId)}" title="${displayText}">${displayText}</a>`;
+}
+
+/**
  * Validates if a string is a valid IPFS CID (Content Identifier).
  * Supports both CIDv0 (Qm...) and CIDv1 (ba...) formats.
  * @param {string} cid - The CID to validate.
