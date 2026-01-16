@@ -173,7 +173,7 @@ async function loadFullHistory() {
         state.historyState.hasMoreEtherscan = false;
         
         processSponsorshipHistory(allGraphEvents, allEtherscanTxs, false);
-        UI.renderSponsorshipsHistory(state.sponsorshipHistory, false);
+        UI.renderSponsorshipsHistory(state.sponsorshipHistory, false, 'operators');
         
     } catch (error) {
         logger.error('Failed to load full history:', error);
@@ -255,7 +255,7 @@ function filterAndRenderChart() {
 }
 
 /**
- * Render Stake chart (original behavior)
+ * Render Stake chart 
  */
 function renderStakeChart() {
     let latestKnownPrice = state.dataPriceUSD || 0;
@@ -834,7 +834,7 @@ export const OperatorLogic = {
                 filterAndRenderChart();
                 
                 const showLoadAll = hasMoreHistoryToLoad();
-                UI.renderSponsorshipsHistory(state.sponsorshipHistory, showLoadAll);
+                UI.renderSponsorshipsHistory(state.sponsorshipHistory, showLoadAll, 'operators');
                 
                 if (expectedTxHash) {
                     const txFound = polygonscanTxs.some(tx => 
@@ -1040,7 +1040,7 @@ export const OperatorLogic = {
                 state.uiState.isSponsorshipsListViewActive = (tab === 'list');
                 if (tab === 'history') {
                     const showLoadAll = hasMoreHistoryToLoad() && !state.historyState.isFullLoaded;
-                    UI.renderSponsorshipsHistory(state.sponsorshipHistory, showLoadAll);
+                    UI.renderSponsorshipsHistory(state.sponsorshipHistory, showLoadAll, 'operators');
                 }
             }
             

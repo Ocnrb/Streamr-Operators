@@ -626,7 +626,7 @@ export function updateDelegatorsSection(delegations, totalDelegatorCount, operat
     }
 }
 
-export function renderSponsorshipsHistory(historyGroups, showLoadAllButton = true) {
+export function renderSponsorshipsHistory(historyGroups, showLoadAllButton = true, context = 'sponsorships') {
     const listEl = document.getElementById('sponsorships-history-list');
     if (!listEl) return;
 
@@ -663,17 +663,33 @@ export function renderSponsorshipsHistory(historyGroups, showLoadAllButton = tru
             
             let directionClass;
             const method = event.methodId;
-            const stakeInMethods = ["Stake", "Unstake", "Force Unstake", "Reduce Stake"];
+            const stakeMethods = ["Stake", "Unstake", "Force Unstake", "Reduce Stake"];
             const redMethods = ["Undelegate", "Protocol Tax"];
 
-            if (redMethods.includes(method)) {
-                directionClass = "tx-badge-out";
-            } else if (stakeInMethods.includes(method)) {
-                directionClass = "tx-badge-stake";
-            } else if (event.relatedObject === "OUT") {
-                directionClass = "tx-badge-out";
+            if (context === 'operators') {
+                // Operators context - ALL stake operations should be orange
+                if (stakeMethods.includes(method)) {
+                    directionClass = "tx-badge-stake-out"; // Orange for ALL stake operations
+                } else if (redMethods.includes(method)) {
+                    directionClass = "tx-badge-out";
+                } else if (event.relatedObject === "OUT") {
+                    directionClass = "tx-badge-out";
+                } else {
+                    directionClass = "tx-badge-in";
+                }
             } else {
-                directionClass = "tx-badge-in";
+                // Sponsorships context
+                if (redMethods.includes(method)) {
+                    directionClass = "tx-badge-out";
+                } else if (method === 'Stake' && event.relatedObject === 'IN') {
+                    directionClass = "tx-badge-stake"; // Green only for STAKE-IN in sponsorships
+                } else if (['Unstake', 'Force Unstake', 'Reduce Stake'].includes(method)) {
+                    directionClass = "tx-badge-out"; // Red for unstake operations in sponsorships
+                } else if (event.relatedObject === "OUT") {
+                    directionClass = "tx-badge-out";
+                } else {
+                    directionClass = "tx-badge-in";
+                }
             }
             
             const txUrl = `https://polygonscan.com/tx/${event.txHash}`;

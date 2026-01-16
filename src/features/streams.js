@@ -2433,7 +2433,7 @@ async function loadSponsorshipOnchainHistory(sponsorshipAddress) {
         }
         
         // Render the transactions
-        renderSponsorshipOnchainHistory(transactions);
+        renderSponsorshipOnchainHistory(transactions, 'sponsorships');
         
         // Sync tile heights after history content is loaded
         requestAnimationFrame(() => {
@@ -2463,8 +2463,9 @@ async function loadSponsorshipOnchainHistory(sponsorshipAddress) {
 /**
  * Render on-chain history transactions
  * @param {Array} transactions - Array of transaction objects from Polygonscan
+ * @param {string} context - 'operators' or 'sponsorships' to determine badge colors
  */
-function renderSponsorshipOnchainHistory(transactions) {
+function renderSponsorshipOnchainHistory(transactions, context = 'sponsorships') {
     const container = document.getElementById('sponsorship-history-list');
     if (!container) return;
     
@@ -2510,17 +2511,25 @@ function renderSponsorshipOnchainHistory(transactions) {
             method = 'Unstake';
         }
 
-        // Determine badge style based on method/direction
+        // Determine badge style based on method/direction and context
         let badgeClass = 'tx-badge-in';
-        // Force Stake IN to always be green in sponsorships
-        if (method === 'Stake' && direction === 'IN') {
-            badgeClass = 'tx-badge-stake';
-        } else if ((method === 'Funding' || method === 'Join') && direction === 'IN') {
-            badgeClass = 'tx-badge-stake';
-        } else if (['Unstake', 'Force Unstake', 'Reduce Stake'].includes(method)) {
-            badgeClass = 'tx-badge-out';
-        } else if (direction === 'OUT') {
-            badgeClass = 'tx-badge-out';
+        
+        if (context === 'sponsorships') {
+            // Sponsorships context
+            if (method === 'Stake' && direction === 'IN') {
+                badgeClass = 'tx-badge-stake'; // Green for STAKE-IN
+            } else if (['Unstake', 'Force Unstake', 'Reduce Stake'].includes(method)) {
+                badgeClass = 'tx-badge-out'; // Red for unstake operations
+            } else if (direction === 'OUT') {
+                badgeClass = 'tx-badge-out';
+            }
+        } else if (context === 'operators') {
+            // Operators context - ALL stake operations should be orange
+            if (['Stake', 'Unstake', 'Force Unstake', 'Reduce Stake'].includes(method)) {
+                badgeClass = 'tx-badge-stake-out'; // Orange for ALL stake operations
+            } else if (direction === 'OUT') {
+                badgeClass = 'tx-badge-out';
+            }
         }
 
         // Get operator name/address 
