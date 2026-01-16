@@ -382,6 +382,7 @@ const detailState = {
     bytesReceived: 0,
     bytesTimestamps: [], // {timestamp, bytes} for KB/s calculation
     partitions: 1, // Number of partitions in the stream
+    sponsorshipStakes: [], // Operators staked in current sponsorship
     // Unified chart state
     chart: null,
     chartData: null,
@@ -1487,22 +1488,16 @@ function renderStreamDetail(stream, isSponsored, sponsorshipId) {
     // Store partitions in state for player
     detailState.partitions = partitions;
     
-    // Stream title/name - extract path from stream ID (everything after the first /)
-    const streamIdParts = stream.id.split('/');
-    const streamPath = streamIdParts.length > 1 ? streamIdParts.slice(1).join('/') : stream.id;
-    setText('stream-detail-title', streamPath);
+    // Stream ID with link to Streamr Hub
     setText('stream-detail-id', stream.id);
     
-    // Setup click handler for stream ID to navigate to Stream Details (non-sponsored view)
-    const streamIdEl = document.getElementById('stream-detail-id');
-    if (streamIdEl && isSponsored) {
-        streamIdEl.onclick = () => {
-            window.router.navigate(`/stream/${encodeURIComponent(stream.id)}`);
-        };
-        streamIdEl.title = 'Click to view Stream Details';
-    } else if (streamIdEl) {
-        streamIdEl.onclick = null;
-        streamIdEl.title = '';
+    // Setup link to Streamr Hub
+    const streamLinkEl = document.getElementById('stream-detail-link');
+    if (streamLinkEl) {
+        // Encode the stream ID for Streamr Hub URL (replace / with %2F)
+        const encodedStreamId = encodeURIComponent(stream.id);
+        streamLinkEl.href = `https://streamr.network/hub/streams/${encodedStreamId}/overview`;
+        streamLinkEl.title = 'View on Streamr Hub';
     }
     
     // Partitions
@@ -1539,6 +1534,12 @@ function renderStreamDetail(stream, isSponsored, sponsorshipId) {
     const streamStatsGrid = document.getElementById('stream-stats-grid');
     const sponsorshipStatsGrid = document.getElementById('sponsorship-stats-grid');
     
+    // Toggle icons and headers between Stream and Sponsorship modes
+    const iconNormal = document.getElementById('stream-icon-normal');
+    const iconSponsorship = document.getElementById('stream-icon-sponsorship');
+    const headerNormal = document.getElementById('stream-header-normal');
+    const headerSponsorship = document.getElementById('stream-header-sponsorship');
+    
     if (isSponsored && stream.sponsorships && stream.sponsorships.length > 0) {
         if (sponsorshipPanel) sponsorshipPanel.classList.remove('hidden');
         if (sponsoredBadge) sponsoredBadge.classList.remove('hidden');
@@ -1552,9 +1553,37 @@ function renderStreamDetail(stream, isSponsored, sponsorshipId) {
         if (sponsorshipsListPanel) sponsorshipsListPanel.classList.add('hidden');
         if (storagePanel) storagePanel.classList.add('hidden');
         
+        // Switch to Sponsorship mode (DATA icon + Sponsorship header)
+        if (iconNormal) iconNormal.classList.add('hidden');
+        if (iconSponsorship) iconSponsorship.classList.remove('hidden');
+        if (headerNormal) headerNormal.classList.add('hidden');
+        if (headerSponsorship) headerSponsorship.classList.remove('hidden');
+        
         const targetSponsorship = sponsorshipId 
             ? stream.sponsorships.find(s => s.id === sponsorshipId) || stream.sponsorships[0]
             : stream.sponsorships[0];
+        
+        // Setup sponsorship header links
+        setText('sponsorship-stream-id', stream.id);
+        const sponsorshipStreamLink = document.getElementById('sponsorship-stream-link');
+        if (sponsorshipStreamLink) {
+            // Link to Stream Details (internal navigation)
+            const encodedStreamId = stream.id.split('/').map(part => encodeURIComponent(part)).join('/');
+            sponsorshipStreamLink.href = `/stream/${encodedStreamId}`;
+            sponsorshipStreamLink.onclick = (e) => {
+                e.preventDefault();
+                window.router.navigate(`/stream/${encodedStreamId}`);
+            };
+            sponsorshipStreamLink.title = 'View Stream Details';
+        }
+        const sponsorshipContractLink = document.getElementById('sponsorship-contract-link');
+        if (sponsorshipContractLink && targetSponsorship.id) {
+            // Link to PolygonScan
+            sponsorshipContractLink.href = `https://polygonscan.com/address/${targetSponsorship.id}`;
+            sponsorshipContractLink.title = 'View on PolygonScan';
+            // Display the contract address
+            setText('sponsorship-contract-address', targetSponsorship.id);
+        }
         
         // Update header APY
         const apy = parseFloat(targetSponsorship.spotAPY || 0);
@@ -1575,6 +1604,13 @@ function renderStreamDetail(stream, isSponsored, sponsorshipId) {
         // Show stream stats, hide sponsorship stats
         if (streamStatsGrid) streamStatsGrid.classList.remove('hidden');
         if (sponsorshipStatsGrid) sponsorshipStatsGrid.classList.add('hidden');
+        
+        // Switch to Stream mode (normal icon + Stream header)
+        if (iconNormal) iconNormal.classList.remove('hidden');
+        if (iconSponsorship) iconSponsorship.classList.add('hidden');
+        if (headerNormal) headerNormal.classList.remove('hidden');
+        if (headerSponsorship) headerSponsorship.classList.add('hidden');
+        
         // Render permissions in standalone panel for streams without sponsorship
         renderPermissionsTable(stream.permissions, true);
         // Render sponsorships list for stream details view
@@ -1947,28 +1983,45 @@ function renderSponsorshipDetails(sponsorship) {
     // Operators list
     renderOperatorsList(sponsorship.stakes);
     
-    // Funding history
-    renderFundingHistory(sponsorship.sponsoringEvents);
-    
-    // Sync tile heights after DOM update
+    // Sync tile heights after operators are rendered
     requestAnimationFrame(() => {
         syncTileHeights();
     });
+    
+    // Additional sync after content is fully loaded
+    setTimeout(() => {
+        syncTileHeights();
+    }, 200);
+    
+    // Store stakes for operator name lookup in history
+    detailState.sponsorshipStakes = sponsorship.stakes || [];
+    
+    // Funding history
+    renderFundingHistory(sponsorship.sponsoringEvents);
+    
+    // On-chain history (async)
+    loadSponsorshipOnchainHistory(sponsorship.id);
 }
 
 /**
- * Sync the height of Staked Operators tile to match Sponsorship Details tile
+ * Sync tile heights: Operators to Details, and Funding to History
  */
 function syncTileHeights() {
-    const sponsorshipTile = document.getElementById('sponsorship-details-tile');
+    const detailsTile = document.getElementById('sponsorship-details-tile');
     const operatorsTile = document.getElementById('staked-operators-tile');
-    
-    if (sponsorshipTile && operatorsTile) {
-        // Get the natural height of the sponsorship tile
-        const height = sponsorshipTile.offsetHeight;
-        // Apply it as max-height to the operators tile
-        operatorsTile.style.maxHeight = `${height}px`;
-        operatorsTile.style.height = `${height}px`;
+
+    if (detailsTile && operatorsTile) {
+        const detailsHeight = detailsTile.offsetHeight;
+        operatorsTile.style.minHeight = `${detailsHeight}px`;
+        operatorsTile.style.maxHeight = `${detailsHeight}px`;
+    }
+
+    const fundingTile = document.getElementById('funding-history-tile');
+    const historyTile = document.getElementById('onchain-history-tile');
+
+    if (fundingTile && historyTile) {
+        const historyHeight = historyTile.offsetHeight;
+        fundingTile.style.minHeight = `${historyHeight}px`;
     }
 }
 
@@ -2335,6 +2388,171 @@ function renderFundingHistory(events) {
                     <span class="text-gray-600 text-xs font-mono hidden sm:inline">${sponsor}</span>
                 </div>
                 <span class="text-green-400 font-semibold text-sm" data-tooltip-value="${rawAmount}">+ ${amount} DATA</span>
+            </div>
+        `;
+    }).join('');
+    
+    container.innerHTML = html;
+}
+
+/**
+ * Load and render on-chain history for a sponsorship contract
+ * @param {string} sponsorshipAddress - The sponsorship contract address
+ */
+async function loadSponsorshipOnchainHistory(sponsorshipAddress) {
+    const container = document.getElementById('sponsorship-history-list');
+    const emptyState = document.getElementById('sponsorship-history-empty');
+    
+    if (!container) return;
+    
+    // Show loading state
+    container.innerHTML = `
+        <div class="flex items-center justify-center py-8">
+            <div class="loader rounded-full border-4 border-t-4 border-[#555555] border-t-transparent h-8 w-8"></div>
+        </div>
+    `;
+    if (emptyState) emptyState.classList.add('hidden');
+    
+    try {
+        // Fetch transaction history from Polygonscan
+        const result = await Services.fetchPolygonscanHistory(sponsorshipAddress, 100, [sponsorshipAddress]);
+        const transactions = result.transactions || result || [];
+        
+        if (transactions.length === 0) {
+            container.innerHTML = '';
+            if (emptyState) emptyState.classList.remove('hidden');
+            
+            // Sync tile heights even when no transactions
+            requestAnimationFrame(() => {
+                syncTileHeights();
+            });
+            setTimeout(() => {
+                syncTileHeights();
+            }, 300);
+            return;
+        }
+        
+        // Render the transactions
+        renderSponsorshipOnchainHistory(transactions);
+        
+        // Sync tile heights after history content is loaded
+        requestAnimationFrame(() => {
+            syncTileHeights();
+        });
+        
+        // Additional sync for Funding/History after longer delay
+        setTimeout(() => {
+            syncTileHeights();
+        }, 300);
+    } catch (error) {
+        logger.error('Failed to load sponsorship on-chain history:', error);
+        container.innerHTML = `<div class="px-4 py-4 text-gray-500 text-center text-sm">Failed to load on-chain history</div>`;
+        
+        // Still sync tile heights even on error
+        requestAnimationFrame(() => {
+            syncTileHeights();
+        });
+        
+        // Additional sync for Funding/History after longer delay
+        setTimeout(() => {
+            syncTileHeights();
+        }, 300);
+    }
+}
+
+/**
+ * Render on-chain history transactions
+ * @param {Array} transactions - Array of transaction objects from Polygonscan
+ */
+function renderSponsorshipOnchainHistory(transactions) {
+    const container = document.getElementById('sponsorship-history-list');
+    if (!container) return;
+    
+    if (!transactions || transactions.length === 0) {
+        container.innerHTML = `<div class="px-4 py-4 text-gray-500 text-center text-sm">No on-chain activity found</div>`;
+        return;
+    }
+    
+    // Build operator lookup map from stakes (address -> name)
+    const operatorNameMap = new Map();
+    for (const stake of detailState.sponsorshipStakes || []) {
+        if (stake.operator?.id) {
+            const addr = stake.operator.id.toLowerCase();
+            const { name } = Utils.parseOperatorMetadata(stake.operator?.metadataJsonString);
+            if (name) {
+                operatorNameMap.set(addr, name);
+            }
+        }
+    }
+    
+    // Sort by timestamp descending (most recent first)
+    const sortedTxs = [...transactions].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    
+    const html = sortedTxs.slice(0, 100).map(tx => {
+        const date = tx.timestamp ? new Date(tx.timestamp * 1000).toLocaleString() : 'Unknown';
+        let method = tx.methodId || 'Unknown';
+        const direction = tx.direction || tx.relatedObject || 'IN';
+        const amount = tx.amount ? Utils.formatBigNumber(Math.round(tx.amount).toString()) : '0';
+        const token = tx.token || 'DATA';
+        const txUrl = `https://polygonscan.com/tx/${tx.txHash}`;
+
+        // Translate method names
+        // If method is Delegate, show Stake (or Funding if input is transferAndCall)
+        // If method is Undelegate, show Unstake
+        if (method === 'Delegate') {
+            // Heuristic: if input length > 10, it's likely transferAndCall (Funding)
+            if (tx.input && tx.input.length > 10) {
+                method = 'Funding';
+            } else {
+                method = 'Stake';
+            }
+        } else if (method === 'Undelegate') {
+            method = 'Unstake';
+        }
+
+        // Determine badge style based on method/direction
+        let badgeClass = 'tx-badge-in';
+        // Force Stake IN to always be green in sponsorships
+        if (method === 'Stake' && direction === 'IN') {
+            badgeClass = 'tx-badge-stake';
+        } else if ((method === 'Funding' || method === 'Join') && direction === 'IN') {
+            badgeClass = 'tx-badge-stake';
+        } else if (['Unstake', 'Force Unstake', 'Reduce Stake'].includes(method)) {
+            badgeClass = 'tx-badge-out';
+        } else if (direction === 'OUT') {
+            badgeClass = 'tx-badge-out';
+        }
+
+        // Get operator name/address 
+        const otherAddress = direction === 'IN' ? tx.from : tx.to;
+        let operatorDisplay = '';
+        if (otherAddress) {
+            const addrLower = otherAddress.toLowerCase();
+            const operatorName = operatorNameMap.get(addrLower);
+            if (operatorName) {
+                operatorDisplay = `<span class="text-gray-400 text-xs truncate max-w-[120px]" title="${otherAddress}">${Utils.escapeHtml(operatorName)}</span>`;
+            } else {
+                operatorDisplay = `<span class="text-gray-500 text-xs font-mono" title="${otherAddress}">${Utils.shortAddress(otherAddress)}</span>`;
+            }
+        }
+
+        return `
+            <div class="flex items-center gap-3 py-2 border-b border-[#333] last:border-b-0">
+                <div class="flex-shrink-0">
+                    <span class="tx-badge ${badgeClass}">${Utils.escapeHtml(direction)}</span>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2">
+                        <a href="${txUrl}" target="_blank" rel="noopener noreferrer" class="text-sm font-medium text-gray-300 hover:text-white transition-colors">
+                            ${Utils.escapeHtml(method)}
+                        </a>
+                        ${operatorDisplay}
+                    </div>
+                    <span class="text-xs text-gray-500">${date}</span>
+                </div>
+                <div class="text-right flex-shrink-0">
+                    <p class="font-mono text-sm text-white">${amount} ${Utils.escapeHtml(token)}</p>
+                </div>
             </div>
         `;
     }).join('');
@@ -2882,5 +3100,3 @@ function clearStreamPlayerLog() {
     const kbpsEl = document.getElementById('stream-player-kbps');
     if (kbpsEl) kbpsEl.textContent = '0';
 }
-
-export default StreamsLogic;

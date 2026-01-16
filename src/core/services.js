@@ -553,11 +553,38 @@ export async function fetchPolygonscanHistory(walletAddress, offset = 500, spons
         const txlistData = await txlistRes.json();
         const tokentxData = await tokentxRes.json();
 
-        if (txlistData.status === "0") throw new Error(`API Error (txlist): ${txlistData.result}`);
-        if (tokentxData.status === "0") throw new Error(`API Error (tokentx): ${tokentxData.result}`);
+        // Handle "No transactions found" or empty results as empty array, not error
+        // Polygonscan returns status "0" for both errors AND empty results
+        const isEmptyOrNoTx = (data) => {
+            if (data.status === "1") return false; // Success with results
+            if (!data.result || data.result === '') return true; // Empty result
+            if (typeof data.result === 'string') {
+                const msg = data.result.toLowerCase();
+                if (msg.includes('no transactions found') || msg.includes('no records found')) return true;
+            }
+            return false;
+        };
+        
+        const isFatalError = (data, type) => {
+            if (data.status === "1") return false;
+            if (isEmptyOrNoTx(data)) return false;
+            // Real error - has error message that's not about empty results
+            if (typeof data.result === 'string' && data.result.length > 0) {
+                logger.warn(`Polygonscan ${type} warning:`, data.result);
+                return true;
+            }
+            return false;
+        };
+        
+        if (isFatalError(txlistData, 'txlist')) {
+            throw new Error(`API Error (txlist): ${txlistData.result}`);
+        }
+        if (isFatalError(tokentxData, 'tokentx')) {
+            throw new Error(`API Error (tokentx): ${tokentxData.result}`);
+        }
 
-        const normalTxs = txlistData.result || [];
-        const tokenTxs = tokentxData.result || [];
+        const normalTxs = Array.isArray(txlistData.result) ? txlistData.result : [];
+        const tokenTxs = Array.isArray(tokentxData.result) ? tokentxData.result : [];
         const nativeToken = POLYGONSCAN_NETWORK.nativeToken;
 
         const methodIdMap = new Map();
@@ -579,7 +606,9 @@ export async function fetchPolygonscanHistory(walletAddress, offset = 500, spons
                 direction: direction,
                 methodId: methodId,
                 amount: amount,
-                rawValue: tx.value 
+                rawValue: tx.value,
+                from: tx.from,
+                to: tx.to
             };
         });
 
@@ -758,7 +787,9 @@ export async function fetchPolygonscanHistory(walletAddress, offset = 500, spons
                     direction: direction,
                     methodId: finalMethodId,
                     amount: amount,
-                    rawValue: tx.value
+                    rawValue: tx.value,
+                    from: tx.from,
+                    to: tx.to
                 });
             }
         }

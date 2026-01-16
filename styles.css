@@ -634,9 +634,6 @@
   .max-h-\[90vh\] {
     max-height: 90vh;
   }
-  .max-h-\[380px\] {
-    max-height: 380px;
-  }
   .min-h-0 {
     min-height: calc(var(--spacing) * 0);
   }
@@ -747,6 +744,9 @@
   }
   .max-w-\[100px\] {
     max-width: 100px;
+  }
+  .max-w-\[120px\] {
+    max-width: 120px;
   }
   .max-w-\[150px\] {
     max-width: 150px;
@@ -2960,11 +2960,6 @@
       height: calc(var(--spacing) * 16);
     }
   }
-  .md\:h-20 {
-    @media (width >= 48rem) {
-      height: calc(var(--spacing) * 20);
-    }
-  }
   .md\:h-80 {
     @media (width >= 48rem) {
       height: calc(var(--spacing) * 80);
@@ -3018,11 +3013,6 @@
   .md\:w-16 {
     @media (width >= 48rem) {
       width: calc(var(--spacing) * 16);
-    }
-  }
-  .md\:w-20 {
-    @media (width >= 48rem) {
-      width: calc(var(--spacing) * 20);
     }
   }
   .md\:max-w-\[200px\] {
@@ -3409,8 +3399,8 @@
     color: #EF4444;
   }
   .tx-badge-stake {
-    background-color: rgba(249, 115, 22, 0.1);
-    color: #F97316;
+    background-color: rgba(34, 197, 94, 0.1);
+    color: #22C55E;
   }
   .chart-container {
     position: relative;
