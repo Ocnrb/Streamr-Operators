@@ -5,9 +5,9 @@
  */
 
 import { showToast, updateToast } from '../ui/ui.js';
-import { runQuery } from '../core/services.js';
+import { runQuery, switchToFallbackRpc, getCurrentRpcUrl } from '../core/services.js';
 import { convertWeiToData, formatBigNumber } from '../core/utils.js';
-import { OPERATOR_CONTRACT_ABI, SPONSORSHIP_ABI } from '../core/constants.js';
+import { OPERATOR_CONTRACT_ABI, SPONSORSHIP_ABI, POLYGON_RPC_FALLBACKS } from '../core/constants.js';
 
 // ethers is loaded globally from libs/ethers.umd.min.js
 
@@ -885,13 +885,37 @@ function generateQueuePaymentAction(currentStakes, stakeableSponsorships, amount
 // Constants for retry logic
 const MAX_RETRY_ATTEMPTS = 5;
 const RETRY_DELAY_MS = 3000;
+const RATE_LIMIT_DELAY_MS = 12000; // Wait 12s when rate limited (RPC says retry in 10s)
 
 /**
- * Check if an error is retryable (state changed, values outdated)
+ * Check if an error is a rate limit error from RPC
  * @param {Error} error - The error to check
- * @returns {boolean} True if the error suggests a recalculation might help
+ * @returns {boolean} True if this is a rate limit error
+ */
+function isRateLimitError(error) {
+    const msg = error.message?.toLowerCase() || '';
+    const rateLimitPatterns = [
+        'too many requests',
+        'rate limit',
+        'call rate limit exhausted',
+        '-32090', // Polygon RPC rate limit error code
+        'could not detect network',
+        'network_error'
+    ];
+    return rateLimitPatterns.some(pattern => msg.includes(pattern.toLowerCase()));
+}
+
+/**
+ * Check if an error is retryable (state changed, values outdated, or rate limited)
+ * @param {Error} error - The error to check
+ * @returns {boolean} True if the error suggests a retry might help
  */
 function isRetryableError(error) {
+    // Rate limit errors are always retryable
+    if (isRateLimitError(error)) {
+        return true;
+    }
+    
     const retryablePatterns = [
         'transfer amount exceeds balance',
         'insufficient balance',
@@ -902,7 +926,9 @@ function isRetryableError(error) {
         'replacement transaction underpriced',
         'already known',
         'ReduceStakeToZero',
-        'CannotUnstakeBelowMinimum'
+        'CannotUnstakeBelowMinimum',
+        'missing revert data',
+        'server_error'
     ];
     
     const msg = error.message?.toLowerCase() || '';
@@ -1023,14 +1049,20 @@ export async function executeActions(actions, operatorId, signer, onProgress, co
     let recalculationAttempts = 0;
     let currentActions = [...orderedActions];
     let actionIndex = 0;
+    const originalTotalActions = orderedActions.length; // Track original count for progress
     
     while (actionIndex < currentActions.length) {
         const action = currentActions[actionIndex];
         
+        // Calculate progress: completed + current position in remaining
+        const completedCount = results.successful.length;
+        const currentProgress = completedCount + actionIndex + 1;
+        const totalProgress = completedCount + currentActions.length;
+        
         if (onProgress) {
             onProgress({
-                current: actionIndex + 1,
-                total: currentActions.length,
+                current: currentProgress,
+                total: Math.max(originalTotalActions, totalProgress),
                 action,
                 isRetry: recalculationAttempts > 0
             });
@@ -1174,7 +1206,12 @@ export async function executeActions(actions, operatorId, signer, onProgress, co
             // Check if this is a retryable error and we have config for recalculation
             if (config && isRetryableError(e) && recalculationAttempts < MAX_RETRY_ATTEMPTS) {
                 recalculationAttempts++;
-                console.log(`[Autostaker] Retryable error detected, attempting recalculation (attempt ${recalculationAttempts}/${MAX_RETRY_ATTEMPTS})...`);
+                
+                // Use longer delay for rate limit errors
+                const isRateLimit = isRateLimitError(e);
+                const delayMs = isRateLimit ? RATE_LIMIT_DELAY_MS : RETRY_DELAY_MS;
+                
+                console.log(`[Autostaker] ${isRateLimit ? 'Rate limit' : 'Retryable'} error detected, waiting ${delayMs/1000}s before retry (attempt ${recalculationAttempts}/${MAX_RETRY_ATTEMPTS})...`);
                 
                 if (onProgress) {
                     onProgress({
@@ -1182,12 +1219,25 @@ export async function executeActions(actions, operatorId, signer, onProgress, co
                         total: currentActions.length,
                         action,
                         isRecalculating: true,
-                        retryAttempt: recalculationAttempts
+                        retryAttempt: recalculationAttempts,
+                        isRateLimited: isRateLimit
                     });
                 }
                 
-                // Wait a bit for chain state to settle
-                await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
+                // Wait for chain state to settle (longer for rate limits)
+                await new Promise(resolve => setTimeout(resolve, delayMs));
+                
+                // If rate limited, try switching to a fallback RPC
+                if (isRateLimit) {
+                    try {
+                        const newProvider = switchToFallbackRpc();
+                        console.log(`[Autostaker] Switched to fallback RPC: ${getCurrentRpcUrl()}`);
+                        // Update the signer's provider connection for subsequent calls
+                        // Note: The signer itself can't be changed, but read operations will use fallback
+                    } catch (switchError) {
+                        console.warn('[Autostaker] Failed to switch RPC:', switchError.message);
+                    }
+                }
                 
                 try {
                     // Recalculate actions based on current on-chain state

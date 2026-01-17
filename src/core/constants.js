@@ -169,6 +169,16 @@ export const SUBGRAPH_ID = 'EGWFdhhiWypDuz22Uy7b3F69E9MEkyfU9iAQMttkH5Rj';
 export const DATA_PRICE_STREAM_ID = 'binance-streamr.eth/DATAUSDT/ticker';
 export const POLYGON_RPC_URL = 'https://polygon-rpc.com';
 
+// Polygon RPC fallback URLs (used when primary RPC is rate limited)
+// Order: primary first, then most reliable fallbacks
+export const POLYGON_RPC_FALLBACKS = [
+    'https://polygon-rpc.com',
+    'https://polygon.drpc.org',
+    'https://polygon-bor-rpc.publicnode.com',
+    'https://polygon.llamarpc.com',
+    'https://1rpc.io/matic'
+];
+
 // ============================================
 // API Keys Configuration
 // ============================================

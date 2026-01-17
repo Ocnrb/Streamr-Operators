@@ -2246,52 +2246,55 @@ async function handleStakeConfirm(sponsorshipInfo, amountInput, confirmBtn, moda
         const currentStakeWei = BigInt(sponsorshipInfo.currentStakeWei);
         const newAmountWeiBig = BigInt(newAmountWei.toString());
         
-        // Get gas overrides for Polygon
-        const gasOverrides = await Services.getGasOverrides(signer.provider);
-        
-        // Get operator contract
-        const operatorContract = new ethers.Contract(
-            sponsorshipInfo.operatorId,
-            [
-                'function stake(address sponsorship, uint256 amountWei) external',
-                'function reduceStakeTo(address sponsorship, uint256 targetStakeWei) external',
-                'function unstake(address sponsorship) external'
-            ],
-            signer
-        );
-        
-        let tx;
-        
-        if (newAmountWeiBig === BigInt(0) && currentStakeWei > BigInt(0)) {
-            // Unstake completely
-            tx = await operatorContract.unstake(sponsorshipInfo.id, gasOverrides);
-        } else if (newAmountWeiBig > currentStakeWei) {
-            // Stake more
-            const amountToStake = newAmountWeiBig - currentStakeWei;
-            tx = await operatorContract.stake(sponsorshipInfo.id, amountToStake.toString(), gasOverrides);
-        } else if (newAmountWeiBig < currentStakeWei) {
-            // Reduce stake
-            tx = await operatorContract.reduceStakeTo(sponsorshipInfo.id, newAmountWeiBig.toString(), gasOverrides);
-        } else {
-            // No change
-            modal.classList.add('hidden');
+        // Use executeWithFallback to handle rate limiting
+        await Services.executeWithFallback(async (currentSigner) => {
+            // Get gas overrides for Polygon
+            const gasOverrides = await Services.getGasOverrides(currentSigner.provider);
+            
+            // Get operator contract
+            const operatorContract = new ethers.Contract(
+                sponsorshipInfo.operatorId,
+                [
+                    'function stake(address sponsorship, uint256 amountWei) external',
+                    'function reduceStakeTo(address sponsorship, uint256 targetStakeWei) external',
+                    'function unstake(address sponsorship) external'
+                ],
+                currentSigner
+            );
+            
+            let tx;
+            
+            if (newAmountWeiBig === BigInt(0) && currentStakeWei > BigInt(0)) {
+                // Unstake completely
+                tx = await operatorContract.unstake(sponsorshipInfo.id, gasOverrides);
+            } else if (newAmountWeiBig > currentStakeWei) {
+                // Stake more
+                const amountToStake = newAmountWeiBig - currentStakeWei;
+                tx = await operatorContract.stake(sponsorshipInfo.id, amountToStake.toString(), gasOverrides);
+            } else if (newAmountWeiBig < currentStakeWei) {
+                // Reduce stake
+                tx = await operatorContract.reduceStakeTo(sponsorshipInfo.id, newAmountWeiBig.toString(), gasOverrides);
+            } else {
+                // No change
+                modal.classList.add('hidden');
+                UI.showToast({
+                    type: 'info',
+                    title: 'No Change',
+                    message: 'Stake amount unchanged.',
+                    duration: 3000
+                });
+                return;
+            }
+            
             UI.showToast({
                 type: 'info',
-                title: 'No Change',
-                message: 'Stake amount unchanged.',
-                duration: 3000
+                title: 'Transaction Submitted',
+                message: 'Waiting for confirmation...',
+                duration: 5000
             });
-            return;
-        }
-        
-        UI.showToast({
-            type: 'info',
-            title: 'Transaction Submitted',
-            message: 'Waiting for confirmation...',
-            duration: 5000
-        });
-        
-        await tx.wait();
+            
+            await tx.wait();
+        }, signer);
         
         modal.classList.add('hidden');
         
@@ -2313,10 +2316,17 @@ async function handleStakeConfirm(sponsorshipInfo, amountInput, confirmBtn, moda
         
     } catch (error) {
         logger.error('Stake transaction failed:', error);
+        
+        // Provide more user-friendly error message for rate limiting
+        let errorMessage = error.reason || error.message || 'Failed to update stake.';
+        if (Services.isRateLimitError(error)) {
+            errorMessage = 'RPC rate limited. Please try again in a few seconds.';
+        }
+        
         UI.showToast({
             type: 'error',
             title: 'Transaction Failed',
-            message: error.reason || error.message || 'Failed to update stake.',
+            message: errorMessage,
             duration: 5000
         });
         confirmBtn.disabled = false;

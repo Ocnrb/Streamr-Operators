@@ -7,6 +7,7 @@ import {
     STREAMR_CONFIG_ABI,
     DATA_PRICE_STREAM_ID,
     POLYGON_RPC_URL,
+    POLYGON_RPC_FALLBACKS,
     DELEGATORS_PER_PAGE,
     OPERATORS_PER_PAGE,
     MIN_SEARCH_LENGTH,
@@ -35,6 +36,39 @@ let historicalDataPriceMap = null;
 // --- Centralized RPC Provider ---
 
 let _readOnlyProvider = null;
+let _currentRpcIndex = 0;
+
+// Storage key for persisting working RPC index
+const RPC_INDEX_STORAGE_KEY = 'polygon_rpc_index';
+
+/**
+ * Load the last working RPC index from localStorage
+ */
+function loadRpcIndex() {
+    try {
+        const stored = localStorage.getItem(RPC_INDEX_STORAGE_KEY);
+        if (stored !== null) {
+            const index = parseInt(stored, 10);
+            if (!isNaN(index) && index >= 0 && index < POLYGON_RPC_FALLBACKS.length) {
+                _currentRpcIndex = index;
+                console.log(`[RPC] Loaded last working RPC index: ${index} (${POLYGON_RPC_FALLBACKS[index]})`);
+            }
+        }
+    } catch (e) {
+        // Ignore localStorage errors
+    }
+}
+
+/**
+ * Save the current RPC index to localStorage
+ */
+function saveRpcIndex() {
+    try {
+        localStorage.setItem(RPC_INDEX_STORAGE_KEY, String(_currentRpcIndex));
+    } catch (e) {
+        // Ignore localStorage errors
+    }
+}
 
 /**
  * Get or create a singleton read-only JsonRpcProvider for Polygon.
@@ -43,9 +77,53 @@ let _readOnlyProvider = null;
  */
 export function getReadOnlyProvider() {
     if (!_readOnlyProvider) {
-        _readOnlyProvider = new ethers.providers.JsonRpcProvider(POLYGON_RPC_URL);
+        // Load last working RPC on first call
+        loadRpcIndex();
+        const rpcUrl = POLYGON_RPC_FALLBACKS[_currentRpcIndex] || POLYGON_RPC_URL;
+        _readOnlyProvider = new ethers.providers.JsonRpcProvider(rpcUrl);
+        console.log(`[RPC] Initialized with: ${rpcUrl}`);
     }
     return _readOnlyProvider;
+}
+
+/**
+ * Switch to next available RPC endpoint when rate limited.
+ * @returns {ethers.providers.JsonRpcProvider} New provider with fallback RPC
+ */
+export function switchToFallbackRpc() {
+    _currentRpcIndex = (_currentRpcIndex + 1) % POLYGON_RPC_FALLBACKS.length;
+    const newRpcUrl = POLYGON_RPC_FALLBACKS[_currentRpcIndex];
+    console.log(`[RPC] Switching to fallback RPC: ${newRpcUrl}`);
+    _readOnlyProvider = new ethers.providers.JsonRpcProvider(newRpcUrl);
+    saveRpcIndex(); // Persist the new working RPC
+    return _readOnlyProvider;
+}
+
+/**
+ * Get current RPC URL being used
+ * @returns {string} Current RPC URL
+ */
+export function getCurrentRpcUrl() {
+    return POLYGON_RPC_FALLBACKS[_currentRpcIndex] || POLYGON_RPC_URL;
+}
+
+/**
+ * Reconnect a signer to the current RPC provider.
+ * Use this when the signer's provider is rate limited.
+ * @param {ethers.Signer} signer - The signer to reconnect
+ * @returns {ethers.Signer} A new signer connected to the current provider
+ */
+export function reconnectSigner(signer) {
+    if (!signer) return null;
+    
+    // For Wallet signers, we can connect to a new provider
+    if (signer._isSigner && signer.privateKey) {
+        const newProvider = getReadOnlyProvider();
+        return new ethers.Wallet(signer.privateKey, newProvider);
+    }
+    
+    // For other signers (like from MetaMask), return as-is
+    return signer;
 }
 
 /**
@@ -151,6 +229,57 @@ async function checkGasPriceAndWarn(provider) {
         console.warn('Could not check gas price:', e);
         return true; // Proceed if we can't check
     }
+}
+
+/**
+ * Check if an error is a rate limit error
+ * @param {Error} error - The error to check
+ * @returns {boolean} True if rate limited
+ */
+export function isRateLimitError(error) {
+    const msg = error?.message?.toLowerCase() || '';
+    return msg.includes('too many requests') || 
+           msg.includes('rate limit') || 
+           msg.includes('-32090') ||
+           msg.includes('could not detect network');
+}
+
+/**
+ * Execute a transaction with automatic RPC fallback on rate limiting
+ * @param {Function} txFn - Async function that executes the transaction, receives signer
+ * @param {ethers.Signer} signer - The signer to use
+ * @param {number} maxRetries - Maximum retry attempts (default: 3)
+ * @returns {Promise<any>} Transaction result
+ */
+export async function executeWithFallback(txFn, signer, maxRetries = 3) {
+    let currentSigner = signer;
+    let lastError = null;
+    
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+            return await txFn(currentSigner);
+        } catch (e) {
+            lastError = e;
+            
+            if (isRateLimitError(e) && attempt < maxRetries - 1) {
+                console.log(`[RPC] Rate limited, switching to fallback (attempt ${attempt + 1}/${maxRetries})...`);
+                
+                // Switch to fallback RPC
+                switchToFallbackRpc();
+                
+                // Reconnect signer to new provider
+                currentSigner = reconnectSigner(signer);
+                
+                // Wait before retry
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                continue;
+            }
+            
+            throw e;
+        }
+    }
+    
+    throw lastError;
 }
 
 // --- API Key Management ---
@@ -1357,20 +1486,22 @@ export async function confirmUndelegation(signer, myRealAddress, currentOperator
 export async function handleProcessQueue(signer, operatorId) {
     setModalState('tx-modal', 'loading', { text: "Checking gas prices...", subtext: "Please wait." });
     try {
-        // Check gas price before proceeding
-        if (!await checkGasPriceAndWarn(signer.provider)) {
-            transactionModal.classList.add('hidden');
-            return null;
-        }
-        
-        setModalState('tx-modal', 'loading', { text: "Processing Queue...", subtext: "This will pay out queued undelegations." });
-        const operatorContract = new ethers.Contract(operatorId, OPERATOR_CONTRACT_ABI, signer);
-        const gasOverrides = await getGasOverrides(signer.provider);
-        const tx = await operatorContract.payOutQueue(0, gasOverrides);
-        setModalState('tx-modal', 'loading', { text: 'Processing Transaction...', subtext: 'Waiting for confirmation.' });
-        const receipt = await tx.wait();
-        setModalState('tx-modal', 'success', { txHash: receipt.transactionHash });
-        return receipt.transactionHash;
+        return await executeWithFallback(async (currentSigner) => {
+            // Check gas price before proceeding
+            if (!await checkGasPriceAndWarn(currentSigner.provider)) {
+                transactionModal.classList.add('hidden');
+                return null;
+            }
+            
+            setModalState('tx-modal', 'loading', { text: "Processing Queue...", subtext: "This will pay out queued undelegations." });
+            const operatorContract = new ethers.Contract(operatorId, OPERATOR_CONTRACT_ABI, currentSigner);
+            const gasOverrides = await getGasOverrides(currentSigner.provider);
+            const tx = await operatorContract.payOutQueue(0, gasOverrides);
+            setModalState('tx-modal', 'loading', { text: 'Processing Transaction...', subtext: 'Waiting for confirmation.' });
+            const receipt = await tx.wait();
+            setModalState('tx-modal', 'success', { txHash: receipt.transactionHash });
+            return receipt.transactionHash;
+        }, signer);
     } catch (e) {
         console.error("Queue processing failed:", e);
         setModalState('tx-modal', 'error', { message: getFriendlyErrorMessage(e) });
@@ -1386,31 +1517,34 @@ export async function confirmStakeEdit(signer, operatorId, sponsorshipId, curren
     }
     setModalState('stake-modal', 'loading', { text: "Checking gas prices...", subtext: "Please wait." });
     try {
-        // Check gas price before proceeding
-        if (!await checkGasPriceAndWarn(signer.provider)) {
-            stakeModal.classList.add('hidden');
-            return null;
-        }
-        
-        setModalState('stake-modal', 'loading', { text: "Preparing transaction...", subtext: "Please wait." });
-        const operatorContract = new ethers.Contract(operatorId, OPERATOR_CONTRACT_ABI, signer);
-        const targetAmountWei = ethers.utils.parseEther(targetAmount);
-        const currentAmountWei = ethers.BigNumber.from(currentStakeWei);
-        const gasOverrides = await getGasOverrides(signer.provider);
-        let tx;
-        if (targetAmountWei.gt(currentAmountWei)) {
-            const differenceWei = targetAmountWei.sub(currentAmountWei);
-            tx = await operatorContract.stake(sponsorshipId, differenceWei, gasOverrides);
-        } else if (targetAmountWei.lt(currentAmountWei)) {
-            tx = await operatorContract.reduceStakeTo(sponsorshipId, targetAmountWei, gasOverrides);
-        } else {
-            stakeModal.classList.add('hidden');
-            return 'nochange';
-        }
-        setModalState('stake-modal', 'loading');
-        const receipt = await tx.wait();
-        setModalState('stake-modal', 'success', { txHash: receipt.transactionHash });
-        return receipt.transactionHash;
+        // Use executeWithFallback to handle rate limiting
+        return await executeWithFallback(async (currentSigner) => {
+            // Check gas price before proceeding
+            if (!await checkGasPriceAndWarn(currentSigner.provider)) {
+                stakeModal.classList.add('hidden');
+                return null;
+            }
+            
+            setModalState('stake-modal', 'loading', { text: "Preparing transaction...", subtext: "Please wait." });
+            const operatorContract = new ethers.Contract(operatorId, OPERATOR_CONTRACT_ABI, currentSigner);
+            const targetAmountWei = ethers.utils.parseEther(targetAmount);
+            const currentAmountWei = ethers.BigNumber.from(currentStakeWei);
+            const gasOverrides = await getGasOverrides(currentSigner.provider);
+            let tx;
+            if (targetAmountWei.gt(currentAmountWei)) {
+                const differenceWei = targetAmountWei.sub(currentAmountWei);
+                tx = await operatorContract.stake(sponsorshipId, differenceWei, gasOverrides);
+            } else if (targetAmountWei.lt(currentAmountWei)) {
+                tx = await operatorContract.reduceStakeTo(sponsorshipId, targetAmountWei, gasOverrides);
+            } else {
+                stakeModal.classList.add('hidden');
+                return 'nochange';
+            }
+            setModalState('stake-modal', 'loading');
+            const receipt = await tx.wait();
+            setModalState('stake-modal', 'success', { txHash: receipt.transactionHash });
+            return receipt.transactionHash;
+        }, signer);
     } catch(e) {
         console.error("Stake edit failed:", e);
         setModalState('stake-modal', 'error', { message: getFriendlyErrorMessage(e) });
@@ -1421,20 +1555,22 @@ export async function confirmStakeEdit(signer, operatorId, sponsorshipId, curren
 export async function handleCollectEarnings(signer, operatorId, sponsorshipId) {
     setModalState('tx-modal', 'loading', { text: "Checking gas prices...", subtext: "Please wait." });
     try {
-        // Check gas price before proceeding
-        if (!await checkGasPriceAndWarn(signer.provider)) {
-            transactionModal.classList.add('hidden');
-            return null;
-        }
-        
-        setModalState('tx-modal', 'loading', { text: "Collecting Earnings...", subtext: "Please wait." });
-        const operatorContract = new ethers.Contract(operatorId, OPERATOR_CONTRACT_ABI, signer);
-        const gasOverrides = await getGasOverrides(signer.provider);
-        const tx = await operatorContract.withdrawEarningsFromSponsorships([sponsorshipId], gasOverrides);
-        setModalState('tx-modal', 'loading', { text: 'Processing Transaction...', subtext: 'Waiting for confirmation.' });
-        const receipt = await tx.wait();
-        setModalState('tx-modal', 'success', { txHash: receipt.transactionHash });
-        return receipt.transactionHash;
+        return await executeWithFallback(async (currentSigner) => {
+            // Check gas price before proceeding
+            if (!await checkGasPriceAndWarn(currentSigner.provider)) {
+                transactionModal.classList.add('hidden');
+                return null;
+            }
+            
+            setModalState('tx-modal', 'loading', { text: "Collecting Earnings...", subtext: "Please wait." });
+            const operatorContract = new ethers.Contract(operatorId, OPERATOR_CONTRACT_ABI, currentSigner);
+            const gasOverrides = await getGasOverrides(currentSigner.provider);
+            const tx = await operatorContract.withdrawEarningsFromSponsorships([sponsorshipId], gasOverrides);
+            setModalState('tx-modal', 'loading', { text: 'Processing Transaction...', subtext: 'Waiting for confirmation.' });
+            const receipt = await tx.wait();
+            setModalState('tx-modal', 'success', { txHash: receipt.transactionHash });
+            return receipt.transactionHash;
+        }, signer);
     } catch (e) {
         console.error("Earnings collection failed:", e);
         setModalState('tx-modal', 'error', { message: getFriendlyErrorMessage(e) });
@@ -1445,21 +1581,23 @@ export async function handleCollectEarnings(signer, operatorId, sponsorshipId) {
 export async function handleCollectAllEarnings(signer, operatorId, currentOperatorData) {
     setModalState('tx-modal', 'loading', { text: "Checking gas prices...", subtext: "Please wait." });
     try {
-        // Check gas price before proceeding
-        if (!await checkGasPriceAndWarn(signer.provider)) {
-            transactionModal.classList.add('hidden');
-            return null;
-        }
-        
-        setModalState('tx-modal', 'loading', { text: "Collecting All Earnings...", subtext: "This will collect from all sponsorships." });
-        const operatorContract = new ethers.Contract(operatorId, OPERATOR_CONTRACT_ABI, signer);
-        const gasOverrides = await getGasOverrides(signer.provider);
-        const allSponsorshipIds = currentOperatorData.stakes.map(stake => stake.sponsorship.id);
-        const tx = await operatorContract.withdrawEarningsFromSponsorships(allSponsorshipIds, gasOverrides);
-        setModalState('tx-modal', 'loading', { text: 'Processing Transaction...', subtext: 'Waiting for confirmation.' });
-        const receipt = await tx.wait();
-        setModalState('tx-modal', 'success', { txHash: receipt.transactionHash });
-        return receipt.transactionHash;
+        return await executeWithFallback(async (currentSigner) => {
+            // Check gas price before proceeding
+            if (!await checkGasPriceAndWarn(currentSigner.provider)) {
+                transactionModal.classList.add('hidden');
+                return null;
+            }
+            
+            setModalState('tx-modal', 'loading', { text: "Collecting All Earnings...", subtext: "This will collect from all sponsorships." });
+            const operatorContract = new ethers.Contract(operatorId, OPERATOR_CONTRACT_ABI, currentSigner);
+            const gasOverrides = await getGasOverrides(currentSigner.provider);
+            const allSponsorshipIds = currentOperatorData.stakes.map(stake => stake.sponsorship.id);
+            const tx = await operatorContract.withdrawEarningsFromSponsorships(allSponsorshipIds, gasOverrides);
+            setModalState('tx-modal', 'loading', { text: 'Processing Transaction...', subtext: 'Waiting for confirmation.' });
+            const receipt = await tx.wait();
+            setModalState('tx-modal', 'success', { txHash: receipt.transactionHash });
+            return receipt.transactionHash;
+        }, signer);
     } catch (e) {
         console.error("Collect all earnings failed:", e);
         setModalState('tx-modal', 'error', { message: getFriendlyErrorMessage(e) });

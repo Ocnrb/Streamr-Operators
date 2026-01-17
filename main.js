@@ -724,6 +724,7 @@ let autostakerState = {
     sponsorships: [],
     botIntervalId: null,
     isRunning: false,
+    isCycleRunning: false, // Prevents concurrent cycles
     lastRunTime: null,
     nextRunTime: null,
     intervalMinutes: 5,
@@ -773,6 +774,10 @@ function renderAutostakerLogs() {
             case 'error':
                 colorClass = 'text-red-400';
                 icon = '✗';
+                break;
+            case 'warning':
+                colorClass = 'text-yellow-400';
+                icon = '⚠';
                 break;
             case 'action':
                 colorClass = 'text-blue-400';
@@ -1015,6 +1020,12 @@ function updateBotStatusUI() {
 }
 
 async function runAutostakerBotCycle() {
+    // Prevent concurrent cycles
+    if (autostakerState.isCycleRunning) {
+        console.log('[Autostaker] Cycle already running, skipping...');
+        return;
+    }
+    
     const operatorId = autostakerState.operatorId;
     const signer = autostakerState.operatorSigner;
     
@@ -1022,6 +1033,9 @@ async function runAutostakerBotCycle() {
         addAutostakerLog('error', 'No signer or operator configured');
         return;
     }
+    
+    // Mark cycle as running
+    autostakerState.isCycleRunning = true;
     
     addAutostakerLog('info', 'Starting analysis cycle...');
     
@@ -1121,10 +1135,16 @@ async function runAutostakerBotCycle() {
                 const action = progress.action;
                 if (action) {
                     const amountData = Utils.formatBigNumber(Utils.convertWeiToData(action.amount.toString()));
+                    const shortId = action.sponsorshipId?.substring(0, 10) + '...' || '';
+                    
                     if (progress.isRecalculating) {
-                        addAutostakerLog('info', `🔄 Recalculating actions (attempt ${progress.retryAttempt}/3)...`);
+                        if (progress.isRateLimited) {
+                            addAutostakerLog('warning', `⏳ RPC rate limited - waiting 12s then retry (${progress.retryAttempt}/5)...`);
+                        } else {
+                            addAutostakerLog('info', `🔄 Recalculating actions (attempt ${progress.retryAttempt}/5)...`);
+                        }
                     } else if (progress.isRetry) {
-                        addAutostakerLog('action', `[${progress.current}/${progress.total}] (retry) ${action.type}: ${amountData} DATA`);
+                        addAutostakerLog('action', `[${progress.current}/${progress.total}] ↻ ${action.type}: ${amountData} DATA`);
                     } else {
                         addAutostakerLog('action', `[${progress.current}/${progress.total}] ${action.type}: ${amountData} DATA`);
                     }
@@ -1154,12 +1174,21 @@ async function runAutostakerBotCycle() {
                 duration: 5000
             });
         } else if (result.results.successful.length > 0) {
-            addAutostakerLog('error', `${result.results.successful.length} succeeded, ${result.results.failed.length} failed${queuePayoutMsg}${retryInfo}`);
+            addAutostakerLog('warning', `⚠️ ${result.results.successful.length} succeeded, ${result.results.failed.length} failed${queuePayoutMsg}${retryInfo}`);
             // Log details of failed actions
             for (const failed of result.results.failed) {
                 const shortId = failed.action.sponsorshipId?.substring(0, 10) + '...' || 'unknown';
                 const retryMsg = failed.retriesAttempted > 0 ? ` (${failed.retriesAttempted} retries)` : '';
-                addAutostakerLog('error', `  ↳ ${failed.action.type} ${shortId}: ${failed.error.substring(0, 60)}${retryMsg}`);
+                // Make error message more readable
+                let errorMsg = failed.error || 'Unknown error';
+                if (errorMsg.includes('rate limit') || errorMsg.includes('Too many requests')) {
+                    errorMsg = 'RPC rate limited - try again later';
+                } else if (errorMsg.includes('processing response error')) {
+                    errorMsg = 'RPC connection error';
+                } else if (errorMsg.length > 50) {
+                    errorMsg = errorMsg.substring(0, 50) + '...';
+                }
+                addAutostakerLog('error', `  ↳ ${failed.action.type} ${shortId}: ${errorMsg}${retryMsg}`);
             }
             UI.showToast({
                 type: 'warning',
@@ -1168,12 +1197,21 @@ async function runAutostakerBotCycle() {
                 duration: 8000
             });
         } else {
-            addAutostakerLog('error', `All ${result.results.failed.length} action(s) failed${retryInfo}`);
+            addAutostakerLog('error', `❌ All ${result.results.failed.length} action(s) failed${retryInfo}`);
             // Log details of failed actions
             for (const failed of result.results.failed) {
                 const shortId = failed.action.sponsorshipId?.substring(0, 10) + '...' || 'unknown';
                 const retryMsg = failed.retriesAttempted > 0 ? ` (${failed.retriesAttempted} retries)` : '';
-                addAutostakerLog('error', `  ↳ ${failed.action.type} ${shortId}: ${failed.error.substring(0, 60)}${retryMsg}`);
+                // Make error message more readable
+                let errorMsg = failed.error || 'Unknown error';
+                if (errorMsg.includes('rate limit') || errorMsg.includes('Too many requests')) {
+                    errorMsg = 'RPC rate limited - try again later';
+                } else if (errorMsg.includes('processing response error')) {
+                    errorMsg = 'RPC connection error';
+                } else if (errorMsg.length > 50) {
+                    errorMsg = errorMsg.substring(0, 50) + '...';
+                }
+                addAutostakerLog('error', `  ↳ ${failed.action.type} ${shortId}: ${errorMsg}${retryMsg}`);
             }
         }
         
@@ -1186,6 +1224,9 @@ async function runAutostakerBotCycle() {
     } catch (e) {
         console.error('[Autostaker Bot] Cycle error:', e);
         addAutostakerLog('error', `Error: ${Utils.getFriendlyErrorMessage(e)}`);
+    } finally {
+        // Always mark cycle as complete
+        autostakerState.isCycleRunning = false;
     }
 }
 
