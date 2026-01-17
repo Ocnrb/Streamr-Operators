@@ -1250,16 +1250,25 @@ export async function executeActions(actions, operatorId, signer, onProgress, co
                         const successfulSponsorships = new Set(results.successful.map(r => r.action.sponsorshipId));
                         const remainingActions = newAnalysis.actions.filter(a => !successfulSponsorships.has(a.sponsorshipId));
                         
+                        if (remainingActions.length === 0) {
+                            // All actions were actually completed on-chain
+                            console.log('[Autostaker] All actions already completed on-chain, finishing');
+                            break;
+                        }
+                        
                         // Replace current actions with recalculated ones
                         const unstakes = remainingActions.filter(a => a.type === 'unstake');
                         const stakes = remainingActions.filter(a => a.type === 'stake');
                         currentActions = [...unstakes, ...stakes];
                         actionIndex = 0; // Restart from the beginning of new actions
+                        recalculationAttempts = 0; // Reset retry counter for new action set
                         
                         console.log(`[Autostaker] Continuing with ${currentActions.length} recalculated actions`);
                         continue; // Continue with the new actions
                     } else {
-                        console.log('[Autostaker] Recalculation produced no actions, stopping');
+                        // No actions needed - state is already balanced
+                        console.log('[Autostaker] Recalculation shows state is balanced, finishing successfully');
+                        break; // Exit loop - job is done
                     }
                 } catch (recalcError) {
                     console.error('[Autostaker] Failed to recalculate actions:', recalcError);
