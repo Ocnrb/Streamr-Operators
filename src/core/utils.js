@@ -90,6 +90,9 @@ export const formatUsdForTooltip = (dataAmountStr, dataPriceUSD) => {
     if (dataPriceUSD === null || !dataAmountStr) return 'Not available';
     const numericDataAmount = parseFloat(dataAmountStr.replace(/ /g, '').replace(',', '.'));
     const usdValue = numericDataAmount * dataPriceUSD;
+    if (usdValue < 10) {
+        return `~$${usdValue.toFixed(2)}`;
+    }
     return `~$${formatBigNumber(Math.round(usdValue))}`;
 };
 
@@ -107,7 +110,11 @@ export const formatDataWithUsdTooltip = (dataAmountStr, dataPriceUSD) => {
     if (dataPriceUSD !== null) {
         const numericDataAmount = parseFloat(dataAmountStr.replace(/ /g, '').replace(',', '.'));
         const usdValue = numericDataAmount * dataPriceUSD;
-        tooltipContent += `<br>~$${formatBigNumber(Math.round(usdValue))}`;
+        if (usdValue < 10) {
+            tooltipContent += `<br>~$${usdValue.toFixed(2)}`;
+        } else {
+            tooltipContent += `<br>~$${formatBigNumber(Math.round(usdValue))}`;
+        }
     }
     
     return tooltipContent;

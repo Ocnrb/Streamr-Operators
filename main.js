@@ -1174,26 +1174,43 @@ async function runAutostakerBotCycle() {
                 duration: 5000
             });
         } else if (result.results.successful.length > 0) {
-            addAutostakerLog('warning', `⚠️ ${result.results.successful.length} succeeded, ${result.results.failed.length} failed${queuePayoutMsg}${retryInfo}`);
-            // Log details of failed actions
-            for (const failed of result.results.failed) {
-                const shortId = failed.action.sponsorshipId?.substring(0, 10) + '...' || 'unknown';
-                const retryMsg = failed.retriesAttempted > 0 ? ` (${failed.retriesAttempted} retries)` : '';
-                // Make error message more readable
-                let errorMsg = failed.error || 'Unknown error';
-                if (errorMsg.includes('rate limit') || errorMsg.includes('Too many requests')) {
-                    errorMsg = 'RPC rate limited - try again later';
-                } else if (errorMsg.includes('processing response error')) {
-                    errorMsg = 'RPC connection error';
-                } else if (errorMsg.length > 50) {
-                    errorMsg = errorMsg.substring(0, 50) + '...';
+            // Check if failures were due to rate limiting but state is likely correct
+            const allFailuresAreRateLimit = result.results.failed.every(f => 
+                f.error?.includes('rate limit') || 
+                f.error?.includes('Too many requests') ||
+                f.error?.includes('processing response error') ||
+                f.error?.includes('could not detect network')
+            );
+            
+            if (allFailuresAreRateLimit) {
+                // Rate limit errors often mean the tx was submitted but we couldn't confirm
+                // The next cycle will verify the actual state
+                addAutostakerLog('warning', `⚠️ ${result.results.successful.length} confirmed, ${result.results.failed.length} unconfirmed (RPC issues)${queuePayoutMsg}`);
+                addAutostakerLog('info', `   Next cycle will verify final state`);
+            } else {
+                addAutostakerLog('warning', `⚠️ ${result.results.successful.length} succeeded, ${result.results.failed.length} failed${queuePayoutMsg}${retryInfo}`);
+                // Log details of failed actions
+                for (const failed of result.results.failed) {
+                    const shortId = failed.action.sponsorshipId?.substring(0, 10) + '...' || 'unknown';
+                    const retryMsg = failed.retriesAttempted > 0 ? ` (${failed.retriesAttempted} retries)` : '';
+                    // Make error message more readable
+                    let errorMsg = failed.error || 'Unknown error';
+                    if (errorMsg.includes('rate limit') || errorMsg.includes('Too many requests')) {
+                        errorMsg = 'RPC rate limited';
+                    } else if (errorMsg.includes('processing response error')) {
+                        errorMsg = 'RPC connection error';
+                    } else if (errorMsg.length > 50) {
+                        errorMsg = errorMsg.substring(0, 50) + '...';
+                    }
+                    addAutostakerLog('error', `  ↳ ${failed.action.type} ${shortId}: ${errorMsg}${retryMsg}`);
                 }
-                addAutostakerLog('error', `  ↳ ${failed.action.type} ${shortId}: ${errorMsg}${retryMsg}`);
             }
             UI.showToast({
                 type: 'warning',
                 title: 'Autostaker',
-                message: `${result.results.successful.length} succeeded, ${result.results.failed.length} failed.`,
+                message: allFailuresAreRateLimit 
+                    ? `${result.results.successful.length} confirmed, ${result.results.failed.length} pending verification.`
+                    : `${result.results.successful.length} succeeded, ${result.results.failed.length} failed.`,
                 duration: 8000
             });
         } else {

@@ -995,7 +995,11 @@ export function renderOperatorEarningsChart(labels, dailyData, cumulativeData, i
                             // Show USD using live current price
                             if (currentPrice && currentPrice > 0) {
                                 const usdValue = value * currentPrice;
-                                lines.push(`~$${formatBigNumber(Math.round(usdValue).toString())}`);
+                                if (usdValue < 10) {
+                                    lines.push(`~$${usdValue.toFixed(2)}`);
+                                } else {
+                                    lines.push(`~$${formatBigNumber(Math.round(usdValue).toString())}`);
+                                }
                             }
                             return lines;
                         }
