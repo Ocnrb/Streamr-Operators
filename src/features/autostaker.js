@@ -422,7 +422,7 @@ function getExpiredSponsorships(myCurrentStakes, stakeableSponsorships) {
 }
 
 /**
- * Select sponsorships to stake - CORRECTED ALGORITHM
+ * Select sponsorships to stake 
  * Selects the most profitable sponsorships up to maxSponsorshipCount
  * When maxSponsorshipCount is reduced, less profitable sponsorships will be abandoned
  */
@@ -1233,9 +1233,29 @@ export async function executeActions(actions, operatorId, signer, onProgress, co
                     if (newAnalysis.actions && newAnalysis.actions.length > 0) {
                         console.log(`[Autostaker] Recalculated ${newAnalysis.actions.length} new actions`);
                         
-                        // Filter out actions that were already successful
+                        // Filter out actions that were already successful (in results.successful)
                         const successfulSponsorships = new Set(results.successful.map(r => r.action.sponsorshipId));
                         const remainingActions = newAnalysis.actions.filter(a => !successfulSponsorships.has(a.sponsorshipId));
+                        
+                        // Count actions that completed on-chain but weren't in results.successful yet
+                        // These are actions where tx was sent but tx.wait() failed with rate limit
+                        const previousActionSponsorships = new Set(currentActions.map(a => a.sponsorshipId));
+                        const completedOnChain = currentActions.filter(a => {
+                            // Action was in our list but is NOT in the new recalculated actions
+                            // AND is not already counted as successful
+                            const stillNeeded = newAnalysis.actions.some(na => na.sponsorshipId === a.sponsorshipId);
+                            const alreadyCounted = successfulSponsorships.has(a.sponsorshipId);
+                            return !stillNeeded && !alreadyCounted;
+                        });
+                        
+                        // Add these to successful results (tx hash unknown due to rate limit during wait)
+                        for (const completedAction of completedOnChain) {
+                            results.successful.push({
+                                action: completedAction,
+                                txHash: 'confirmed-via-recalculation'
+                            });
+                            console.log(`[Autostaker] Action ${completedAction.type} for ${completedAction.sponsorshipId.substring(0,10)}... confirmed via recalculation`);
+                        }
                         
                         if (remainingActions.length === 0) {
                             // All actions were actually completed on-chain
@@ -1254,6 +1274,16 @@ export async function executeActions(actions, operatorId, signer, onProgress, co
                         continue; // Continue with the new actions
                     } else {
                         // No actions needed - state is already balanced
+                        // Count any remaining actions as successful (completed on-chain)
+                        const successfulSponsorships = new Set(results.successful.map(r => r.action.sponsorshipId));
+                        for (const pendingAction of currentActions) {
+                            if (!successfulSponsorships.has(pendingAction.sponsorshipId)) {
+                                results.successful.push({
+                                    action: pendingAction,
+                                    txHash: 'confirmed-via-recalculation'
+                                });
+                            }
+                        }
                         console.log('[Autostaker] Recalculation shows state is balanced, finishing successfully');
                         break; // Exit loop - job is done
                     }

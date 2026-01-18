@@ -127,12 +127,16 @@ export function reconnectSigner(signer) {
 }
 
 /**
- * Get the best available provider: signer's provider if available, otherwise read-only.
- * @param {ethers.Signer|null} signer - Optional signer with attached provider
+ * Get the best available provider for READ operations.
+ * Always uses the current read-only provider (which may have been switched due to rate limits).
+ * For write operations, use the signer directly.
+ * @param {ethers.Signer|null} signer - Optional signer (ignored for reads, use getReadOnlyProvider)
  * @returns {ethers.providers.Provider}
  */
 export function getProvider(signer = null) {
-    return signer?.provider || getReadOnlyProvider();
+    // Always use the current read-only provider for read operations
+    // This ensures we use the fallback RPC if the primary was rate limited
+    return getReadOnlyProvider();
 }
 
 // --- Gas Price Helper ---

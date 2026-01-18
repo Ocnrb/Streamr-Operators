@@ -1139,9 +1139,9 @@ async function runAutostakerBotCycle() {
                     
                     if (progress.isRecalculating) {
                         if (progress.isRateLimited) {
-                            addAutostakerLog('warning', `⏳ RPC rate limited - waiting 12s then retry (${progress.retryAttempt}/5)...`);
+                            addAutostakerLog('warning', `⏳ RPC rate limited - switching RPC & retrying (${progress.retryAttempt}/5)...`);
                         } else {
-                            addAutostakerLog('info', `🔄 Recalculating actions (attempt ${progress.retryAttempt}/5)...`);
+                            addAutostakerLog('info', `🔄 Recalculating actions (${progress.retryAttempt}/5)...`);
                         }
                     } else if (progress.isRetry) {
                         addAutostakerLog('action', `[${progress.current}/${progress.total}] ↻ ${action.type}: ${amountData} DATA`);
