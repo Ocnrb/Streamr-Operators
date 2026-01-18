@@ -1049,20 +1049,18 @@ export async function executeActions(actions, operatorId, signer, onProgress, co
     let recalculationAttempts = 0;
     let currentActions = [...orderedActions];
     let actionIndex = 0;
+    let displayedActionNumber = 0; // Simple counter for progress display
     const originalTotalActions = orderedActions.length; // Track original count for progress
     
     while (actionIndex < currentActions.length) {
         const action = currentActions[actionIndex];
+        displayedActionNumber++;
         
-        // Calculate progress: completed + current position in remaining
-        const completedCount = results.successful.length;
-        const currentProgress = completedCount + actionIndex + 1;
-        const totalProgress = completedCount + currentActions.length;
-        
+        // Simple progress: current action number / original total
         if (onProgress) {
             onProgress({
-                current: currentProgress,
-                total: Math.max(originalTotalActions, totalProgress),
+                current: displayedActionNumber,
+                total: originalTotalActions,
                 action,
                 isRetry: recalculationAttempts > 0
             });
@@ -1078,12 +1076,6 @@ export async function executeActions(actions, operatorId, signer, onProgress, co
                 
                 const amountHex = '0x' + action.amount.toString(16);
                 const amountBN = ethers.BigNumber.from(amountHex);
-                
-                console.log(`[Autostaker] Stake validation:`);
-                console.log(`  - valueWithoutEarnings: ${ethers.utils.formatEther(valueWithoutEarnings)} DATA`);
-                console.log(`  - totalStakedIntoSponsorships: ${ethers.utils.formatEther(totalStakedIntoSponsorships)} DATA`);
-                console.log(`  - actualFreeBalance: ${ethers.utils.formatEther(actualFreeBalance)} DATA`);
-                console.log(`  - amountToStake: ${ethers.utils.formatEther(amountBN)} DATA`);
                 
                 // Check if we have enough free balance
                 if (amountBN.gt(actualFreeBalance)) {
@@ -1119,13 +1111,6 @@ export async function executeActions(actions, operatorId, signer, onProgress, co
                 const minimumStakeOf = await sponsorshipContract.minimumStakeOf(operatorId);
                 const lockedStake = await sponsorshipContract.lockedStakeWei(operatorId);
                 
-                console.log(`[Autostaker] Unstake debug:`);
-                console.log(`  - JS BigInt target: ${action.targetStake}`);
-                console.log(`  - targetStakeBN: ${targetStakeBN.toString()}`);
-                console.log(`  - onChainStake: ${currentStakeOnChain.toString()}`);
-                console.log(`  - minimumStakeOf: ${minimumStakeOf.toString()}`);
-                console.log(`  - lockedStake: ${lockedStake.toString()}`);
-                
                 // Check if there's locked stake preventing full unstake
                 if (lockedStake.gt(0)) {
                     console.warn(`[Autostaker] Cannot unstake: ${lockedStake.toString()} wei is locked (lock period active)`);
@@ -1133,6 +1118,7 @@ export async function executeActions(actions, operatorId, signer, onProgress, co
                         action,
                         error: `Cannot unstake - ${ethers.utils.formatEther(lockedStake)} DATA is locked due to lock period`
                     });
+                    actionIndex++;
                     continue;
                 }
                 
@@ -1154,6 +1140,7 @@ export async function executeActions(actions, operatorId, signer, onProgress, co
                             action,
                             error: 'Cannot reduce stake - target is not less than current stake or at minimum'
                         });
+                        actionIndex++;
                         continue;
                     }
                     
