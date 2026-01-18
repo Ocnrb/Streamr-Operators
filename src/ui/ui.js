@@ -1074,6 +1074,31 @@ export function populateOperatorSettingsModal(operatorData) {
     operatorSettingsModal.classList.remove('hidden');
 }
 
+/**
+ * Update the earnings display for a specific sponsorship
+ * @param {string} sponsorshipId - The sponsorship contract address (lowercase)
+ * @param {string} earningsWei - The earnings amount in wei
+ * @param {number|null} dataPriceUSD - Current DATA price in USD for tooltip
+ */
+export function updateSponsorshipEarningsDisplay(sponsorshipId, earningsWei, dataPriceUSD = null) {
+    const element = document.getElementById(`earnings-${sponsorshipId.toLowerCase()}`);
+    if (!element) return;
+    
+    const earningsData = convertWeiToData(earningsWei);
+    const formattedData = formatBigNumber(earningsData);
+    
+    // Calculate USD value for tooltip
+    let tooltipValue = earningsData;
+    if (dataPriceUSD && dataPriceUSD > 0) {
+        const usdValue = parseFloat(earningsData) * dataPriceUSD;
+        tooltipValue = `${earningsData} DATA ≈ $${usdValue.toFixed(2)} USD`;
+    }
+    
+    // Update the element
+    element.textContent = `${formattedData} DATA`;
+    element.setAttribute('data-tooltip-value', tooltipValue);
+}
+
 
 export function renderOperatorDetails(data, globalState) {
     if (stakeHistoryChart) {
@@ -1205,6 +1230,7 @@ export function renderOperatorDetails(data, globalState) {
         if (!sp) return '';
         const sponsorshipDisplayText = escapeHtml(sp.stream?.id || sp.id);
         const streamId = sp.stream?.id || sp.id;
+        const sponsorshipIdLower = sp.id.toLowerCase();
         const editStakeLink = isAgent
             ? `<a href="#" class="block px-4 py-2 text-sm text-gray-200 hover:bg-[#444444] edit-stake-link" data-sponsorship-id="${sp.id}" data-current-stake="${stake.amountWei}">Edit Stake</a>`
             : `<span class="block px-4 py-2 text-sm text-gray-500 opacity-50 cursor-not-allowed" data-tooltip-content="You must be an agent for this operator to edit stake.">Edit Stake</span>`;
@@ -1215,6 +1241,7 @@ export function renderOperatorDetails(data, globalState) {
                     <a href="#" class="font-mono text-xs text-gray-300 hover:text-white transition-colors truncate block sponsorship-link" data-sponsorship-id="${sp.id}" data-stream-id="${escapeHtml(streamId)}" title="${sponsorshipDisplayText}">${sponsorshipDisplayText}</a>
                     <div class="text-xs mt-2 space-y-1">
                         <div class="flex justify-between items-center"><span class="text-gray-400">Staked:</span><strong class="text-white font-mono" data-tooltip-value="${convertWeiToData(stake.amountWei)}">${formatBigNumber(convertWeiToData(stake.amountWei))} DATA</strong></div>
+                        <div class="flex justify-between items-center"><span class="text-gray-400">Uncollected Earnings:</span><span id="earnings-${sponsorshipIdLower}" class="text-white font-mono earnings-ticker" data-tooltip-value="0"><span class="earnings-spinner"></span></span></div>
                         <div class="flex justify-between items-center"><span class="text-gray-400">APY:</span><strong class="text-green-400 font-mono">${Math.round(Number(sp.spotAPY) * 100)}%</strong></div>
                         <div class="flex justify-between items-center"><span class="text-gray-400">Status:</span><strong class="${sp.isRunning ? 'text-green-400' : 'text-red-400'} font-semibold">${sp.isRunning ? 'Active' : 'Inactive'}</strong></div>
                     </div>

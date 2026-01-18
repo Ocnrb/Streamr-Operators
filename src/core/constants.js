@@ -136,6 +136,17 @@ export const OPERATOR_CONTRACT_ABI = [
         "outputs": [],
         "stateMutability": "nonpayable",
         "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "getSponsorshipsAndEarnings",
+        "outputs": [
+            { "internalType": "address[]", "name": "addresses", "type": "address[]" },
+            { "internalType": "uint256[]", "name": "earnings", "type": "uint256[]" },
+            { "internalType": "uint256", "name": "maxAllowedEarnings", "type": "uint256" }
+        ],
+        "stateMutability": "view",
+        "type": "function"
     }
 ];
 

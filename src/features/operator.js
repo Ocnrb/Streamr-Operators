@@ -57,6 +57,10 @@ const state = {
         etherscanCutoffDate: null,
         allSponsorshipAddresses: [],
     },
+    
+    // Sponsorship earnings state for real-time ticker
+    sponsorshipEarnings: new Map(), // Map<sponsorshipId, {earningsWei, changePerSecond, lastUpdated}>
+    earningsTickerInterval: null,
 };
 
 // Debounced search function
@@ -361,6 +365,106 @@ function setupOperatorStream() {
 }
 
 // ============================================
+// Earnings Ticker Functions
+// ============================================
+
+/**
+ * Start the earnings ticker that updates displayed values every second
+ */
+function startEarningsTicker() {
+    // Stop any existing ticker
+    stopEarningsTicker();
+    
+    state.earningsTickerInterval = setInterval(() => {
+        const now = Date.now();
+        
+        for (const [sponsorshipId, earningsData] of state.sponsorshipEarnings) {
+            if (earningsData.changePerSecond <= BigInt(0)) continue;
+            
+            // Calculate elapsed time since last update
+            const elapsedMs = now - earningsData.lastUpdated;
+            const elapsedSeconds = elapsedMs / 1000;
+            
+            // Calculate new earnings value
+            const increment = BigInt(Math.floor(Number(earningsData.changePerSecond) * elapsedSeconds));
+            earningsData.earningsWei += increment;
+            earningsData.lastUpdated = now;
+            
+            // Update the DOM element
+            UI.updateSponsorshipEarningsDisplay(sponsorshipId, earningsData.earningsWei.toString(), state.dataPriceUSD);
+        }
+    }, 1000);
+    
+    logger.log('[Earnings] Ticker started');
+}
+
+/**
+ * Stop the earnings ticker
+ */
+function stopEarningsTicker() {
+    if (state.earningsTickerInterval) {
+        clearInterval(state.earningsTickerInterval);
+        state.earningsTickerInterval = null;
+        logger.log('[Earnings] Ticker stopped');
+    }
+}
+
+/**
+ * Fetch and initialize sponsorship earnings data
+ */
+async function fetchAndUpdateEarnings() {
+    if (!state.currentOperatorId || !state.currentOperatorData?.stakes) {
+        return;
+    }
+    
+    try {
+        const earningsMap = await Services.fetchSponsorshipEarnings(
+            state.currentOperatorId,
+            state.currentOperatorData.stakes
+        );
+        
+        // Update state with new earnings data
+        state.sponsorshipEarnings = earningsMap;
+        
+        // Update all earnings displays
+        for (const [sponsorshipId, earningsData] of earningsMap) {
+            UI.updateSponsorshipEarningsDisplay(sponsorshipId, earningsData.earningsWei.toString(), state.dataPriceUSD);
+        }
+        
+        // Start/restart the ticker
+        startEarningsTicker();
+        
+    } catch (error) {
+        logger.error('[Earnings] Failed to fetch earnings:', error);
+    }
+}
+
+/**
+ * Reset earnings for a specific sponsorship (called after collect)
+ */
+function resetSponsorshipEarnings(sponsorshipId) {
+    const normalizedId = sponsorshipId.toLowerCase();
+    const earningsData = state.sponsorshipEarnings.get(normalizedId);
+    
+    if (earningsData) {
+        earningsData.earningsWei = BigInt(0);
+        earningsData.lastUpdated = Date.now();
+        UI.updateSponsorshipEarningsDisplay(normalizedId, '0', state.dataPriceUSD);
+    }
+}
+
+/**
+ * Reset earnings for all sponsorships (called after collect all)
+ */
+function resetAllSponsorshipEarnings() {
+    for (const [sponsorshipId, earningsData] of state.sponsorshipEarnings) {
+        earningsData.earningsWei = BigInt(0);
+        earningsData.lastUpdated = Date.now();
+        UI.updateSponsorshipEarningsDisplay(sponsorshipId, '0', state.dataPriceUSD);
+    }
+}
+
+// ============================================
 // Transaction Handlers
 // ============================================
 
@@ -525,6 +629,8 @@ async function handleCollectEarningsClick(button, sponsorshipId) {
 
     const txHash = await Services.handleCollectEarnings(state.signer, state.currentOperatorId, sponsorshipId);
     if (txHash) {
+        // Reset earnings display immediately
+        resetSponsorshipEarnings(sponsorshipId);
         await OperatorLogic.refreshWithRetry(txHash);
     } else {
         await OperatorLogic.refreshData(true);
@@ -544,6 +650,8 @@ async function handleCollectAllEarningsClick(button) {
 
     const txHash = await Services.handleCollectAllEarnings(state.signer, state.currentOperatorId, state.currentOperatorData);
     if (txHash) {
+        // Reset all earnings displays immediately
+        resetAllSponsorshipEarnings();
         await OperatorLogic.refreshWithRetry(txHash);
     } else {
         await OperatorLogic.refreshData(true);
@@ -833,6 +941,9 @@ export const OperatorLogic = {
                 setupOperatorStream();
                 filterAndRenderChart();
                 
+                // Fetch and start earnings ticker
+                fetchAndUpdateEarnings();
+                
                 const showLoadAll = hasMoreHistoryToLoad();
                 UI.renderSponsorshipsHistory(state.sponsorshipHistory, showLoadAll, 'operators');
                 
@@ -850,6 +961,9 @@ export const OperatorLogic = {
                 UI.renderBalances(addresses);
                 updateMyStakeUI();
                 filterAndRenderChart();
+                
+                // Refresh earnings data (will restart ticker with fresh base values)
+                fetchAndUpdateEarnings();
             }
 
         } catch (error) {
@@ -933,6 +1047,8 @@ export const OperatorLogic = {
             clearInterval(state.detailsRefreshInterval);
             state.detailsRefreshInterval = null;
         }
+        stopEarningsTicker();
+        state.sponsorshipEarnings.clear();
         Services.unsubscribeFromCoordinationStream();
     },
     

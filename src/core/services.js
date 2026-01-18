@@ -573,7 +573,7 @@ export async function fetchOperatorDetails(operatorId) {
         query GetOperatorDetails {
           operator(id: "${sanitizedId}") {
             id owner valueWithoutEarnings operatorTokenTotalSupplyWei delegatorCount cumulativeEarningsWei cumulativeProfitsWei cumulativeOperatorsCutWei operatorsCutFraction nodes controllers metadataJsonString
-            stakes(first: 100) { amountWei sponsorship { id remainingWei spotAPY isRunning stream { id } } }
+            stakes(first: 100) { amountWei sponsorship { id remainingWei spotAPY isRunning totalPayoutWeiPerSec totalStakedWei stream { id } } }
             delegations(where: {isSelfDelegation: false}, first: 15, orderBy: _valueDataWei, orderDirection: desc) { id _valueDataWei operatorTokenBalanceWei delegator { id } }
             queueEntries(orderBy: date, orderDirection: asc) { id amount delegator { id } date }
           }
@@ -623,6 +623,71 @@ export async function fetchOperatorDetails(operatorId) {
           slashingEvents(where: {operator: "${sanitizedId}"}, orderBy: date, orderDirection: desc, first: 100) { id amount date sponsorship { id stream { id } } }
         }`;
     return await runQuery(query);
+}
+
+/**
+ * Fetch uncollected earnings for all sponsorships of an operator
+ * Calls the operator contract's getSponsorshipsAndEarnings() function
+ * and calculates changePerSecond for real-time ticker updates
+ * @param {string} operatorId - The operator contract address
+ * @param {Array} stakes - Stakes array from operator data (with sponsorship info)
+ * @returns {Promise<Map<string, {earningsWei: bigint, changePerSecond: bigint}>>} Map of sponsorship ID to earnings data
+ */
+export async function fetchSponsorshipEarnings(operatorId, stakes = []) {
+    const earningsMap = new Map();
+    
+    try {
+        const provider = getReadOnlyProvider();
+        const operatorContract = new ethers.Contract(operatorId, OPERATOR_CONTRACT_ABI, provider);
+        
+        // Call getSponsorshipsAndEarnings() on the operator contract
+        const result = await operatorContract.getSponsorshipsAndEarnings();
+        const addresses = result.addresses || result[0];
+        const earnings = result.earnings || result[1];
+        
+        // Build a lookup map for stake info (for calculating changePerSecond)
+        const stakeInfoMap = new Map();
+        for (const stake of stakes) {
+            if (stake.sponsorship) {
+                stakeInfoMap.set(stake.sponsorship.id.toLowerCase(), {
+                    myStakeWei: BigInt(stake.amountWei || '0'),
+                    totalPayoutWeiPerSec: BigInt(stake.sponsorship.totalPayoutWeiPerSec || '0'),
+                    totalStakedWei: BigInt(stake.sponsorship.totalStakedWei || '0'),
+                    isRunning: stake.sponsorship.isRunning,
+                    remainingWei: BigInt(stake.sponsorship.remainingWei || '0')
+                });
+            }
+        }
+        
+        // Process each sponsorship's earnings
+        for (let i = 0; i < addresses.length; i++) {
+            const sponsorshipId = addresses[i].toLowerCase();
+            const earningsWei = BigInt(earnings[i].toString());
+            
+            // Calculate changePerSecond based on stake proportion
+            let changePerSecond = BigInt(0);
+            const stakeInfo = stakeInfoMap.get(sponsorshipId);
+            
+            if (stakeInfo && stakeInfo.isRunning && stakeInfo.remainingWei > BigInt(0) && stakeInfo.totalStakedWei > BigInt(0)) {
+                // changePerSecond = (myStake / totalStaked) * totalPayoutPerSecond
+                // Use BigInt math with precision: (myStake * payoutPerSec) / totalStaked
+                changePerSecond = (stakeInfo.myStakeWei * stakeInfo.totalPayoutWeiPerSec) / stakeInfo.totalStakedWei;
+            }
+            
+            earningsMap.set(sponsorshipId, {
+                earningsWei,
+                changePerSecond,
+                lastUpdated: Date.now()
+            });
+        }
+        
+        logger.log(`[Earnings] Fetched earnings for ${earningsMap.size} sponsorships`);
+        
+    } catch (error) {
+        logger.error('[Earnings] Failed to fetch sponsorship earnings:', error);
+    }
+    
+    return earningsMap;
 }
 
 export async function fetchMoreDelegators(operatorId, skip) {
