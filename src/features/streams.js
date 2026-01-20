@@ -1488,16 +1488,16 @@ function renderStreamDetail(stream, isSponsored, sponsorshipId) {
     // Store partitions in state for player
     detailState.partitions = partitions;
     
-    // Stream ID with link to Streamr Hub
+    // Stream ID with link to PolygonScan
     setText('stream-detail-id', stream.id);
     
-    // Setup link to Streamr Hub
+    // Setup link to PolygonScan
     const streamLinkEl = document.getElementById('stream-detail-link');
     if (streamLinkEl) {
-        // Encode the stream ID for Streamr Hub URL (replace / with %2F)
-        const encodedStreamId = encodeURIComponent(stream.id);
-        streamLinkEl.href = `https://streamr.network/hub/streams/${encodedStreamId}/overview`;
-        streamLinkEl.title = 'View on Streamr Hub';
+        // Link to PolygonScan using the stream ID (ENS-style address)
+        const streamAddress = stream.id.split('/')[0]; // Get the first part (e.g., "eth-watch.eth")
+        streamLinkEl.href = `https://polygonscan.com/address/${streamAddress}`;
+        streamLinkEl.title = 'View on PolygonScan';
     }
     
     // Partitions

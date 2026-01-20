@@ -263,6 +263,69 @@ export function isRateLimitError(error) {
 }
 
 /**
+ * Check if a Polygonscan API response indicates a rate limit error
+ * @param {Object} data - The JSON response from Polygonscan API
+ * @returns {boolean} True if rate limited
+ */
+function isPolygonscanRateLimited(data) {
+    if (data?.status === "0" && typeof data?.result === 'string') {
+        const msg = data.result.toLowerCase();
+        return msg.includes('rate limit') || 
+               msg.includes('max rate limit') || 
+               msg.includes('too many requests');
+    }
+    return false;
+}
+
+/**
+ * Fetch with retry logic for Polygonscan API rate limits
+ * @param {string} url - The URL to fetch
+ * @param {number} maxRetries - Maximum retry attempts
+ * @param {number} baseDelay - Base delay in ms for exponential backoff
+ * @returns {Promise<Object>} The JSON response
+ */
+async function fetchWithPolygonscanRetry(url, maxRetries = 5, baseDelay = 2000) {
+    let lastError = null;
+    
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+            const response = await fetch(url, { cache: 'no-store' });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            
+            const data = await response.json();
+            
+            // Check for rate limit in response
+            if (isPolygonscanRateLimited(data)) {
+                if (attempt < maxRetries - 1) {
+                    const delay = baseDelay * Math.pow(2, attempt);
+                    logger.log(`[Polygonscan] Rate limited, retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})...`);
+                    await new Promise(r => setTimeout(r, delay));
+                    continue;
+                }
+                throw new Error('Polygonscan API rate limit exceeded');
+            }
+            
+            return data;
+        } catch (error) {
+            lastError = error;
+            
+            // Retry on network errors
+            if (attempt < maxRetries - 1) {
+                const delay = baseDelay * Math.pow(2, attempt);
+                logger.log(`[Polygonscan] Request failed, retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})...`);
+                await new Promise(r => setTimeout(r, delay));
+                continue;
+            }
+        }
+    }
+    
+    throw lastError || new Error('Polygonscan API request failed after retries');
+}
+
+/**
  * Execute a READ operation with automatic RPC fallback on rate limiting.
  * Use this for all contract.call() and provider read operations.
  * @param {Function} readFn - Async function that performs the read operation
@@ -797,16 +860,13 @@ export async function fetchPolygonscanHistory(walletAddress, offset = 500, spons
     });
 
     try {
-        const [txlistRes, tokentxRes] = await Promise.all([
-            fetch(txlistUrl, { cache: 'no-store' }), 
-            fetch(tokentxUrl, { cache: 'no-store' })
-        ]);
-
-        if (!txlistRes.ok) throw new Error(`API request failed (txlist): HTTP ${txlistRes.status}`);
-        if (!tokentxRes.ok) throw new Error(`API request failed (tokentx): HTTP ${tokentxRes.status}`);
-
-        const txlistData = await txlistRes.json();
-        const tokentxData = await tokentxRes.json();
+        // Fetch with retry logic for rate limits - sequential to avoid overwhelming API
+        const txlistData = await fetchWithPolygonscanRetry(txlistUrl);
+        
+        // Small delay between requests to be nice to the API
+        await new Promise(r => setTimeout(r, 300));
+        
+        const tokentxData = await fetchWithPolygonscanRetry(tokentxUrl);
 
         // Handle "No transactions found" or empty results as empty array, not error
         // Polygonscan returns status "0" for both errors AND empty results
@@ -1125,8 +1185,7 @@ export async function fetchAllPolygonscanHistory(walletAddress, sponsorshipAddre
 
     const OFFSET = 500;
     const MAX_PAGES = 20;
-    const MAX_RETRIES = 3;
-    const BASE_DELAY = 1000;
+    const BASE_DELAY = 2000;
     const sponsorshipSet = new Set(sponsorshipAddresses.map(addr => addr.toLowerCase()));
     const nativeToken = POLYGONSCAN_NETWORK.nativeToken;
     
@@ -1137,84 +1196,62 @@ export async function fetchAllPolygonscanHistory(walletAddress, sponsorshipAddre
     let consecutiveErrors = 0;
     
     while (hasMore) {
-        let retryCount = 0;
-        let success = false;
-        
-        while (!success && retryCount < MAX_RETRIES) {
-            try {
-                if (retryCount > 0) {
-                    await new Promise(r => setTimeout(r, BASE_DELAY * Math.pow(2, retryCount)));
+        try {
+            const txlistUrl = buildPolygonscanUrl({
+                module: 'account',
+                action: 'txlist',
+                address: walletAddress,
+                page,
+                offset: OFFSET
+            });
+            
+            const tokentxUrl = buildPolygonscanUrl({
+                module: 'account',
+                action: 'tokentx',
+                address: walletAddress,
+                page,
+                offset: OFFSET
+            });
+            
+            // Use retry-enabled fetch for both requests (sequential to avoid overwhelming API)
+            const txlistData = await fetchWithPolygonscanRetry(txlistUrl);
+            await new Promise(r => setTimeout(r, 300));
+            const tokentxData = await fetchWithPolygonscanRetry(tokentxUrl);
+
+            // Handle "No transactions found" as empty, not error
+            const isEmptyResult = (data) => {
+                if (data.status === "1") return false;
+                if (!data.result || data.result === '') return true;
+                if (typeof data.result === 'string') {
+                    const msg = data.result.toLowerCase();
+                    if (msg.includes('no transactions found') || msg.includes('no records found')) return true;
                 }
-                
-                const txlistUrl = buildPolygonscanUrl({
-                    module: 'account',
-                    action: 'txlist',
-                    address: walletAddress,
-                    page,
-                    offset: OFFSET
-                });
-                
-                await new Promise(r => setTimeout(r, 300));
-                
-                const tokentxUrl = buildPolygonscanUrl({
-                    module: 'account',
-                    action: 'tokentx',
-                    address: walletAddress,
-                    page,
-                    offset: OFFSET
-                });
-                
-                const txlistRes = await fetch(txlistUrl, { cache: 'no-store' });
-                await new Promise(r => setTimeout(r, 300));
-                const tokentxRes = await fetch(tokentxUrl, { cache: 'no-store' });
+                return false;
+            };
 
-                if (!txlistRes.ok || !tokentxRes.ok) {
-                    retryCount++;
-                    continue;
-                }
+            const normalTxs = isEmptyResult(txlistData) ? [] : (txlistData.result || []);
+            const tokenTxs = isEmptyResult(tokentxData) ? [] : (tokentxData.result || []);
 
-                const txlistData = await txlistRes.json();
-                const tokentxData = await tokentxRes.json();
+            const pageTxs = processPolygonscanPage(normalTxs, tokenTxs, walletAddress, sponsorshipSet, nativeToken);
+            
+            const newTxs = pageTxs.filter(tx => !existingHashes.has(`${tx.txHash}-${tx.timestamp}`));
+            newTxs.forEach(tx => existingHashes.add(`${tx.txHash}-${tx.timestamp}`));
+            allProcessedTxs = [...allProcessedTxs, ...newTxs];
 
-                const txlistError = txlistData.status === "0" && txlistData.message !== "No transactions found";
-                const tokentxError = tokentxData.status === "0" && tokentxData.message !== "No transactions found";
-                
-                if (txlistError || tokentxError) {
-                    const isRateLimit = (txlistData.result?.includes?.("rate limit")) || 
-                                       (tokentxData.result?.includes?.("rate limit"));
-                    if (isRateLimit) {
-                        retryCount++;
-                        continue;
-                    }
-                    retryCount++;
-                    continue;
-                }
+            hasMore = (normalTxs.length === OFFSET || tokenTxs.length === OFFSET) && page < MAX_PAGES;
+            consecutiveErrors = 0;
+            page++;
 
-                const normalTxs = txlistData.result || [];
-                const tokenTxs = tokentxData.result || [];
-
-                const pageTxs = processPolygonscanPage(normalTxs, tokenTxs, walletAddress, sponsorshipSet, nativeToken);
-                
-                const newTxs = pageTxs.filter(tx => !existingHashes.has(`${tx.txHash}-${tx.timestamp}`));
-                newTxs.forEach(tx => existingHashes.add(`${tx.txHash}-${tx.timestamp}`));
-                allProcessedTxs = [...allProcessedTxs, ...newTxs];
-
-                hasMore = (normalTxs.length === OFFSET || tokenTxs.length === OFFSET) && page < MAX_PAGES;
-                success = true;
-                consecutiveErrors = 0;
-                page++;
-
-                if (hasMore) {
-                    await new Promise(r => setTimeout(r, BASE_DELAY));
-                }
-            } catch (error) {
-                retryCount++;
+            if (hasMore) {
+                await new Promise(r => setTimeout(r, BASE_DELAY));
             }
-        }
-        
-        if (!success) {
+        } catch (error) {
+            logger.warn(`[Polygonscan] Error fetching page ${page}:`, error.message);
             consecutiveErrors++;
-            if (consecutiveErrors >= 2) break;
+            if (consecutiveErrors >= 3) {
+                logger.warn(`[Polygonscan] Too many consecutive errors, stopping pagination`);
+                break;
+            }
             page++;
             hasMore = page <= MAX_PAGES;
         }

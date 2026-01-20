@@ -641,9 +641,13 @@ export function renderSponsorshipsHistory(historyGroups, showLoadAllButton = tru
         const graphEventsHtml = group.events.filter(e => e.type === 'graph').map(event => {
             const sp = event.relatedObject;
             if (!sp) return '';
-            const sponsorshipUrl = `https://streamr.network/hub/network/sponsorships/${sp.id}`;
-            const sponsorshipDisplayText = escapeHtml(sp.stream?.id || sp.id);
-            const link = `<a href="${sponsorshipUrl}" target="_blank" rel="noopener noreferrer" class="text-gray-300 hover:text-white transition-colors" title="${sponsorshipDisplayText}">${sponsorshipDisplayText}</a>`;
+            const streamId = sp.stream?.id || '';
+            const sponsorshipId = sp.id;
+            const sponsorshipDisplayText = escapeHtml(streamId || sponsorshipId);
+            // Internal link to Sponsorship Details page
+            const link = streamId 
+                ? `<a href="#" class="sponsorship-link text-gray-300 hover:text-white transition-colors" data-stream-id="${escapeHtml(streamId)}" data-sponsorship-id="${escapeHtml(sponsorshipId)}" title="${sponsorshipDisplayText}">${sponsorshipDisplayText}</a>`
+                : `<a href="https://polygonscan.com/address/${sponsorshipId}" target="_blank" rel="noopener noreferrer" class="text-gray-300 hover:text-white transition-colors" title="${sponsorshipDisplayText}">${sponsorshipDisplayText}</a>`;
             const text = `Action on ${link}`;
             const icon = '<svg class="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path></svg>';
 
@@ -1158,7 +1162,7 @@ export function renderOperatorDetails(data, globalState) {
                 </div>
                 <div class="flex-shrink-0 text-right">
                     <p class="text-xs sm:text-sm text-gray-400 font-semibold mb-1">APY</p>
-                    <p class="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-green-400 whitespace-nowrap">${Math.round(apy * 100)}%</p>
+                    <p class="text-2xl sm:text-3xl lg:text-4xl font-extrabold ${apyColorClass} whitespace-nowrap">${Math.round(apy * 100)}%</p>
                 </div>
             </div>
             <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mt-4 sm:mt-6">
@@ -1242,8 +1246,8 @@ export function renderOperatorDetails(data, globalState) {
                     <div class="text-xs mt-2 space-y-1">
                         <div class="flex justify-between items-center"><span class="text-gray-400">Staked:</span><strong class="text-white font-mono" data-tooltip-value="${convertWeiToData(stake.amountWei)}">${formatBigNumber(convertWeiToData(stake.amountWei))} DATA</strong></div>
                         <div class="flex justify-between items-center"><span class="text-gray-400">Uncollected Earnings:</span><span id="earnings-${sponsorshipIdLower}" class="text-white font-mono earnings-ticker" data-tooltip-value="0"><span class="earnings-spinner"></span></span></div>
-                        <div class="flex justify-between items-center"><span class="text-gray-400">APY:</span><strong class="text-green-400 font-mono">${Math.round(Number(sp.spotAPY) * 100)}%</strong></div>
-                        <div class="flex justify-between items-center"><span class="text-gray-400">Status:</span><strong class="${sp.isRunning ? 'text-green-400' : 'text-red-400'} font-semibold">${sp.isRunning ? 'Active' : 'Inactive'}</strong></div>
+                        <div class="flex justify-between items-center"><span class="text-gray-400">APY:</span><strong class="${Math.round(Number(sp.spotAPY) * 100) === 0 ? 'text-red-400' : 'text-green-400'} font-mono">${Math.round(Number(sp.spotAPY) * 100)}%</strong></div>
+                        <div class="flex justify-between items-center"><span class="text-gray-400">Status:</span><strong class="${Math.round(Number(sp.spotAPY) * 100) > 0 ? 'text-green-400' : 'text-red-400'} font-semibold">${Math.round(Number(sp.spotAPY) * 100) > 0 ? 'Active' : 'Inactive'}</strong></div>
                     </div>
                 </div>
                 <div class="flex-shrink-0 ml-4">
