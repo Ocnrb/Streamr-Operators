@@ -5,7 +5,7 @@
  */
 
 import { showToast, updateToast } from '../ui/ui.js';
-import { runQuery, switchToFallbackRpc, getCurrentRpcUrl } from '../core/services.js';
+import { runQuery, switchToFallbackRpc, getCurrentRpcUrl, readWithFallback, isRateLimitError as isRateLimitErrorService } from '../core/services.js';
 import { convertWeiToData, formatBigNumber } from '../core/utils.js';
 import { OPERATOR_CONTRACT_ABI, SPONSORSHIP_ABI, POLYGON_RPC_FALLBACKS } from '../core/constants.js';
 
@@ -709,7 +709,7 @@ export async function analyzeAndCalculateActions(operatorId, config, operatorCon
     // Fallback to contract if Graph data not available
     if (myUnstakedAmount === BigInt(0)) {
         try {
-            const valueWithoutEarnings = await operatorContract.valueWithoutEarnings();
+            const valueWithoutEarnings = await readWithFallback(() => operatorContract.valueWithoutEarnings());
             const myStakedAmount = sumBigInts([...myCurrentStakes.values()]);
             myUnstakedAmount = valueWithoutEarnings.gt(myStakedAmount.toString()) 
                 ? BigInt(valueWithoutEarnings.toString()) - myStakedAmount 
@@ -889,20 +889,12 @@ const RATE_LIMIT_DELAY_MS = 12000; // Wait 12s when rate limited (RPC says retry
 
 /**
  * Check if an error is a rate limit error from RPC
+ * Uses the centralized isRateLimitError from services.js
  * @param {Error} error - The error to check
  * @returns {boolean} True if this is a rate limit error
  */
 function isRateLimitError(error) {
-    const msg = error.message?.toLowerCase() || '';
-    const rateLimitPatterns = [
-        'too many requests',
-        'rate limit',
-        'call rate limit exhausted',
-        '-32090', // Polygon RPC rate limit error code
-        'could not detect network',
-        'network_error'
-    ];
-    return rateLimitPatterns.some(pattern => msg.includes(pattern.toLowerCase()));
+    return isRateLimitErrorService(error);
 }
 
 /**
@@ -994,7 +986,7 @@ export async function executeActions(actions, operatorId, signer, onProgress, co
     // First, try to pay out any pending undelegation queue if there are funds available
     // This helps avoid issues where unstake funds go to queue instead of being available
     try {
-        const queueIsEmpty = await operatorContract.queueIsEmpty();
+        const queueIsEmpty = await readWithFallback(() => operatorContract.queueIsEmpty());
         if (!queueIsEmpty) {
             console.log('[Autostaker] Undelegation queue not empty, checking if we can pay it out...');
             
@@ -1015,7 +1007,7 @@ export async function executeActions(actions, operatorId, signer, onProgress, co
     // Check again if we have stake actions and queue status after potential payout
     if (stakeActions.length > 0) {
         try {
-            const queueIsEmpty = await operatorContract.queueIsEmpty();
+            const queueIsEmpty = await readWithFallback(() => operatorContract.queueIsEmpty());
             if (!queueIsEmpty) {
                 // Queue still not empty - need more funds
                 // Filter out stake actions, only do unstakes first
@@ -1070,8 +1062,8 @@ export async function executeActions(actions, operatorId, signer, onProgress, co
             let tx;
             if (action.type === 'stake') {
                 // For stakes, first verify the operator has enough free balance
-                const valueWithoutEarnings = await operatorContract.valueWithoutEarnings();
-                const totalStakedIntoSponsorships = await operatorContract.totalStakedIntoSponsorshipsWei();
+                const valueWithoutEarnings = await readWithFallback(() => operatorContract.valueWithoutEarnings());
+                const totalStakedIntoSponsorships = await readWithFallback(() => operatorContract.totalStakedIntoSponsorshipsWei());
                 const actualFreeBalance = valueWithoutEarnings.sub(totalStakedIntoSponsorships);
                 
                 const amountHex = '0x' + action.amount.toString(16);
@@ -1104,12 +1096,12 @@ export async function executeActions(actions, operatorId, signer, onProgress, co
                 let targetStakeBN = ethers.BigNumber.from(targetStakeHex);
                 
                 // Verify targetStake is valid before calling contract
-                const currentStakeOnChain = await operatorContract.stakedInto(action.sponsorshipId);
+                const currentStakeOnChain = await readWithFallback(() => operatorContract.stakedInto(action.sponsorshipId));
                 
                 // Check minimumStakeOf on the Sponsorship contract
                 const sponsorshipContract = new ethers.Contract(action.sponsorshipId, SPONSORSHIP_ABI, signer.provider);
-                const minimumStakeOf = await sponsorshipContract.minimumStakeOf(operatorId);
-                const lockedStake = await sponsorshipContract.lockedStakeWei(operatorId);
+                const minimumStakeOf = await readWithFallback(() => sponsorshipContract.minimumStakeOf(operatorId));
+                const lockedStake = await readWithFallback(() => sponsorshipContract.lockedStakeWei(operatorId));
                 
                 // Check if there's locked stake preventing full unstake
                 if (lockedStake.gt(0)) {
@@ -1190,15 +1182,22 @@ export async function executeActions(actions, operatorId, signer, onProgress, co
         } catch (e) {
             console.error(`Failed to execute ${action.type} action:`, e);
             
+            // Check if the transaction was already submitted (has hash)
+            // If so, it either succeeded or failed on-chain - recalculate to find out
+            const txWasSubmitted = e?.transactionHash || e?.transaction?.hash || e?.receipt;
+            if (txWasSubmitted) {
+                console.log(`[Autostaker] Transaction was submitted but may have failed on-chain. Recalculating...`);
+            }
+            
             // Check if this is a retryable error and we have config for recalculation
             if (config && isRetryableError(e) && recalculationAttempts < MAX_RETRY_ATTEMPTS) {
                 recalculationAttempts++;
                 
-                // Use longer delay for rate limit errors
+                // Use longer delay for rate limit errors, or if tx was submitted (wait for chain state)
                 const isRateLimit = isRateLimitError(e);
-                const delayMs = isRateLimit ? RATE_LIMIT_DELAY_MS : RETRY_DELAY_MS;
+                const delayMs = txWasSubmitted ? RETRY_DELAY_MS : (isRateLimit ? RATE_LIMIT_DELAY_MS : RETRY_DELAY_MS);
                 
-                console.log(`[Autostaker] ${isRateLimit ? 'Rate limit' : 'Retryable'} error detected, waiting ${delayMs/1000}s before retry (attempt ${recalculationAttempts}/${MAX_RETRY_ATTEMPTS})...`);
+                console.log(`[Autostaker] ${txWasSubmitted ? 'Tx submitted,' : (isRateLimit ? 'Rate limit' : 'Retryable')} error detected, waiting ${delayMs/1000}s before retry (attempt ${recalculationAttempts}/${MAX_RETRY_ATTEMPTS})...`);
                 
                 if (onProgress) {
                     onProgress({

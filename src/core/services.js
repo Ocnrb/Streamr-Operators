@@ -237,19 +237,69 @@ async function checkGasPriceAndWarn(provider) {
 
 /**
  * Check if an error is a rate limit error
+ * Excludes transaction failures (CALL_EXCEPTION with receipt) which are on-chain reverts, not rate limits
  * @param {Error} error - The error to check
  * @returns {boolean} True if rate limited
  */
 export function isRateLimitError(error) {
+    // If this error has a transaction receipt, it's an on-chain failure, not a rate limit
+    // These are transactions that were mined but reverted
+    if (error?.receipt || error?.transactionHash) {
+        return false;
+    }
+    
     const msg = error?.message?.toLowerCase() || '';
-    return msg.includes('too many requests') || 
+    const errorStr = JSON.stringify(error || {}).toLowerCase();
+    
+    // Check for rate limit patterns
+    const isRateLimit = msg.includes('too many requests') || 
            msg.includes('rate limit') || 
            msg.includes('-32090') ||
-           msg.includes('could not detect network');
+           msg.includes('could not detect network') ||
+           errorStr.includes('-32090') ||
+           errorStr.includes('rate limit');
+    
+    return isRateLimit;
 }
 
 /**
- * Execute a transaction with automatic RPC fallback on rate limiting
+ * Execute a READ operation with automatic RPC fallback on rate limiting.
+ * Use this for all contract.call() and provider read operations.
+ * @param {Function} readFn - Async function that performs the read operation
+ * @param {number} maxRetries - Maximum retry attempts (default: 3)
+ * @returns {Promise<any>} Read result
+ */
+export async function readWithFallback(readFn, maxRetries = 3) {
+    let lastError = null;
+    
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+            return await readFn();
+        } catch (e) {
+            lastError = e;
+            
+            if (isRateLimitError(e) && attempt < maxRetries - 1) {
+                console.log(`[RPC] Read rate limited, switching to fallback (attempt ${attempt + 1}/${maxRetries})...`);
+                
+                // Switch to fallback RPC
+                switchToFallbackRpc();
+                
+                // Wait before retry (longer for rate limits)
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                continue;
+            }
+            
+            throw e;
+        }
+    }
+    
+    throw lastError;
+}
+
+/**
+ * Execute a transaction with automatic RPC fallback on rate limiting.
+ * IMPORTANT: Only retries if rate limit occurs BEFORE transaction is submitted.
+ * If tx is already submitted, we wait for it instead of retrying.
  * @param {Function} txFn - Async function that executes the transaction, receives signer
  * @param {ethers.Signer} signer - The signer to use
  * @param {number} maxRetries - Maximum retry attempts (default: 3)
@@ -265,8 +315,15 @@ export async function executeWithFallback(txFn, signer, maxRetries = 3) {
         } catch (e) {
             lastError = e;
             
+            // If the error has a transaction hash, the tx was already submitted
+            // Don't retry - just throw the error (tx either succeeded or failed on-chain)
+            if (e?.transactionHash || e?.transaction?.hash || e?.receipt) {
+                console.log(`[RPC] Transaction was submitted (hash exists), not retrying:`, e?.transactionHash || e?.transaction?.hash);
+                throw e;
+            }
+            
             if (isRateLimitError(e) && attempt < maxRetries - 1) {
-                console.log(`[RPC] Rate limited, switching to fallback (attempt ${attempt + 1}/${maxRetries})...`);
+                console.log(`[RPC] Rate limited before tx submission, switching to fallback (attempt ${attempt + 1}/${maxRetries})...`);
                 
                 // Switch to fallback RPC
                 switchToFallbackRpc();
@@ -644,8 +701,8 @@ export async function fetchSponsorshipEarnings(operatorId, stakes = []) {
         const provider = getReadOnlyProvider();
         const operatorContract = new ethers.Contract(operatorId, OPERATOR_CONTRACT_ABI, provider);
         
-        // Call getSponsorshipsAndEarnings() on the operator contract
-        const result = await operatorContract.getSponsorshipsAndEarnings();
+        // Call getSponsorshipsAndEarnings() on the operator contract with fallback
+        const result = await readWithFallback(() => operatorContract.getSponsorshipsAndEarnings());
         const addresses = result.addresses || result[0];
         const earnings = result.earnings || result[1];
         
@@ -1320,8 +1377,10 @@ function classifyTransaction(tx, direction, isToTreasury, baseMethodId, groupMet
 
 export async function getMaticBalance(address) {
     try {
-        const provider = getReadOnlyProvider();
-        const balanceWei = await provider.getBalance(address);
+        const balanceWei = await readWithFallback(async () => {
+            const provider = getReadOnlyProvider();
+            return await provider.getBalance(address);
+        });
         const balanceMatic = parseFloat(ethers.utils.formatEther(balanceWei));
         return balanceMatic.toFixed(2);
     } catch (error) {
@@ -1356,10 +1415,10 @@ export async function manageTransactionModal(show, mode = 'delegate', signer, my
         let balanceWei;
         if (mode === 'delegate') {
             const dataTokenContract = new ethers.Contract(DATA_TOKEN_ADDRESS_POLYGON, DATA_TOKEN_ABI, provider);
-            balanceWei = await dataTokenContract.balanceOf(myRealAddress);
+            balanceWei = await readWithFallback(() => dataTokenContract.balanceOf(myRealAddress));
             try {
                 const configContract = new ethers.Contract(STREAMR_CONFIG_ADDRESS, STREAMR_CONFIG_ABI, provider);
-                const minWei = await configContract.minimumDelegationWei();
+                const minWei = await readWithFallback(() => configContract.minimumDelegationWei());
                 txModalMinimumValue.textContent = `${parseFloat(ethers.utils.formatEther(minWei)).toFixed(0)} DATA`;
             } catch (e) {
                 console.error("Failed to get minimum delegation", e);
@@ -1368,11 +1427,13 @@ export async function manageTransactionModal(show, mode = 'delegate', signer, my
         } else {
             // Calculate balance using real-time exchange rate for undelegate
             const operatorContract = new ethers.Contract(currentOperatorId, OPERATOR_CONTRACT_ABI, provider);
-            const [userTokensWei, totalSupplyWei, valueWithoutEarningsWei] = await Promise.all([
-                operatorContract.balanceOf(myRealAddress),
-                operatorContract.totalSupply(),
-                operatorContract.valueWithoutEarnings()
-            ]);
+            const [userTokensWei, totalSupplyWei, valueWithoutEarningsWei] = await readWithFallback(() => 
+                Promise.all([
+                    operatorContract.balanceOf(myRealAddress),
+                    operatorContract.totalSupply(),
+                    operatorContract.valueWithoutEarnings()
+                ])
+            );
             
             // Calculate DATA balance: userTokens * valueWithoutEarnings / totalSupply
             if (totalSupplyWei.isZero()) {
@@ -1423,7 +1484,7 @@ export async function confirmDelegation(signer, myRealAddress, currentOperatorId
             return null;
         }
         
-        const userBalanceWei = await dataTokenContract.balanceOf(myRealAddress);
+        const userBalanceWei = await readWithFallback(() => dataTokenContract.balanceOf(myRealAddress));
 
         if (amountWei.gt(userBalanceWei)) {
             showToast({ type: 'warning', title: 'Insufficient Balance', message: 'You do not have enough DATA to delegate that amount.' });
@@ -1481,11 +1542,13 @@ export async function confirmUndelegation(signer, myRealAddress, currentOperator
         }
         
         // Fetch all required values in parallel for accurate real-time exchange rate calculation
-        const [userBalanceTokensWei, totalSupplyWei, valueWithoutEarningsWei] = await Promise.all([
-            operatorContract.balanceOf(myRealAddress),
-            operatorContract.totalSupply(),
-            operatorContract.valueWithoutEarnings()
-        ]);
+        const [userBalanceTokensWei, totalSupplyWei, valueWithoutEarningsWei] = await readWithFallback(() => 
+            Promise.all([
+                operatorContract.balanceOf(myRealAddress),
+                operatorContract.totalSupply(),
+                operatorContract.valueWithoutEarnings()
+            ])
+        );
 
         // Calculate real-time exchange rate: DATA per Operator Token
         // exchangeRate = valueWithoutEarnings / totalSupply
@@ -1682,11 +1745,13 @@ export async function fetchMyStake(operatorId, myRealAddress, signer) {
         const operatorContract = new ethers.Contract(operatorId, OPERATOR_CONTRACT_ABI, provider);
         
         // Calculate stake using real-time exchange rate
-        const [userTokensWei, totalSupplyWei, valueWithoutEarningsWei] = await Promise.all([
-            operatorContract.balanceOf(myRealAddress),
-            operatorContract.totalSupply(),
-            operatorContract.valueWithoutEarnings()
-        ]);
+        const [userTokensWei, totalSupplyWei, valueWithoutEarningsWei] = await readWithFallback(() => 
+            Promise.all([
+                operatorContract.balanceOf(myRealAddress),
+                operatorContract.totalSupply(),
+                operatorContract.valueWithoutEarnings()
+            ])
+        );
         
         // Calculate DATA balance: userTokens * valueWithoutEarnings / totalSupply
         if (totalSupplyWei.isZero()) {

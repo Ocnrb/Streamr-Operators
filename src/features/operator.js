@@ -585,7 +585,7 @@ async function handleEditStakeClick(sponsorshipId, currentStakeWei) {
     
     try {
         const tokenContract = new ethers.Contract(Constants.DATA_TOKEN_ADDRESS_POLYGON, Constants.DATA_TOKEN_ABI, state.signer.provider);
-        const freeFundsWei = await tokenContract.balanceOf(state.currentOperatorId);
+        const freeFundsWei = await Services.readWithFallback(() => tokenContract.balanceOf(state.currentOperatorId));
         UI.stakeModalFreeFunds.textContent = `${Utils.formatBigNumber(Utils.convertWeiToData(freeFundsWei))} DATA`;
         const maxStakeAmountWei = ethers.BigNumber.from(currentStakeWei).add(freeFundsWei).toString();
         
