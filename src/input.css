@@ -479,6 +479,12 @@
   }
   
   /* Desktop header adjustment for sidebar width */
+  @media (min-width: 768px) {
+    #desktop-header {
+      left: 72px !important; /* Sidebar colapsada = 72px */
+    }
+  }
+  
   @media (min-width: 1024px) {
     #desktop-header {
       left: 18rem !important; /* lg:w-72 = 288px = 18rem */
