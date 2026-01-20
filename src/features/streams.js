@@ -388,8 +388,94 @@ const detailState = {
     chartData: null,
     currentChartType: 'apy',
     currentViewMode: 'data',
-    currentTimeframe: 'all'
+    currentTimeframe: 'all',
+    // Remaining balance ticker state
+    remainingBalanceData: null, // {remainingWei: BigInt, changePerSecond: BigInt, lastUpdated: number}
+    remainingBalanceTickerInterval: null
 };
+
+// ============================================
+// Remaining Balance Ticker Functions
+// ============================================
+
+/**
+ * Start the remaining balance ticker that updates displayed values every second
+ * Balance decreases based on totalPayoutWeiPerSec, stops at zero
+ */
+function startRemainingBalanceTicker() {
+    // Stop any existing ticker
+    stopRemainingBalanceTicker();
+    
+    // Don't start if no data or already at zero
+    if (!detailState.remainingBalanceData || detailState.remainingBalanceData.remainingWei <= BigInt(0)) {
+        return;
+    }
+    
+    detailState.remainingBalanceTickerInterval = setInterval(() => {
+        const data = detailState.remainingBalanceData;
+        if (!data || data.changePerSecond <= BigInt(0)) return;
+        
+        const now = Date.now();
+        const elapsedMs = now - data.lastUpdated;
+        const elapsedSeconds = elapsedMs / 1000;
+        
+        // Calculate decrement
+        const decrement = BigInt(Math.floor(Number(data.changePerSecond) * elapsedSeconds));
+        
+        // Subtract from remaining, floor at zero
+        data.remainingWei = data.remainingWei - decrement;
+        if (data.remainingWei < BigInt(0)) {
+            data.remainingWei = BigInt(0);
+        }
+        data.lastUpdated = now;
+        
+        // Update the display
+        updateRemainingBalanceDisplay(data.remainingWei.toString(), state.dataPriceUSD);
+        
+        // Stop ticker if remaining reached zero
+        if (data.remainingWei <= BigInt(0)) {
+            logger.log('[RemainingBalance] Ticker stopped - balance reached zero');
+            stopRemainingBalanceTicker();
+        }
+    }, 1000);
+    
+    logger.log('[RemainingBalance] Ticker started');
+}
+
+/**
+ * Stop the remaining balance ticker
+ */
+function stopRemainingBalanceTicker() {
+    if (detailState.remainingBalanceTickerInterval) {
+        clearInterval(detailState.remainingBalanceTickerInterval);
+        detailState.remainingBalanceTickerInterval = null;
+        logger.log('[RemainingBalance] Ticker stopped');
+    }
+}
+
+/**
+ * Update the remaining balance display element
+ * @param {string} remainingWei - Remaining balance in wei as string
+ * @param {number} dataPriceUSD - Current DATA price in USD
+ */
+function updateRemainingBalanceDisplay(remainingWei, dataPriceUSD) {
+    const element = document.getElementById('stream-remaining');
+    if (!element) return;
+    
+    const remainingData = Utils.convertWeiToData(remainingWei);
+    const formattedData = Utils.formatBigNumber(remainingData);
+    
+    // Display only DATA value
+    element.textContent = `${formattedData} DATA`;
+    
+    // Tooltip shows precise DATA value and USD if available
+    let tooltipText = remainingData.toString();
+    if (dataPriceUSD && dataPriceUSD > 0) {
+        const usdValue = parseFloat(remainingData) * dataPriceUSD;
+        tooltipText += ` (~$${Utils.formatBigNumber(usdValue)})`;
+    }
+    element.setAttribute('data-tooltip-value', tooltipText);
+}
 
 /**
  * Fetch complete stream details including permissions
@@ -1378,6 +1464,8 @@ export const StreamsLogic = {
     stop() {
         logger.log('StreamsLogic: Stopping...');
         stopStreamPlayer();
+        stopRemainingBalanceTicker();
+        detailState.remainingBalanceData = null;
         
         // Destroy chart if exists
         if (detailState.chart) {
@@ -1411,6 +1499,10 @@ export const StreamsLogic = {
         // Stop any existing stream player and clear log before loading new stream
         await stopStreamPlayer();
         clearStreamPlayerLog();
+        
+        // Stop any existing remaining balance ticker
+        stopRemainingBalanceTicker();
+        detailState.remainingBalanceData = null;
         
         detailState.currentStreamId = streamId;
         detailState.currentSponsorshipId = sponsorshipId;
@@ -1585,9 +1677,15 @@ function renderStreamDetail(stream, isSponsored, sponsorshipId) {
             setText('sponsorship-contract-address', targetSponsorship.id);
         }
         
-        // Update header APY
+        // Update header APY with dynamic color
         const apy = parseFloat(targetSponsorship.spotAPY || 0);
-        setText('stream-header-apy', (apy * 100).toFixed(0) + '%');
+        const apyPercent = Math.round(apy * 100);
+        const apyEl = document.getElementById('stream-header-apy');
+        if (apyEl) {
+            apyEl.textContent = apyPercent + '%';
+            apyEl.className = apyEl.className.replace(/text-(green|red)-400/g, '');
+            apyEl.classList.add(apyPercent > 0 ? 'text-green-400' : 'text-red-400');
+        }
         
         // Update header stats for sponsorship
         updateSponsorshipHeaderStats(targetSponsorship);
@@ -1880,10 +1978,10 @@ function updateSponsorshipHeaderStats(sponsorship) {
         if (el) el.textContent = text;
     };
     
-    // Status badge
-    const now = Math.floor(Date.now() / 1000);
-    const insolvencyTs = parseInt(sponsorship.projectedInsolvency || 0);
-    const isActive = sponsorship.isRunning && insolvencyTs > now;
+    // Status badge - based on APY (active if APY > 0)
+    const apy = parseFloat(sponsorship.spotAPY || 0);
+    const apyPercent = Math.round(apy * 100);
+    const isActive = apyPercent > 0;
     
     if (isActive) {
         setHtml('stream-sponsorship-status', `
@@ -1911,6 +2009,7 @@ function updateSponsorshipHeaderStats(sponsorship) {
     setText('stream-header-payout', Utils.formatBigNumber(parseFloat(payoutPerDay)));
     
     // Expires date
+    const insolvencyTs = parseInt(sponsorship.projectedInsolvency || 0);
     if (insolvencyTs > 0) {
         const insolvencyDate = new Date(insolvencyTs * 1000);
         const day = String(insolvencyDate.getDate()).padStart(2, '0');
@@ -1947,16 +2046,37 @@ function renderSponsorshipDetails(sponsorship) {
     const totalSponsorships = Utils.convertWeiToData(sponsorship.cumulativeSponsoring || '0');
     setValueWithTooltip('stream-total-sponsored', totalSponsorships, Utils.formatBigNumber(totalSponsorships) + ' DATA');
     
-    // Remaining balance
+    // Remaining balance - set initial value then start ticker
+    const remainingWei = BigInt(sponsorship.remainingWei || '0');
+    const payoutWeiPerSec = BigInt(sponsorship.totalPayoutWeiPerSec || '0');
     const remaining = Utils.convertWeiToData(sponsorship.remainingWei || '0');
-    setValueWithTooltip('stream-remaining', remaining, Utils.formatBigNumber(remaining) + ' DATA');
+    
+    // Build tooltip text with USD if available
+    let remainingTooltip = remaining.toString();
+    if (state.dataPriceUSD && state.dataPriceUSD > 0) {
+        const usdValue = parseFloat(remaining) * state.dataPriceUSD;
+        remainingTooltip += ` (~$${Utils.formatBigNumber(usdValue)})`;
+    }
+    setValueWithTooltip('stream-remaining', remainingTooltip, Utils.formatBigNumber(remaining) + ' DATA');
+    
+    // Initialize and start remaining balance ticker if sponsorship is running and has balance
+    stopRemainingBalanceTicker(); // Stop any existing ticker
+    if (remainingWei > BigInt(0) && sponsorship.isRunning && payoutWeiPerSec > BigInt(0)) {
+        detailState.remainingBalanceData = {
+            remainingWei: remainingWei,
+            changePerSecond: payoutWeiPerSec,
+            lastUpdated: Date.now()
+        };
+        startRemainingBalanceTicker();
+    } else {
+        detailState.remainingBalanceData = null;
+    }
     
     // Total staked
     const totalStaked = Utils.convertWeiToData(sponsorship.totalStakedWei || '0');
     setValueWithTooltip('stream-total-staked', totalStaked, Utils.formatBigNumber(totalStaked) + ' DATA');
     
     // Payout rate (DATA/day) - calculate in wei first to avoid precision loss
-    const payoutWeiPerSec = BigInt(sponsorship.totalPayoutWeiPerSec || '0');
     const payoutWeiPerDay = payoutWeiPerSec * BigInt(86400);
     const payoutPerDay = Utils.convertWeiToData(payoutWeiPerDay.toString());
     setText('stream-payout-rate', Utils.formatBigNumber(parseFloat(payoutPerDay)));
