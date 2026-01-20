@@ -5,15 +5,24 @@
 
 /**
  * Parse date string from CSV format to UTC timestamp
- * Supports formats: "Dec 07, 2024", "2024-12-07", or "30/11/25 00:00"
+ * Supports formats: "Dec 07, 2024", "2024-12-07", "30/11/25 00:00", or "30/11/2025"
  */
 function parseDateFromCsv(dateString) {
     if (!dateString) return null;
     
+    // Try "30/11/2025" format (DD/MM/YYYY - 4-digit year, no time)
+    const ddmmyyyyMatch = dateString.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (ddmmyyyyMatch) {
+        const day = parseInt(ddmmyyyyMatch[1], 10);
+        const month = parseInt(ddmmyyyyMatch[2], 10) - 1; // 0-indexed
+        const year = parseInt(ddmmyyyyMatch[3], 10);
+        return Date.UTC(year, month, day);
+    }
+    
     // Try "30/11/25 00:00" format (DD/MM/YY HH:mm)
     const ddmmyyMatch = dateString.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})\s+\d{2}:\d{2}$/);
     if (ddmmyyMatch) {
-        const day = parseInt(ddmmyyMatch[1], 10)-1;
+        const day = parseInt(ddmmyyMatch[1], 10);
         const month = parseInt(ddmmyyMatch[2], 10) - 1; // 0-indexed
         let year = parseInt(ddmmyyMatch[3], 10);
         // Convert 2-digit year to 4-digit (assuming 2000s)
@@ -30,7 +39,7 @@ function parseDateFromCsv(dateString) {
     const match = dateString.match(/^([A-Za-z]{3})\s+(\d{1,2}),\s+(\d{4})$/);
     if (match) {
         const month = monthNames[match[1]];
-        const day = parseInt(match[2], 10)-1;
+        const day = parseInt(match[2], 10);
         const year = parseInt(match[3], 10);
         if (month !== undefined) {
             return Date.UTC(year, month, day);
@@ -42,7 +51,7 @@ function parseDateFromCsv(dateString) {
     if (isoMatch) {
         const year = parseInt(isoMatch[1], 10);
         const month = parseInt(isoMatch[2], 10) - 1;
-        const day = parseInt(isoMatch[3], 10)-1;
+        const day = parseInt(isoMatch[3], 10);
         return Date.UTC(year, month, day);
     }
     

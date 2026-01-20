@@ -200,15 +200,19 @@ async function loadFullHistory() {
 
 /**
  * Get historical price for a given date (unix timestamp in seconds)
+ * Normalizes timestamp to midnight UTC to match price map keys
  */
 function getHistoricalPrice(dateTimestamp) {
     if (!state.historicalDataPriceMap) return state.dataPriceUSD || 0;
     
-    let price = state.historicalDataPriceMap.get(dateTimestamp);
+    // Normalize to midnight UTC (same as price map keys)
+    const normalizedTimestamp = Math.floor(dateTimestamp / 86400) * 86400;
+    
+    let price = state.historicalDataPriceMap.get(normalizedTimestamp);
     
     if (!price) {
         for (let i = 1; i <= 7; i++) {
-            const priorDate = dateTimestamp - (i * 86400);
+            const priorDate = normalizedTimestamp - (i * 86400);
             price = state.historicalDataPriceMap.get(priorDate);
             if (price) break;
         }

@@ -404,8 +404,21 @@ async function initializeApp() {
         const streamrClient = new StreamrClient({ logLevel: 'error' });
         Services.setStreamrClient(streamrClient);
 
-        // Load CSV price data on startup
-        state.historicalDataPriceMap = await Services.fetchHistoricalDataPrice();
+        // Start historical price stream in background (non-blocking)
+        // App can start immediately while this loads
+        Services.setupHistoricalPriceStream();
+        
+        // Register callback for when historical data is loaded
+        Services.onHistoricalDataLoaded(({ priceMap, eurMap }) => {
+            state.historicalDataPriceMap = priceMap;
+            // Propagate to modules
+            if (OperatorLogic) {
+                OperatorLogic.setSharedState({ historicalDataPriceMap: priceMap });
+            }
+            if (DelegatorsLogic) {
+                DelegatorsLogic.setSharedState({ historicalDataPriceMap: priceMap });
+            }
+        });
 
         await Services.setupDataPriceStream((price) => {
             state.dataPriceUSD = price;

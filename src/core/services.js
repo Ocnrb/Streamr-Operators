@@ -6,6 +6,7 @@ import {
     OPERATOR_CONTRACT_ABI,
     STREAMR_CONFIG_ABI,
     DATA_PRICE_STREAM_ID,
+    DATA_HISTORY_STREAM_ID,
     POLYGON_RPC_URL,
     POLYGON_RPC_FALLBACKS,
     DELEGATORS_PER_PAGE,
@@ -31,7 +32,12 @@ let _etherscanApiKeyOverride = null;
 let streamrClient = null;
 let priceSubscription = null;
 let coordinationSubscription = null;
-let historicalDataPriceMap = null; 
+let historySubscription = null;
+let historicalDataPriceMap = null;
+let historicalEurRateMap = null;
+
+// Callbacks for notifying when historical data is loaded
+let historicalDataCallbacks = []; 
 
 // --- Centralized RPC Provider ---
 
@@ -581,33 +587,291 @@ function parseCSVSync(csvText) {
 }
 
 /**
- * Fetches and processes the historical DATA price from a local CSV file.
- * Uses Web Worker for non-blocking parsing when available.
- * Returns a Map where key is a UTC day timestamp (seconds) and value is the price.
+ * Parse date string from stream format (DD/MM/YYYY) to UTC timestamp in seconds
+ * @param {string} dateStr - Date in format "DD/MM/YYYY"
+ * @returns {number|null} UTC timestamp in seconds, or null if invalid
+ */
+function parseDateFromStream(dateStr) {
+    if (!dateStr) return null;
+    
+    // Match DD/MM/YYYY format
+    const match = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (!match) return null;
+    
+    const day = parseInt(match[1], 10);
+    const month = parseInt(match[2], 10) - 1; // 0-indexed
+    const year = parseInt(match[3], 10);
+    
+    // Create UTC date at midnight
+    const utcMs = Date.UTC(year, month, day);
+    return Math.floor(utcMs / 1000);
+}
+
+/**
+ * Process historical price data from stream message
+ * @param {Array|string|object} data - Array of price objects from stream (may be string or wrapped)
+ * @returns {{ priceMap: Map<number, number>, eurMap: Map<number, number> }}
+ */
+function processStreamHistoricalData(data) {
+    const priceMap = new Map();
+    const eurMap = new Map();
+    
+    // Handle different input formats
+    let parsedData = data;
+    
+    // If it's a string, try to parse as JSON
+    if (typeof data === 'string') {
+        try {
+            parsedData = JSON.parse(data);
+        } catch (e) {
+            console.error('[HistoryStream] Failed to parse string as JSON:', e.message);
+            return { priceMap, eurMap };
+        }
+    }
+    
+    // If the data is wrapped in an object (e.g., { data: [...] } or { content: [...] })
+    if (parsedData && typeof parsedData === 'object' && !Array.isArray(parsedData)) {
+        // Try common wrapper keys
+        const possibleArrayKeys = ['data', 'content', 'prices', 'history', 'records'];
+        for (const key of possibleArrayKeys) {
+            if (Array.isArray(parsedData[key])) {
+                parsedData = parsedData[key];
+                break;
+            }
+        }
+        
+        // If still not an array, check if it's an object with numeric keys (array-like)
+        if (!Array.isArray(parsedData) && parsedData) {
+            const keys = Object.keys(parsedData);
+            if (keys.length > 0 && keys.every(k => !isNaN(parseInt(k, 10)))) {
+                parsedData = Object.values(parsedData);
+            }
+        }
+    }
+    
+    if (!Array.isArray(parsedData)) {
+        console.warn('[HistoryStream] Invalid data format, expected array');
+        return { priceMap, eurMap };
+    }
+    
+    for (const entry of parsedData) {
+        const timestamp = parseDateFromStream(entry.date);
+        if (timestamp === null) continue;
+        
+        const price = parseFloat(entry.DATA_USD);
+        const eurRate = parseFloat(entry.USD_EUR);
+        
+        if (!isNaN(price)) {
+            // Keep highest price for each day (same logic as CSV)
+            const existing = priceMap.get(timestamp) || 0;
+            if (price > existing) {
+                priceMap.set(timestamp, price);
+            }
+        }
+        
+        if (!isNaN(eurRate)) {
+            eurMap.set(timestamp, eurRate);
+        }
+    }
+    
+    return { priceMap, eurMap };
+}
+
+/**
+ * Handle incoming historical data from stream
+ * Updates the maps and notifies callbacks
+ * @param {Array} message - Stream message data
+ * @param {boolean} isOverride - Whether this is overriding CSV fallback data
+ */
+function handleHistoricalStreamData(message, isOverride = false) {
+    try {
+        const { priceMap, eurMap } = processStreamHistoricalData(message);
+        
+        if (priceMap.size > 0) {
+            historicalDataPriceMap = priceMap;
+            historicalEurRateMap = eurMap;
+            
+            // Notify callbacks (they may have already been called with CSV data)
+            notifyHistoricalDataLoaded();
+            return true;
+        } else {
+            console.warn('[HistoryStream] Received empty data');
+            return false;
+        }
+    } catch (error) {
+        console.error('[HistoryStream] Error processing data:', error);
+        return false;
+    }
+}
+
+/**
+ * Fetch historical price from CSV file (fallback method)
+ * @returns {Promise<{ priceMap: Map, eurMap: Map }>}
+ */
+async function fetchHistoricalPriceFromCSV() {
+    const response = await fetch('/data/DATAHistoricalPrice.csv');
+    if (!response.ok) {
+        throw new Error(`Failed to fetch DATAHistoricalPrice.csv: ${response.statusText}`);
+    }
+    const csvText = await response.text();
+    
+    // Use Web Worker for parsing (non-blocking)
+    const priceMap = await parseCSVWithWorker(csvText);
+    
+    // CSV doesn't have EUR data, return empty map
+    return { priceMap, eurMap: new Map() };
+}
+
+/**
+ * Register a callback to be notified when historical data is loaded or updated
+ * @param {Function} callback - Callback function receiving { priceMap, eurMap }
+ */
+export function onHistoricalDataLoaded(callback) {
+    if (typeof callback === 'function') {
+        // Always register callback (may be called multiple times if stream overrides CSV)
+        historicalDataCallbacks.push(callback);
+        
+        // If data is already loaded, call immediately
+        if (historicalDataPriceMap) {
+            callback({ priceMap: historicalDataPriceMap, eurMap: historicalEurRateMap || new Map() });
+        }
+    }
+}
+
+/**
+ * Notify all registered callbacks that historical data is loaded/updated
+ */
+function notifyHistoricalDataLoaded() {
+    const data = { priceMap: historicalDataPriceMap, eurMap: historicalEurRateMap || new Map() };
+    for (const callback of historicalDataCallbacks) {
+        try {
+            callback(data);
+        } catch (e) {
+            console.error('[HistoricalData] Callback error:', e);
+        }
+    }
+    // Don't clear callbacks - they should be called again if stream overrides CSV
+}
+
+// Track if we've received stream data (to know if we need to override)
+let streamDataReceived = false;
+let csvFallbackLoaded = false;
+
+/**
+ * Setup historical price data stream subscription (runs in background)
+ * Subscribes to stream and starts 30s timer for CSV fallback
+ * Stream stays active and will override CSV data if it arrives later
+ * Non-blocking - app can start while this loads
+ */
+export async function setupHistoricalPriceStream() {
+    // Already loaded from stream
+    if (historicalDataPriceMap && streamDataReceived) {
+        return;
+    }
+    
+    if (!streamrClient) {
+        console.error('[HistoricalData] StreamrClient not initialized, falling back to CSV');
+        await loadCSVFallback();
+        return;
+    }
+    
+    // Reset state
+    streamDataReceived = false;
+    csvFallbackLoaded = false;
+    
+    // Start 30s timer for CSV fallback
+    const fallbackTimerId = setTimeout(async () => {
+        if (!streamDataReceived) {
+            await loadCSVFallback();
+        }
+    }, 30000);
+    
+    try {
+        
+        historySubscription = await streamrClient.subscribe(DATA_HISTORY_STREAM_ID, (message) => {
+            // Clear fallback timer if we get data before timeout
+            if (!streamDataReceived) {
+                clearTimeout(fallbackTimerId);
+            }
+            
+            const isOverride = csvFallbackLoaded;
+            streamDataReceived = true;
+            
+            handleHistoricalStreamData(message, isOverride);
+        });
+        
+    } catch (error) {
+        console.error('[HistoricalData] Subscription failed:', error.message);
+        clearTimeout(fallbackTimerId);
+        
+        // Subscription failed, load CSV immediately
+        await loadCSVFallback();
+    }
+}
+
+/**
+ * Load CSV fallback data
+ */
+async function loadCSVFallback() {
+    if (csvFallbackLoaded) return;
+    
+    try {
+        const { priceMap, eurMap } = await fetchHistoricalPriceFromCSV();
+        
+        // Only use CSV if we haven't received stream data yet
+        if (!streamDataReceived) {
+            historicalDataPriceMap = priceMap;
+            historicalEurRateMap = eurMap;
+            csvFallbackLoaded = true;
+            notifyHistoricalDataLoaded();
+        }
+        // If stream data already arrived, ignore CSV fallback
+    } catch (error) {
+        console.error('[HistoricalData] CSV fallback failed:', error);
+        
+        if (!streamDataReceived) {
+            showToast({ type: 'warning', title: 'Price Data Error', message: 'Failed to load historical price data.', duration: 6000 });
+            // Set empty maps so the app can continue
+            historicalDataPriceMap = new Map();
+            historicalEurRateMap = new Map();
+            notifyHistoricalDataLoaded();
+        }
+    }
+}
+
+/**
+ * Get the historical DATA price map.
+ * Returns cached data if available, or empty Map if still loading.
+ * Use onHistoricalDataLoaded() to be notified when data is ready.
+ * @returns {Map<number, number>}
+ */
+export function getHistoricalDataPriceMap() {
+    return historicalDataPriceMap || new Map();
+}
+
+/**
+ * Get the historical EUR rate map.
+ * Returns cached data if available, or empty Map if still loading.
+ * @returns {Map<number, number>}
+ */
+export function getHistoricalEurRateMap() {
+    return historicalEurRateMap || new Map();
+}
+
+/**
+ * @deprecated Use setupHistoricalPriceStream() for background loading instead.
+ * Fetches and processes the historical DATA price from a local CSV file (blocking).
+ * Kept for backward compatibility - now just returns cached data or empty Map.
  * @returns {Promise<Map<number, number>>}
  */
 export async function fetchHistoricalDataPrice() {
+    // Return cached data if available
     if (historicalDataPriceMap) {
         return historicalDataPriceMap;
     }
-
-    try {
-        const response = await fetch('/data/DATAHistoricalPrice.csv');
-        if (!response.ok) {
-            throw new Error(`Failed to fetch DATAHistoricalPrice.csv: ${response.statusText}`);
-        }
-        const csvText = await response.text();
-        
-        // Use Web Worker for parsing (non-blocking)
-        historicalDataPriceMap = await parseCSVWithWorker(csvText);
-        
-        return historicalDataPriceMap;
-
-    } catch (error) {
-        console.error("Error fetching or processing historical price data:", error);
-        showToast({ type: 'warning', title: 'Price Data Error', message: `Failed to load historical price data.`, duration: 6000 });
-        return new Map(); 
-    }
+    
+    // If not loaded yet, return empty map (background loading handles this)
+    return new Map();
 }
 
 // --- API (The Graph) ---
@@ -1908,6 +2172,10 @@ export async function cleanupClient() {
     if (priceSubscription) {
         try { await priceSubscription.unsubscribe(); } catch (e) { /* ignore */ }
         priceSubscription = null;
+    }
+    if (historySubscription) {
+        try { await historySubscription.unsubscribe(); } catch (e) { /* ignore */ }
+        historySubscription = null;
     }
     if (streamrClient) {
         try { await streamrClient.destroy(); } catch (e) { /* ignore */ }

@@ -178,6 +178,7 @@ export const STREAMR_CONFIG_ABI = [{ "inputs": [], "name": "minimumDelegationWei
 
 export const SUBGRAPH_ID = 'EGWFdhhiWypDuz22Uy7b3F69E9MEkyfU9iAQMttkH5Rj';
 export const DATA_PRICE_STREAM_ID = 'binance-streamr.eth/DATAUSDT/ticker';
+export const DATA_HISTORY_STREAM_ID = '0xd5a8024414f59cf0c453c35fc3655a31251645f6/DATA_History';
 export const POLYGON_RPC_URL = 'https://polygon-rpc.com';
 
 // Polygon RPC fallback URLs (used when primary RPC is rate limited)
