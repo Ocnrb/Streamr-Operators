@@ -2046,10 +2046,26 @@ function renderSponsorshipDetails(sponsorship) {
     const totalSponsorships = Utils.convertWeiToData(sponsorship.cumulativeSponsoring || '0');
     setValueWithTooltip('stream-total-sponsored', totalSponsorships, Utils.formatBigNumber(totalSponsorships) + ' DATA');
     
-    // Remaining balance - set initial value then start ticker
-    const remainingWei = BigInt(sponsorship.remainingWei || '0');
+    // Remaining balance - calculate real-time value from projectedInsolvency
+    // The indexed remainingWei can be stale, so we compute: remaining = (insolvency - now) * payoutPerSec
     const payoutWeiPerSec = BigInt(sponsorship.totalPayoutWeiPerSec || '0');
-    const remaining = Utils.convertWeiToData(sponsorship.remainingWei || '0');
+    const projectedInsolvency = parseInt(sponsorship.projectedInsolvency || 0);
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    
+    let remainingWei;
+    if (projectedInsolvency > 0 && projectedInsolvency > nowSeconds && payoutWeiPerSec > BigInt(0)) {
+        // Calculate real remaining based on time until insolvency
+        const secondsRemaining = BigInt(projectedInsolvency - nowSeconds);
+        remainingWei = secondsRemaining * payoutWeiPerSec;
+    } else if (projectedInsolvency > 0 && projectedInsolvency <= nowSeconds) {
+        // Already past insolvency
+        remainingWei = BigInt(0);
+    } else {
+        // No insolvency data, fall back to indexed value
+        remainingWei = BigInt(sponsorship.remainingWei || '0');
+    }
+    
+    const remaining = Utils.convertWeiToData(remainingWei.toString());
     
     // Build tooltip text with USD if available
     let remainingTooltip = remaining.toString();
