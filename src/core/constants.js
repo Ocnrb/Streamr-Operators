@@ -195,7 +195,7 @@ export const POLYGON_RPC_FALLBACKS = [
 // API Keys Configuration
 // ============================================
 // Default API key fallbacks (used when user hasn't configured their own)
-export const DEFAULT_GRAPH_API_KEY = '110f7c17d58082ad6f9110df12a870bc';
+export const DEFAULT_GRAPH_API_KEY = 'd6837383c1632c9f9419f95f0d31d04d';
 export const DEFAULT_ETHERSCAN_API_KEY = 'B8BXCXWR66RI1J2QYQRTT4SPHCC6VYYJHC';
 
 // LocalStorage keys for user-configured API keys
@@ -291,6 +291,7 @@ export const DELEGATOR_TIMEFRAMES = {
     '365': 365,
     'all': 'all'
 };
+
 
 
 
