@@ -264,6 +264,9 @@ async function fetchAllStreams(skip = 0) {
                     subscribeExpiration
                     publishExpiration
                 }
+                storageNodes(first: 1) {
+                    id
+                }
             }
         }
     `;
@@ -351,6 +354,14 @@ async function searchAllStreams(searchTerm) {
                 updatedAt
                 metadata
                 sponsorships(first: 1) {
+                    id
+                }
+                permissions(first: 10) {
+                    userAddress
+                    subscribeExpiration
+                    publishExpiration
+                }
+                storageNodes(first: 1) {
                     id
                 }
             }
@@ -734,6 +745,14 @@ function createAllStreamRowHtml(stream, index) {
     // Create partition pill (purple badge like in Live Data Viewer)
     const partitionPill = `<span class="px-1.5 py-0.5 bg-purple-500/20 text-purple-400 rounded text-[10px] font-medium">P${partitions}</span>`;
     
+    // Check if stream has storage nodes
+    const hasStorage = stream.storageNodes && stream.storageNodes.length > 0;
+    const storageIcon = hasStorage
+        ? `<svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" title="Has Storage">
+             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"/>
+           </svg>`
+        : '';
+    
     // Determine access control (public vs private)
     const accessType = determineAccessControl(stream.permissions);
     const isPublic = accessType === 'public-all' || accessType === 'public-subscribe';
@@ -759,6 +778,7 @@ function createAllStreamRowHtml(stream, index) {
                 <span class="font-mono text-sm group-hover:text-blue-400 transition-colors md:hidden" title="${Utils.escapeHtml(streamId)}">${Utils.escapeHtml(displayStreamIdMobile)}</span>
             </td>
             <td class="px-4 py-3 text-center">${sponsorshipIcon}</td>
+            <td class="px-4 py-3 text-center">${storageIcon}</td>
             <td class="px-4 py-3 text-center">${accessIcon}</td>
             <td class="px-4 py-3 text-center whitespace-nowrap">${partitionPill}</td>
             <td class="px-4 py-3 text-right text-gray-400 whitespace-nowrap hidden md:table-cell">${createdAt}</td>
