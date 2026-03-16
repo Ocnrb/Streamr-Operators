@@ -946,7 +946,7 @@ export async function executeActions(actions, operatorId, signer, onProgress, co
     // Get current gas prices from the network
     // Use fixed gasLimit like official plugin to avoid gas estimation failures
     // when stake actions are calculated before unstakes complete
-    const ACTION_GAS_LIMIT = 500000;
+    const ACTION_GAS_LIMIT = 800000;
     
     let gasSettings = {};
     try {
