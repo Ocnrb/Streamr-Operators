@@ -5,7 +5,6 @@ import {
     DATA_TOKEN_ABI,
     OPERATOR_CONTRACT_ABI,
     STREAMR_CONFIG_ABI,
-    DATA_PRICE_STREAM_ID,
     DATA_HISTORY_STREAM_ID,
     POLYGON_RPC_URL,
     POLYGON_RPC_FALLBACKS,
@@ -30,14 +29,17 @@ import { getFriendlyErrorMessage, convertWeiToData, parseDateFromCsv, parseOpera
 let _etherscanApiKeyOverride = null;
 
 let streamrClient = null;
-let priceSubscription = null;
 let coordinationSubscription = null;
 let historySubscription = null;
 let historicalDataPriceMap = null;
 let historicalEurRateMap = null;
 
 // Callbacks for notifying when historical data is loaded
-let historicalDataCallbacks = []; 
+let historicalDataCallbacks = [];
+
+// Callback for live price updates (extracted from DATA_History stream)
+let livePriceCallback = null;
+let currentLivePrice = null; 
 
 // --- Centralized RPC Provider ---
 
@@ -678,13 +680,74 @@ function processStreamHistoricalData(data) {
 }
 
 /**
+ * Extract and update live price from the stream data (first/most recent entry)
+ * @param {Array|Object} data - Raw stream message data
+ */
+function extractAndUpdateLivePrice(data) {
+    try {
+        let parsedData = data;
+        
+        // If it's a string, try to parse as JSON
+        if (typeof data === 'string') {
+            parsedData = JSON.parse(data);
+        }
+        
+        // If wrapped in an object, extract the array
+        if (parsedData && typeof parsedData === 'object' && !Array.isArray(parsedData)) {
+            const possibleArrayKeys = ['data', 'content', 'prices', 'history', 'records'];
+            for (const key of possibleArrayKeys) {
+                if (Array.isArray(parsedData[key])) {
+                    parsedData = parsedData[key];
+                    break;
+                }
+            }
+        }
+        
+        if (!Array.isArray(parsedData) || parsedData.length === 0) {
+            return;
+        }
+        
+        // Get the first (most recent) entry
+        const latestEntry = parsedData[0];
+        if (latestEntry && latestEntry.DATA_USD !== undefined) {
+            const price = parseFloat(latestEntry.DATA_USD);
+            if (!isNaN(price) && price > 0) {
+                currentLivePrice = price;
+                
+                // Update UI
+                const priceText = `$${price.toFixed(4)}`;
+                if (dataPriceValueEl) {
+                    dataPriceValueEl.textContent = priceText;
+                }
+                const mobilePriceEl = document.getElementById('mobile-data-price');
+                if (mobilePriceEl) {
+                    mobilePriceEl.textContent = priceText;
+                }
+                
+                // Notify callback
+                if (livePriceCallback) {
+                    livePriceCallback(price);
+                }
+                
+                logger.log(`[LivePrice] Updated from DATA_History: $${price.toFixed(4)} (date: ${latestEntry.date})`);
+            }
+        }
+    } catch (error) {
+        console.error('[LivePrice] Error extracting live price:', error);
+    }
+}
+
+/**
  * Handle incoming historical data from stream
- * Updates the maps and notifies callbacks
+ * Updates the maps, notifies callbacks, and extracts live price
  * @param {Array} message - Stream message data
  * @param {boolean} isOverride - Whether this is overriding CSV fallback data
  */
 function handleHistoricalStreamData(message, isOverride = false) {
     try {
+        // Extract live price from the most recent data point
+        extractAndUpdateLivePrice(message);
+        
         const { priceMap, eurMap } = processStreamHistoricalData(message);
         
         if (priceMap.size > 0) {
@@ -823,6 +886,37 @@ async function loadCSVFallback() {
             historicalDataPriceMap = priceMap;
             historicalEurRateMap = eurMap;
             csvFallbackLoaded = true;
+            
+            // Extract the most recent price from CSV as live price fallback
+            if (priceMap.size > 0 && !currentLivePrice) {
+                // Get the most recent timestamp (highest value)
+                const timestamps = Array.from(priceMap.keys()).sort((a, b) => b - a);
+                if (timestamps.length > 0) {
+                    const latestTimestamp = timestamps[0];
+                    const latestPrice = priceMap.get(latestTimestamp);
+                    if (latestPrice && latestPrice > 0) {
+                        currentLivePrice = latestPrice;
+                        
+                        // Update UI
+                        const priceText = `$${latestPrice.toFixed(4)}`;
+                        if (dataPriceValueEl) {
+                            dataPriceValueEl.textContent = priceText;
+                        }
+                        const mobilePriceEl = document.getElementById('mobile-data-price');
+                        if (mobilePriceEl) {
+                            mobilePriceEl.textContent = priceText;
+                        }
+                        
+                        // Notify callback
+                        if (livePriceCallback) {
+                            livePriceCallback(latestPrice);
+                        }
+                        
+                        logger.log(`[LivePrice] Fallback from CSV: $${latestPrice.toFixed(4)}`);
+                    }
+                }
+            }
+            
             notifyHistoricalDataLoaded();
         }
         // If stream data already arrived, ignore CSV fallback
@@ -856,6 +950,14 @@ export function getHistoricalDataPriceMap() {
  */
 export function getHistoricalEurRateMap() {
     return historicalEurRateMap || new Map();
+}
+
+/**
+ * Get the current live DATA price (extracted from DATA_History stream or CSV fallback)
+ * @returns {number|null} - Current price in USD or null if not yet loaded
+ */
+export function getCurrentLivePrice() {
+    return currentLivePrice;
 }
 
 /**
@@ -2111,27 +2213,34 @@ export function getStreamrClient() {
 }
 
 export async function setupDataPriceStream(onPriceUpdate) {
-    dataPriceValueEl.textContent = 'Subscribing...';
-    const mobilePriceEl = document.getElementById('mobile-data-price');
-    if (mobilePriceEl) mobilePriceEl.textContent = '...';
+    // Register callback - price is extracted from DATA_History stream
+    livePriceCallback = onPriceUpdate;
     
-    try {
-        if (priceSubscription) await priceSubscription.unsubscribe();
-        priceSubscription = await streamrClient.subscribe(DATA_PRICE_STREAM_ID, (message) => {
-            if (message && message.bestBid !== undefined) {
-                const price = parseFloat(message.bestBid);
-                const priceText = `$${price.toFixed(4)}`;
-                dataPriceValueEl.textContent = priceText;
-                if (mobilePriceEl) mobilePriceEl.textContent = priceText;
-                onPriceUpdate(price);
-            }
-        });
-        logger.log(`Subscribed to DATA price stream: ${DATA_PRICE_STREAM_ID}`);
-    } catch (error) {
-        console.error("Error setting up DATA price stream:", error);
-        dataPriceValueEl.textContent = 'Stream Error';
-        if (mobilePriceEl) mobilePriceEl.textContent = 'Error';
+    const mobilePriceEl = document.getElementById('mobile-data-price');
+    
+    // Show loading state
+    if (dataPriceValueEl) {
+        dataPriceValueEl.textContent = 'Loading...';
     }
+    if (mobilePriceEl) {
+        mobilePriceEl.textContent = '...';
+    }
+    
+    // If we already have a live price from DATA_History, use it immediately
+    if (currentLivePrice && currentLivePrice > 0) {
+        const priceText = `$${currentLivePrice.toFixed(4)}`;
+        if (dataPriceValueEl) {
+            dataPriceValueEl.textContent = priceText;
+        }
+        if (mobilePriceEl) {
+            mobilePriceEl.textContent = priceText;
+        }
+        if (onPriceUpdate) {
+            onPriceUpdate(currentLivePrice);
+        }
+    }
+    
+    logger.log('[LivePrice] Callback registered - price will be extracted from DATA_History stream');
 }
 
 export async function setupStreamrSubscription(operatorId, onMessageCallback) {
@@ -2169,10 +2278,8 @@ export async function unsubscribeFromCoordinationStream() {
 
 export async function cleanupClient() {
     await unsubscribeFromCoordinationStream();
-    if (priceSubscription) {
-        try { await priceSubscription.unsubscribe(); } catch (e) { /* ignore */ }
-        priceSubscription = null;
-    }
+    livePriceCallback = null;
+    currentLivePrice = null;
     if (historySubscription) {
         try { await historySubscription.unsubscribe(); } catch (e) { /* ignore */ }
         historySubscription = null;
